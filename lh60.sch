@@ -250,4 +250,72 @@ F18 "COL12" I L 4500 4450 50
 F19 "COL13" I L 4500 4550 50 
 F20 "COL14" I L 4500 4650 50 
 $EndSheet
+Wire Bus Line
+	4000 4900 4200 4900
+Entry Wire Line
+	3900 4500 4000 4600
+Entry Wire Line
+	3900 4600 4000 4700
+Entry Wire Line
+	3900 4700 4000 4800
+Wire Wire Line
+	3900 4500 3500 4500
+Wire Wire Line
+	3500 4600 3900 4600
+Wire Wire Line
+	3900 4700 3500 4700
+Entry Wire Line
+	4200 2900 4300 2800
+Wire Wire Line
+	4300 2800 4500 2800
+Entry Wire Line
+	4200 3000 4300 2900
+Wire Wire Line
+	4300 2900 4500 2900
+Entry Wire Line
+	4200 3100 4300 3000
+Wire Wire Line
+	4300 3000 4500 3000
+Entry Wire Line
+	4200 3200 4300 3100
+Wire Wire Line
+	4300 3100 4500 3100
+Entry Wire Line
+	4200 3300 4300 3200
+Wire Wire Line
+	4300 3200 4500 3200
+Wire Bus Line
+	4200 2550 4200 4900
+Wire Bus Line
+	4000 3100 4000 4900
+Text Label 3700 4400 0    50   ~ 0
+ROW5
+Text Label 3700 4300 0    50   ~ 0
+ROW4
+Text Label 3700 4200 0    50   ~ 0
+ROW3
+Text Label 3700 4100 0    50   ~ 0
+ROW2
+Text Label 3700 4000 0    50   ~ 0
+ROW1
+Wire Wire Line
+	3500 4400 3900 4400
+Wire Wire Line
+	3900 4300 3500 4300
+Wire Wire Line
+	3500 4200 3900 4200
+Wire Wire Line
+	3900 4100 3500 4100
+Wire Wire Line
+	3500 4000 3900 4000
+Entry Wire Line
+	3900 4400 4000 4500
+Entry Wire Line
+	3900 4300 4000 4400
+Entry Wire Line
+	3900 4200 4000 4300
+Entry Wire Line
+	3900 4100 4000 4200
+Entry Wire Line
+	3900 4000 4000 4100
 $EndSCHEMATC
