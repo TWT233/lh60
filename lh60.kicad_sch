@@ -3581,10 +3581,7 @@
       (reference "S3") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.75u")
     )
     (path "/00000000-0000-0000-0000-0000622a1cb9/c0acb86d-7830-44c8-bf63-597144d839ba"
-      (reference "S4") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.25u")
-    )
-    (path "/00000000-0000-0000-0000-0000622a1cb9/57db30ca-1c0b-4db9-8817-f14c4cd7a51d"
-      (reference "S5") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.00u")
+      (reference "S4") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.00u")
     )
     (path "/00000000-0000-0000-0000-0000622a1cb9/847fbff6-b0ff-4015-9077-7dbd6d672279"
       (reference "S6") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.25u")
@@ -3597,9 +3594,6 @@
     )
     (path "/00000000-0000-0000-0000-0000622a1cb9/d2834a4c-5a90-45f1-ab3c-5470dbdd7c9c"
       (reference "S9") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.00u")
-    )
-    (path "/00000000-0000-0000-0000-0000622a1cb9/497965ee-05ee-45f8-8276-825e3f3b3cf9"
-      (reference "S10") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.00u")
     )
     (path "/00000000-0000-0000-0000-0000622a1cb9/8385eb10-2e83-45ed-8a85-9372df2e0b25"
       (reference "S11") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.25u")
@@ -3776,7 +3770,7 @@
       (reference "S68") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.00u")
     )
     (path "/00000000-0000-0000-0000-0000622a1cb9/6c37d440-62a4-43b6-bbf9-34294352d5a8"
-      (reference "S69") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.25u")
+      (reference "S69") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.00u")
     )
     (path "/00000000-0000-0000-0000-0000622a1cb9/8fc793b7-d229-4a34-8977-0fd576956fb5"
       (reference "S70") (unit 1) (value "MX1A") (footprint "mx1a:KaiHua_Contact_1.75u")
