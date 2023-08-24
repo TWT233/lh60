@@ -30,3 +30,6 @@ fp-info-cache
 
 # File Lock
 *.lck
+
+# Generated Gerber/Drill
+FabOutput/

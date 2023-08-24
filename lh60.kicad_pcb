@@ -77,7 +77,7 @@
       (mirror false)
       (drillshape 0)
       (scaleselection 1)
-      (outputdirectory "C:/Users/TWT23/Desktop/gbr/")
+      (outputdirectory "FabOutput")
     )
   )
 
@@ -12902,9 +12902,9 @@
       (stroke (width 0.1) (type solid)) (layer "B.Fab") (tstamp f209d3d1-ec1c-4681-a299-2f33f3818d80))
     (fp_line (start 1.6 0.8) (end 1.6 -0.8)
       (stroke (width 0.1) (type solid)) (layer "B.Fab") (tstamp 2a13acaf-e15c-4625-95d8-3800ec5111d6))
-    (pad "1" smd roundrect (at -1.5625 0) (size 1.325 1.8) (layers "B.Cu" "B.Paste" "B.Mask") (roundrect_rratio 0.188679)
+    (pad "1" smd roundrect (at -1.5625 0) (size 1.325 1.8) (layers "B.Cu" "B.Paste" "B.Mask") (roundrect_rratio 0.1886792453)
       (net 6 "+5V") (pintype "passive") (tstamp df4c8622-f650-49fc-bb47-d96f9d75ad0c))
-    (pad "2" smd roundrect (at 1.5625 0) (size 1.325 1.8) (layers "B.Cu" "B.Paste" "B.Mask") (roundrect_rratio 0.188679)
+    (pad "2" smd roundrect (at 1.5625 0) (size 1.325 1.8) (layers "B.Cu" "B.Paste" "B.Mask") (roundrect_rratio 0.1886792453)
       (net 2 "GND") (pintype "passive") (tstamp b5e2790b-5d5a-470e-bea9-7658ea98a079))
     (model "${KICAD6_3DMODEL_DIR}/Capacitor_SMD.3dshapes/C_1206_3216Metric.wrl"
       (offset (xyz 0 0 0))
