@@ -4,6 +4,7 @@
 # Misc
 ## Apple DS Store
 .DS_Store
+.worktrees/
 
 # Temporary files
 *.000
