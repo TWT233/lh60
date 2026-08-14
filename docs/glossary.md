@@ -47,8 +47,8 @@ Kailh Choc 之外的另一种 15×15 mm 矮轴家族（Gateron 低剖面），MX
 
 ## 键距（Key pitch）
 
-相邻 1u 键中心距：Choc 紧凑生态 18×17 mm（MBK/CFX/LDSA 键帽）；MX/Gateron LP 标准 19.05×19.05 mm。
-两者不可混用。当前 KLE 语义单位（u）不变，mm 换算随键距决策而定。
+相邻 1u 键中心距。本板已定 **19.05×19.05 mm（MX 键帽生态，15u = 285.75 mm）**；
+Choc 紧凑生态的 18×17 mm（MBK/CFX/LDSA）不采用。KLE 单位（u）与 mm 换算按 19.05 执行。
 
 ## 卫星轴（Stabilizer）
 
