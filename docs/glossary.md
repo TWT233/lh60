@@ -1,6 +1,6 @@
 # LH60 术语表
 
-> 随设计迭代持续补充；本会话由 `grill-with-docs` 工作流生成。
+> 当前术语口径。先读 `docs/current-baseline.md`；历史推导在 `docs/archive/`。
 
 ## 配列（Layout）
 
@@ -35,7 +35,7 @@ Gateron LP / KS-33 PTH 镀铜座；普通 1U 可用 `Gateron-LP-or-ChocV1-Hotswa
 > ⚠️ 本会话拷问发现：旋转只能解决焊盘交错，**无法解决座体/轴孔重叠**。
 > 实测两座共存最小中心距：kiswitch V1/V2 座 同向 14.76 mm / 180° 13.22 mm；
 > Kailh CPG151101S11（KaiHua contact）同向 16.20 mm / 180° 12.16 mm。
-> 当前 KLE 冲突区中心距 9.0–11.25 mm，全部低于下限（见 ADR-0002、grill-002）。
+> 这是历史 Choc/KaiHua 证伪结论；当前 Gateron PTH 多配列策略见 `docs/current-baseline.md`。
 
 ## 冲突区（Conflict zone）
 
@@ -85,4 +85,5 @@ keyboard-layout-editor.com 的配列 JSON 格式；同一行多个数组表示�
 
 ## ADR
 
-Architecture Decision Record：记录一个决策的背景、选项、结论与后果，随设计沉淀。
+Architecture Decision Record：记录一个决策的背景、选项、结论与后果。早期 ADR 已归档到
+`docs/archive/adr/`，可能包含 superseded 结论。

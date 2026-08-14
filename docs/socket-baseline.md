@@ -1,6 +1,6 @@
-# LH60 拷问报告 #005：定库与双座方案
+# LH60 Socket 基线
 
-> 生成：2026-08-15 · grill-with-docs 第五轮
+> 当前 socket 基线文档；总体入口见 `docs/current-baseline.md`。历史第五轮拷问记录已吸收到本文。
 
 ## 1. 裁决
 
