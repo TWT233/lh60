@@ -1,0 +1,13 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "mxv2_Gateron_KS33_Hotswap")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/../lib/mxv2/Gateron_KS33_Hotswap.pretty")
+    (options "")
+    (descr "Gateron LP (KS-27/KS-33) hotswap sockets, ai03 MX_V2 (MIT)"))
+  (lib (name "mxv2_Kailh_PG1353_Hotswap")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/../lib/mxv2/Kailh_PG1353_Hotswap.pretty")
+    (options "")
+    (descr "Kailh Choc V2 (PG1353) hotswap sockets, ai03 MX_V2 (MIT)"))
+)
