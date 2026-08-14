@@ -1,5 +1,7 @@
 (fp_lib_table
 	(version 7)
 	(lib (name "keysw_siderakb") (type "KiCad") (uri "${KIPRJMOD}/../lib/keysw-siderakb") (options "") (descr "siderakb/key-switches.pretty: MX/Choc/Gateron LP hotswap + THT (CERN-OHL-P v2)"))
-	(lib (name "lh60_sockets") (type "KiCad") (uri "${KIPRJMOD}/../lib/lh60-sockets") (options "") (descr "LH60: Gateron LP pure-socket 1U-2.75U + Gateron/ChocV1 dual 1U (beekeeb production geometry)"))
+	(lib (name "Gateron_KS33_Hotswap") (type "KiCad") (uri "C:/Users/TWT23/Documents/kbd/lh60/.worktrees/lh60-rp2040-v2/lib/mxv2/Gateron_KS33_Hotswap.pretty") (options "") (descr ""))
+	(lib (name "lh60-sockets") (type "KiCad") (uri "C:/Users/TWT23/Documents/kbd/lh60/.worktrees/lh60-rp2040-v2/lib/lh60-sockets") (options "") (descr "LH60 sockets: siderakb PTH base + U keycap frames, 1U Gateron/ChocV1 dual"))
+	(lib (name "Kailh_PG1353_Hotswap") (type "KiCad") (uri "C:/Users/TWT23/Documents/kbd/lh60/.worktrees/lh60-rp2040-v2/lib/mxv2/Kailh_PG1353_Hotswap.pretty") (options "") (descr ""))
 )

@@ -1,55 +1,38 @@
-# lh60-sockets — LH60 项目自用座子库
+# lh60-sockets — LH60 座子库（siderakb PTH 基底 + U 线框）
 
-以 **siderakb/beekeeb 量产几何为准**（Gateron LP 热插拔座：B.Cu SMD 焊盘 +
-3 个非镀通孔，无 THT 引脚、无电气孔），键帽轮廓取自 ai03 MX_V2 的图形。
-
-座子几何（相对中心）：
-
-| 项目 | 位置 | 尺寸 |
-|---|---|---:|
-| 开关孔 NPTH | (0,0) | φ5.25 |
-| 定位孔 NPTH | (−4.4,4.7) / (2.6,5.75) | φ3 |
-| SMD 焊盘（B.Cu） | (−8.075,4.7) / (6.275,5.75) | 2.5×2.55 |
+本版本**基于 siderakb `SW_Gateron_LowProfile_HotSwap_PTH`（镀铜电气孔）**，
+仅增加各 U 数的外圈键帽线框，并做噪声清理。旧版（beekeeb 纯 NPTH）已删除。
 
 ## 封装清单
 
-**Gateron LP 纯座子（各 U 数辅助封装）**——键帽轮廓按 U 数缩放：
+| 文件 | 说明 |
+|---|---|
+| `Gateron-LP-Hotswap-Socket-1U / 1.25U / 1.5U / 1.75U / 2U / 2.25U / 2.75U` | Gateron LP 热插拔座（PTH 镀铜），仅 Gateron |
+| `Gateron-LP-or-ChocV1-Hotswap-Socket-1U` | 双兼容：正置 Gateron（焊盘 1/2）+ 倒置 180° Choc V1（焊盘 3/4），每键只焊一个座子 |
 
-- `Gateron-LP-Hotswap-Socket-1U / 1.25U / 1.5U / 1.75U / 2U / 2.25U / 2.75U`
+## 清理与线框（按需求 1–3、5）
 
-**Gateron LP 或 Choc V1 双座（1U，字母/符号区用）**：
+- **无 courtyard**（F/B.CrtYd 全部删除）——消除多座子重叠时的 courtyard 检查噪声；
+- **无 F.Fab 图形**——只保留隐藏的 value 文字；
+- **F.SilkS 只画外圈键帽框**（`fp_rect`，宽 = U×19.05，高 19.05，中心对齐），
+  原 siderakb 丝印全部删除，不画内圈轴框；
+- B.SilkS / B.Fab 保持 siderakb 原样（座子侧参考）。
 
-- `Gateron-LP-or-ChocV1-Hotswap-Socket-1U`
+## 双座（1U）
 
-  同一键位中心两套座子图案：正置 Gateron（焊盘 1/2，+y 半区）+ 倒置 180°
-  Choc V1 热插拔座（焊盘 3/4，−y 半区）。跨座子最小余量 +0.62mm（实测 DRC 干净）。
-  用法：每个键**只焊其中一个座子**；装 Gateron 轴用 1/2 焊盘，装 Choc V1 轴用
-  3/4 焊盘（Choc 座焊 180° 朝向，Choc 轴也需旋转 180° 插入，键帽方向不受影响）。
-  四个焊盘是同一按键的替代触点，布线时全部接同一行列网络。
-  注意：**Choc V2 不可行**——其定位孔倒置后与 Gateron 的 φ3 孔冲突（−0.25mm）。
+Gateron PTH 0° + Choc V1 PTH 180°，中心开关孔合并为 φ5.25（NPTH）。
+焊盘 1/2 = Gateron（thru + smd），3/4 = Choc V1（thru + smd）；四焊盘属同一
+按键的替代触点，布线接同一行列网络。**Choc V2 无法并入**：其定位孔 (5,−5.15)
+倒置后落在 (−5,5.15)，与 Gateron 的 φ3 孔距离 0.75mm，孔壁重叠（实测 −0.25）。
 
-所有焊盘默认在 B.Cu（座子焊板底，与 Gateron 官方一致）；每键位中心放一个座子即可
-（键帽包络只是图形，座子本身恒为 1U）。
+## 关于 `SW_Kailh_Choc_V1V2_HotSwap_Hybrid` 右上角铜通孔
 
-## Courtyard
-
-- Gateron 纯座子各 U 数：采用 beekeeb 量产版 courtyard——16.5×16.5 方框
-  （`fp_rect (8.25,-8.25)-( -8.25,8.25)`，F.CrtYd），对称形状翻转后无方向问题；
-- 双座：courtyard 覆盖两套座子全部特征（20×15，F.CrtYd）。
-
-## 为什么用非镀通孔（不保留铜）
-
-**实测更新（2026-08-15）**：保留镀铜（siderakb PTH 版）在 RShift 三方案与
-双座方案中 DRC 均 0 违规，且顺带保留"无底座直焊"能力。纯 NPTH 仍是余量
-更大的选择（多 ~0.3–0.5mm），且能避开 RShift 右侧那处 0.07mm 制造紧点。
-两版均可使用，按制造余量偏好选择。
+那是 **Choc V2 开关定位销的过孔**（混合座为兼容 V1/V2 而设，镀铜）。双座方案
+不用混合座（混合座 180° 时该孔撞 Gateron 孔），故本库不含它；`keysw_siderakb`
+原库中的混合座保持原样，仅作独立封装参考。
 
 ## 来源与协议
 
-- 座子几何：beekeeb Corne GLP（在售产品，MIT）量产 PCB 内嵌封装提取；与
-  siderakb `HotSwap_THT` 同几何，删去了其"无底座直焊"兼容用的 THT 引脚/电气孔。
-- 键帽轮廓图形：ai03-2725/MX_V2（MIT）`Gateron_KS33_Hotswap.pretty`。
-- Choc V1 座子图案：siderakb/key-switches.pretty（CERN-OHL-P v2）。
-
-协议：beekeeb Corne GLP（MIT）；几何源自 siderakb/key-switches.pretty
-（CERN-OHL-P v2）。
+- 座子几何：siderakb/key-switches.pretty `SW_Gateron_LowProfile_HotSwap_PTH`
+  与 `SW_Kailh_Choc_V1_HotSwap_PTH`（CERN-OHL-P v2），未改几何；
+- 键帽框与清理：本库自行生成。
