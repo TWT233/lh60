@@ -4,10 +4,13 @@
 
 ## 1. 裁决
 
-1. **以 siderakb/beekeeb 量产几何为准**（B.Cu SMD + 3 个 NPTH，无 THT 引脚/电气孔）；
-2. **新增各 U 数辅助封装**（Gateron LP 纯座子 1U–2.75U，键帽轮廓取自 ai03）；
-3. **字母/符号键（1U、无需多配列）采用"正置 Gateron + 倒置 Choc V1"双座**，
-   用户可按区装 Gateron LP 或 Choc V1 轴。
+1. **以 siderakb PTH 镀铜几何为当前基线**（`SW_Gateron_LowProfile_HotSwap_PTH`）；
+2. **新增各 U 数辅助封装**（Gateron LP PTH 1U–2.75U，键帽轮廓取自 ai03）；
+3. **字母/符号键（1U、无需多配列）采用"正置 Gateron + 倒置 Choc V1"双座**；
+4. **不承诺 Choc V2**：V2 角落定位脚会与 Gateron PTH 孔冲突，不能并入双座。
+
+> Superseded：早期"以 beekeeb 纯 NPTH 几何为准、删除电气孔/THT"的判断已被后续 PTH
+> 实测推翻。纯 NPTH 仍可作为余量更大的备选，不是当前主基线。
 
 ## 2. 双座几何验证（真实封装数值）
 
@@ -26,14 +29,28 @@ Choc V2 兼容，否则无法并入双座。
 
 KiCad 10 实测：双座封装自检 DRC 干净（0 footprint errors、0 孔/铜违规）。
 
-### 2.1 Courtyard 修正
+### 2.1 同时焊两种座子的状态
+
+双座的保守装配语义是"每键二选一焊接"：焊 Gateron 或焊 Choc V1。若目标是用户后续
+免焊换轴，则同一 1U 键位需要 **两种 socket 同时焊接**。目前结论分层如下：
+
+| 层面 | 结论 |
+|---|---|
+| 电气/钻孔 | ✅ 源封装复核通过；非合并孔在 0.2mm copper/hole clearance、0.25mm hole-to-hole 下无违规 |
+| Choc V1 socket 外形 | ✅ Kailh `CPG135001S30` 官方/LCSC 规格图显示外形约 13.15×6.85mm，推荐 PCB 主孔中心距 5.00mm、孔径 φ3.00 |
+| Gateron KS-33 开关孔位 | ✅ Gateron 官网规格书显示 15×15mm switch、中心孔 φ5.25，以及 5.00/3.20/5.75/4.70/2.60/4.40mm 等 PCB layout 标注 |
+| Gateron hotswap socket 实体外形 | ⚠️ 未找到公开官方 socket 外形图；需实物测量或 coupon 验证 |
+
+因此：**可以把双座同时焊接作为免焊换轴目标保留，但量产承诺前必须做 1U coupon 实物验证**。
+
+### 2.2 Courtyard 修正
 
 初版封装沿用了 ai03 的 courtyard（按 ai03 镜像几何的座子轮廓画的），与
 beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 −6.65）。
 已替换为 beekeeb 量产版 courtyard：16.5×16.5 方框（对称，翻转无方向问题）；
 双座用覆盖全部特征的 20×15 方框。验证：DRC 0 footprint errors。
 
-### 2.2 "保留镀铜" 验证：会影响方案
+### 2.3 "保留镀铜" 验证
 
 **修正（2026-08-15）：保留镀铜不影响方案，两个方案实测均成立。**
 
@@ -60,7 +77,7 @@ beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 
 
 - 双座封装焊盘编号：1/2 = Gateron，3/4 = Choc；四个焊盘同属一键，接同一行列网络；
 - Choc 座焊 180°、Choc 轴也旋转 180° 插入（键帽沿十字轴旋转不受影响）；
-- 每键只焊一个座子；未焊座子的备用焊盘空置即可；
+- 默认每键只焊一个座子；若追求用户免焊换轴，可两种座子都焊，但必须先通过实物 coupon；
 - 双座仅 1U（字母/符号区）；需多配列的键仍用单 Gateron 座 + 布局替代方案。
 
 ## 4. 交付

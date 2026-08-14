@@ -45,11 +45,9 @@ ai03 MX_V2 与 siderakb/beekeeb 的 Gateron LP 座子几何不一致（焊盘位
 → 定稿前需用卡尺实测真实座子，确认以哪版几何为准；若以 siderakb 为准，
 当前摆法只需微调（改一个旋转或挪 0.1 mm 级）。
 
-**用户裁决（2026-08-14）：不需要兼容"无底座直焊"，故不采用 siderakb 为兼容
-而加的电气孔/THT 引脚版本；以 beekeeb 量产"纯座子"几何为准**（B.Cu SMD +
-3 个 NPTH）。该几何已提取为 `lib/lh60-sockets/Gateron-LP-Hotswap-Socket-1U`
-并注册到 fp-lib-table。用纯几何重算用户摆法：**全部共存**，最紧两对 7.14 mm
-余量 +0.32 / +1.38 mm，9.53 mm 对余 +0.60 / +1.65 mm。
+> Superseded（2026-08-15）：后续实测确认 siderakb `HotSwap_PTH` 镀铜版本可行，
+> 当前 `lh60-sockets` 以 PTH 镀铜几何为基线；纯 NPTH/beekeeb 几何仅作为余量更大的备选。
+> 早期"不采用 PTH / 以纯座子为准"不再是当前结论。
 
 ### 3.2 ±90° 座子需配合 ±90° 插轴
 

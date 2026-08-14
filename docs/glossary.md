@@ -12,7 +12,9 @@
 
 ## 热插拔座（Hot-swap socket）
 
-预先焊在 PCB 背面的 SMD 座子，用户把轴直接插入即可，无需焊接。本板选用 Kailh **Choc V1/V2 双兼容**座（kiswitch `SW_Hotswap_Kailh_Choc_V1V2(_Plated)_*`）。
+预先焊在 PCB 背面的座子，用户把轴直接插入即可，无需焊接。本板当前主线是
+Gateron LP / KS-33 PTH 镀铜座；普通 1U 可用 `Gateron-LP-or-ChocV1-Hotswap-Socket-1U`
+兼容 Gateron LP 与 Choc V1。Choc V2 不纳入该双座封装。
 
 ## 0 焊接
 
@@ -43,7 +45,8 @@
 ## Gateron LP（KS-33）
 
 Kailh Choc 之外的另一种 15×15 mm 矮轴家族（Gateron 低剖面），MX 兼容轴心、标准键距 19.05 mm。
-与 Choc V1/V2 引脚布局不同，能否共用热插拔座待查证；若确认兼容，可保留"双轴"卖点。
+与 Choc 引脚布局不同；当前用自有 1U 双座封装与 Choc V1 兼容。Gateron LP 与
+Choc V1/V2 hybrid 不能同中心叠加，原因是 Choc V2 角落定位脚会撞 Gateron PTH 孔。
 
 ## 键距（Key pitch）
 
@@ -65,6 +68,8 @@ Choc 紧凑生态的 18×17 mm（MBK/CFX/LDSA）不采用。KLE 单位（u）与
 ## Choc V1 / V2
 
 Kailh 矮轴两代：V1（PG1350，5 针含固定脚、Choc 专用轴心）、V2（PG1353，3 针、MX 十字轴心）。外壳同为 15×15 mm、定位板开孔 14×14，键帽互不通用。双兼容座同时吃两种。
+在 Choc-only 设计中可用 V1/V2 hybrid footprint 兼容两代；在本板的 Gateron+Choc
+1U 双座中只支持 Choc V1，不支持 Choc V2。
 
 ## 18×17
 
