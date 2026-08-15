@@ -1,0 +1,303 @@
+{
+  "region": "top-right",
+  "solved": false,
+  "placements": [
+    {
+      "socket_ref": "r0_top_2u",
+      "footprint": "Gateron-LP-Hotswap-Socket-2U",
+      "center_x_mm": 266.7,
+      "center_y_mm": 9.525,
+      "rotation_deg": 180,
+      "logical_node_id": "r0_top_2u"
+    },
+    {
+      "socket_ref": "r0_top_split_left_fn_1u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "center_x_mm": 257.175,
+      "center_y_mm": 9.525,
+      "rotation_deg": 270,
+      "logical_node_id": "r0_top_split_left_fn_1u"
+    },
+    {
+      "socket_ref": "r0_top_split_right_1u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "center_x_mm": 276.225,
+      "center_y_mm": 9.525,
+      "rotation_deg": 0,
+      "logical_node_id": "r0_top_2u"
+    }
+  ],
+  "minimum_copper_clearance_mm": 4.700598366165726,
+  "minimum_hole_edge_clearance_mm": 2.828820892142721,
+  "minimum_courtyard_clearance_mm": -0.5678291350924366,
+  "hole_edge_target_met": true,
+  "drc_status": "blocked",
+  "blocking_conflicts": [
+    {
+      "domain": "courtyard",
+      "items": [
+        "r0_top_2u",
+        "r0_top_split_right_1u"
+      ],
+      "actual_mm": -0.5678291350924366,
+      "required_mm": 0.0,
+      "shortfall_mm": 0.5678291350924366
+    }
+  ],
+  "coupon_drc": {
+    "project": "/tmp/lh60-region-top-right-clean/lh60-region-top-right.kicad_pcb",
+    "tool": "Konnect run_drc",
+    "status": "blocked",
+    "violations": 1,
+    "errors": 1,
+    "warnings": 0,
+    "unconnected_items": 0,
+    "source_series": {
+      "r0_top_2u": "Gateron-LP",
+      "r0_top_split_left_fn_1u": "Gateron-LP",
+      "r0_top_split_right_1u": "Gateron-LP"
+    },
+    "library_nickname": "lh60-sockets",
+    "library_path": "lib/lh60-sockets",
+    "findings": [
+      {
+        "severity": "error",
+        "description": "Courtyards overlap"
+      }
+    ]
+  },
+  "source_series": {
+    "r0_top_2u": "Gateron-LP",
+    "r0_top_split_left_fn_1u": "Gateron-LP",
+    "r0_top_split_right_1u": "Gateron-LP"
+  },
+  "upgrade_attempts": [
+    {
+      "socket_ref": "r0_top_2u",
+      "retained": false,
+      "result": {
+        "region": "top-right",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r0_top_2u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-2U",
+            "center_x_mm": 266.7,
+            "center_y_mm": 9.525,
+            "rotation_deg": 0,
+            "logical_node_id": "r0_top_2u"
+          },
+          {
+            "socket_ref": "r0_top_split_left_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 257.175,
+            "center_y_mm": 9.525,
+            "rotation_deg": 270,
+            "logical_node_id": "r0_top_split_left_fn_1u"
+          },
+          {
+            "socket_ref": "r0_top_split_right_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 9.525,
+            "rotation_deg": 90,
+            "logical_node_id": "r0_top_2u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 3.275000000000034,
+        "minimum_hole_edge_clearance_mm": 0.549099999999977,
+        "minimum_courtyard_clearance_mm": -2.0662643315954257,
+        "hole_edge_target_met": true,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "courtyard",
+            "items": [
+              "r0_top_2u",
+              "r0_top_split_right_1u"
+            ],
+            "actual_mm": -2.0662643315954257,
+            "required_mm": 0.0,
+            "shortfall_mm": 2.0662643315954257
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r0_top_2u",
+              "r0_top_split_left_fn_1u"
+            ],
+            "actual_mm": -0.8355455302254765,
+            "required_mm": 0.0,
+            "shortfall_mm": 0.8355455302254765
+          }
+        ]
+      }
+    },
+    {
+      "socket_ref": "r0_top_split_left_fn_1u",
+      "retained": false,
+      "result": {
+        "region": "top-right",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r0_top_2u",
+            "footprint": "Gateron-LP-Hotswap-Socket-2U",
+            "center_x_mm": 266.7,
+            "center_y_mm": 9.525,
+            "rotation_deg": 0,
+            "logical_node_id": "r0_top_2u"
+          },
+          {
+            "socket_ref": "r0_top_split_left_fn_1u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+            "center_x_mm": 257.175,
+            "center_y_mm": 9.525,
+            "rotation_deg": 180,
+            "logical_node_id": "r0_top_split_left_fn_1u"
+          },
+          {
+            "socket_ref": "r0_top_split_right_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 9.525,
+            "rotation_deg": 90,
+            "logical_node_id": "r0_top_2u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": 0.5490999999999773,
+        "minimum_courtyard_clearance_mm": -4.5017093403324395,
+        "hole_edge_target_met": true,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r0_top_2u",
+              "r0_top_split_left_fn_1u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r0_top_2u",
+              "r0_top_split_left_fn_1u"
+            ],
+            "actual_mm": -4.5017093403324395,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.5017093403324395
+          }
+        ]
+      }
+    },
+    {
+      "socket_ref": "r0_top_split_right_1u",
+      "retained": false,
+      "result": {
+        "region": "top-right",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r0_top_2u",
+            "footprint": "Gateron-LP-Hotswap-Socket-2U",
+            "center_x_mm": 266.7,
+            "center_y_mm": 9.525,
+            "rotation_deg": 180,
+            "logical_node_id": "r0_top_2u"
+          },
+          {
+            "socket_ref": "r0_top_split_left_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 257.175,
+            "center_y_mm": 9.525,
+            "rotation_deg": 0,
+            "logical_node_id": "r0_top_split_left_fn_1u"
+          },
+          {
+            "socket_ref": "r0_top_split_right_1u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 9.525,
+            "rotation_deg": 0,
+            "logical_node_id": "r0_top_2u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": 0.5491000000000341,
+        "minimum_courtyard_clearance_mm": -4.5017093403324,
+        "hole_edge_target_met": true,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r0_top_2u",
+              "r0_top_split_right_1u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r0_top_2u",
+              "r0_top_split_right_1u"
+            ],
+            "actual_mm": -4.5017093403324,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.5017093403324
+          }
+        ]
+      }
+    }
+  ],
+  "minimum_change_alternatives": [
+    {
+      "type": "center-offset",
+      "socket_ref": "r0_top_2u",
+      "axis": "center_y_mm",
+      "offset_mm": -0.1934,
+      "requires_layout_approval": true,
+      "change": "Move the 2U center 0.1934 mm upward from the approved center.",
+      "effect": "Solves the single-G geometry without weakening hard clearances.",
+      "minimum_clearances_mm": {
+        "copper": 4.706265362968285,
+        "hole_edge": 2.960971250294527,
+        "courtyard": 7.159833510997159e-05
+      }
+    },
+    {
+      "type": "center-offset",
+      "socket_ref": "r0_top_split_left_fn_1u",
+      "axis": "center_y_mm",
+      "offset_mm": -0.1934,
+      "requires_layout_approval": true,
+      "change": "Move the split-left Fn center 0.1934 mm upward from the approved center.",
+      "effect": "Solves the single-G geometry without weakening hard clearances.",
+      "minimum_clearances_mm": {
+        "copper": 4.037491401057347,
+        "hole_edge": 2.960971250294487,
+        "courtyard": 7.159833510625386e-05
+      }
+    },
+    {
+      "type": "center-offset",
+      "socket_ref": "r0_top_split_right_1u",
+      "axis": "center_y_mm",
+      "offset_mm": 0.1934,
+      "requires_layout_approval": true,
+      "change": "Move the split-right center 0.1934 mm downward from the approved center.",
+      "effect": "Solves the single-G geometry without weakening hard clearances.",
+      "minimum_clearances_mm": {
+        "copper": 4.700598366165726,
+        "hole_edge": 2.960971250294527,
+        "courtyard": 7.159833510997159e-05
+      }
+    }
+  ]
+}
