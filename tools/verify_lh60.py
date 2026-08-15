@@ -408,7 +408,10 @@ class Rp2040TinyContractTest(unittest.TestCase):
 
         self.assertTrue(self.MODEL.is_file())
         self.assertGreater(self.MODEL.stat().st_size, 1_000_000)
-        self.assertIn('(symbol "RP2040-Tiny"', symbol_text)
+        self.assertEqual(
+            symbol_text.count('\n  (symbol "RP2040-Tiny"\n'),
+            1,
+        )
         self.assertIn('(name "VSYS"', symbol_text)
         self.assertNotIn('(name "5V"', symbol_text)
         self.assertEqual(footprint_text.count("\n  (pad "), 23)

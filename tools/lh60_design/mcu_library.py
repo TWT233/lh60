@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+import re
 import sys
 
 from tools.lh60_design.mcp import McpClient
@@ -186,6 +187,13 @@ def footprint_payload() -> dict[str, object]:
     }
 
 
+def _symbol_definition_count() -> int:
+    if not SYMBOL_LIBRARY.exists():
+        return 0
+    pattern = re.compile(r'(?m)^  \(symbol "RP2040-Tiny"$')
+    return len(pattern.findall(SYMBOL_LIBRARY.read_text()))
+
+
 def _outline_graphics() -> list[dict[str, object]]:
     return [
         {
@@ -209,6 +217,14 @@ def apply_mcu_library(client: McpClient) -> None:
     client.tool_schemas("library")
     MCU_ROOT.mkdir(parents=True, exist_ok=True)
     FOOTPRINT_LIBRARY.mkdir(parents=True, exist_ok=True)
+    for _ in range(_symbol_definition_count()):
+        client.call_tool(
+            "delete_symbol",
+            {
+                "library_path": str(SYMBOL_LIBRARY),
+                "symbol_name": "RP2040-Tiny",
+            },
+        )
     client.call_tool("create_symbol", symbol_payload())
     client.call_tool("create_footprint", footprint_payload())
     client.call_tool(

@@ -11,6 +11,9 @@ depending on an untracked workstation setup.
 - `lh60-core:KeySwitch`: passive logical pads 1 and 2.
 - `lh60-core:MatrixDiode`: pin 1 cathode, pin 2 anode.
 - `lh60-core:TestPoint`: one passive pin.
+- `lh60-core:PowerFlag`: power-output marker for the carrier-provided
+  `VSYS`, `3V3`, and `GND` rails so ERC can verify the otherwise passive
+  test-point connections.
 
 ## Footprints
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+import re
 import sys
 
 from tools.lh60_design.mcp import McpClient
@@ -90,6 +91,14 @@ def core_symbol_specs() -> tuple[CoreSymbolSpec, ...]:
                 CorePinSpec("1", "TP", "passive", 5.08, 0.0, 180.0),
             ),
         ),
+        CoreSymbolSpec(
+            name="PowerFlag",
+            reference_prefix="#FLG",
+            value="PWR_FLAG",
+            pins=(
+                CorePinSpec("1", "PWR_FLAG", "power_out", 5.08, 0.0, 180.0),
+            ),
+        ),
     )
 
 
@@ -152,6 +161,15 @@ def core_footprint_specs() -> tuple[CoreFootprintSpec, ...]:
             attributes=("exclude_from_pos_files", "exclude_from_bom"),
         ),
     )
+
+
+def _symbol_definition_count(symbol_name: str) -> int:
+    if not SYMBOL_LIBRARY.exists():
+        return 0
+    pattern = re.compile(
+        rf'(?m)^  \(symbol "{re.escape(symbol_name)}"$'
+    )
+    return len(pattern.findall(SYMBOL_LIBRARY.read_text()))
 
 
 def _symbol_payload(spec: CoreSymbolSpec) -> dict[str, object]:
@@ -342,6 +360,14 @@ def apply_core_library(client: McpClient) -> None:
     FOOTPRINT_LIBRARY.mkdir(parents=True, exist_ok=True)
 
     for symbol in core_symbol_specs():
+        for _ in range(_symbol_definition_count(symbol.name)):
+            client.call_tool(
+                "delete_symbol",
+                {
+                    "library_path": str(SYMBOL_LIBRARY),
+                    "symbol_name": symbol.name,
+                },
+            )
         client.call_tool("create_symbol", _symbol_payload(symbol))
 
     for spec in core_footprint_specs():
