@@ -2,4 +2,5 @@
   (version 7)
 
   (lib (name "lh60-sockets") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-sockets") (options "") (descr ""))
-  (lib (name "lh60-mcu") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-mcu/lh60-mcu.pretty") (options "") (descr "")))
+  (lib (name "lh60-mcu") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-mcu/lh60-mcu.pretty") (options "") (descr ""))
+  (lib (name "lh60-core") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-core/lh60-core.pretty") (options "") (descr "")))
