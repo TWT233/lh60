@@ -47,8 +47,13 @@ KiCad 10 实测：双座封装自检 DRC 干净（0 footprint errors、0 孔/铜
 
 初版封装沿用了 ai03 的 courtyard（按 ai03 镜像几何的座子轮廓画的），与
 beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 −6.65）。
-已替换为 beekeeb 量产版 courtyard：16.5×16.5 方框（对称，翻转无方向问题）；
-双座用覆盖全部特征的 20×15 方框。验证：DRC 0 footprint errors。
+中间版本曾改用 16.5×16.5 / 20×15 mm 包围方框，但会把座体凹槽和两套座子之间的
+空白区误判为占用空间。
+
+当前版本使用真实 `B.CrtYd`：对底面塑胶座体、金属端子和完整 land pattern
+（SMD 焊盘、铜桥、PTH 焊环）的几何并集整体外扩 0.25 mm。Gateron 单座是一套闭合
+轮廓；双座保留 Gateron 与旋转 180° Choc V1 两套独立闭合轮廓。键帽包络移至
+`Dwgs.User`，不再占用生产 `F.SilkS`。
 
 ### 2.3 "保留镀铜" 验证
 

@@ -1,7 +1,7 @@
 # lh60-sockets — LH60 座子库（siderakb PTH 基底 + U 线框）
 
 本版本**基于 siderakb `SW_Gateron_LowProfile_HotSwap_PTH`（镀铜电气孔）**，
-仅增加各 U 数的外圈键帽线框，并做噪声清理。旧版（beekeeb 纯 NPTH）已删除。
+增加各 U 数的键帽包络、真实底面装配轮廓与 courtyard。旧版（beekeeb 纯 NPTH）已删除。
 
 ## 封装清单
 
@@ -10,13 +10,18 @@
 | `Gateron-LP-Hotswap-Socket-1U / 1.25U / 1.5U / 1.75U / 2U / 2.25U / 2.75U` | Gateron LP 热插拔座（PTH 镀铜），仅 Gateron |
 | `Gateron-LP-or-ChocV1-Hotswap-Socket-1U` | 双兼容：正置 Gateron（焊盘 1/2）+ 倒置 180° Choc V1（焊盘 3/4）。默认按订单二选一焊接；若要支持用户免焊换轴，可尝试两种座子同时贴装，但需实物 coupon 验证机械干涉 |
 
-## 清理与线框（按需求 1–3、5）
+## 图层约定
 
-- **无 courtyard**（F/B.CrtYd 全部删除）——消除多座子重叠时的 courtyard 检查噪声；
-- **无 F.Fab 图形**——只保留隐藏的 value 文字；
-- **F.SilkS 只画外圈键帽框**（`fp_rect`，宽 = U×19.05，高 19.05，中心对齐），
-  原 siderakb 丝印全部删除，不画内圈轴框；
-- B.SilkS / B.Fab 保持 siderakb 原样（座子侧参考）。
+- `Dwgs.User`：外圈键帽包络，宽 = U×19.05、高 19.05 mm、中心对齐；
+- `F.SilkS`：不放键帽网格，避免相邻键位形成生产丝印重叠；
+- `B.Fab`：底面座体真实轮廓；双座同时显示 Gateron 与 Choc V1，并用 `G`/`C`
+  线框标记装配方向；
+- `B.CrtYd`：底面座体与完整 land pattern 的几何并集向外偏移 0.25 mm，
+  线宽 0.05 mm；双座保留两套独立轮廓；
+- 不增加 `F.CrtYd`：顶面的开关和定位板机械约束由整板结构设计负责。
+
+封装图形由 `tools/update_socket_library.py` 计算并通过 Konnect MCP
+`set_footprint_graphics` 原子写入，不直接编辑 `.kicad_mod`。
 
 ## 双座（1U）
 
