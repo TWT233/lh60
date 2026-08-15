@@ -325,5 +325,99 @@ class SocketLibraryOutputTest(unittest.TestCase):
                 self.assertEqual(text.count("\n  (model "), len(spec.models))
 
 
+class Rp2040TinyContractTest(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+    SYMBOL_LIBRARY = ROOT / "lib" / "lh60-mcu" / "lh60-mcu.kicad_sym"
+    FOOTPRINT = (
+        ROOT
+        / "lib"
+        / "lh60-mcu"
+        / "lh60-mcu.pretty"
+        / "MCU_RP2040-Tiny_SMD.kicad_mod"
+    )
+    MODEL = ROOT / "lib" / "lh60-mcu" / "RP2040-Tiny-V1.1.step"
+    README = ROOT / "lib" / "lh60-mcu" / "README.md"
+
+    def specs(self):
+        from tools.lh60_design.mcu_library import (
+            rp2040_tiny_footprint_spec,
+            rp2040_tiny_symbol_pins,
+        )
+
+        return rp2040_tiny_symbol_pins(), rp2040_tiny_footprint_spec()
+
+    def test_symbol_contract_has_23_unique_official_pins(self):
+        pins, _ = self.specs()
+        expected = {
+            **{str(index + 1): f"GP{index}" for index in range(16)},
+            "17": "GP26",
+            "18": "GP27",
+            "19": "GP28",
+            "20": "GP29",
+            "21": "3V3",
+            "22": "GND",
+            "23": "VSYS",
+        }
+
+        self.assertEqual(len(pins), 23)
+        self.assertEqual(len({pin.number for pin in pins}), 23)
+        self.assertEqual({pin.number: pin.name for pin in pins}, expected)
+        self.assertNotIn("5V", {pin.name for pin in pins})
+
+    def test_symbol_power_pins_are_carrier_power_inputs(self):
+        pins, _ = self.specs()
+        pin_types = {pin.name: pin.pin_type for pin in pins}
+
+        self.assertEqual(pin_types["3V3"], "power_in")
+        self.assertEqual(pin_types["GND"], "power_in")
+        self.assertEqual(pin_types["VSYS"], "power_in")
+
+    def test_footprint_contract_matches_lambdakb_smd_coordinates(self):
+        _, spec = self.specs()
+        expected_positions = {
+            **{
+                str(index + 1): (8.2, index * 2.54)
+                for index in range(9)
+            },
+            **{
+                str(index + 10): (5.08 - index * 2.54, 20.9)
+                for index in range(5)
+            },
+            **{
+                str(index + 15): (-8.2, 20.32 - index * 2.54)
+                for index in range(9)
+            },
+        }
+
+        self.assertEqual(spec.name, "MCU_RP2040-Tiny_SMD")
+        self.assertEqual(spec.body_width_mm, 18.0)
+        self.assertEqual(spec.body_height_mm, 23.5)
+        self.assertEqual(spec.courtyard_clearance_mm, 0.5)
+        self.assertEqual(len(spec.pads), 23)
+        self.assertEqual(
+            {pad.number: (pad.x, pad.y) for pad in spec.pads},
+            expected_positions,
+        )
+        self.assertTrue(all((pad.width, pad.height) == (2.4, 1.6) for pad in spec.pads))
+        self.assertEqual(spec.fpc_edge, "rear")
+
+    def test_generated_library_contains_symbol_footprint_model_and_provenance(self):
+        symbol_text = self.SYMBOL_LIBRARY.read_text()
+        footprint_text = self.FOOTPRINT.read_text()
+        readme_text = self.README.read_text()
+
+        self.assertTrue(self.MODEL.is_file())
+        self.assertGreater(self.MODEL.stat().st_size, 1_000_000)
+        self.assertIn('(symbol "RP2040-Tiny"', symbol_text)
+        self.assertIn('(name "VSYS"', symbol_text)
+        self.assertNotIn('(name "5V"', symbol_text)
+        self.assertEqual(footprint_text.count("\n  (pad "), 23)
+        self.assertIn("RP2040-Tiny-V1.1.step", footprint_text)
+        self.assertIn("FPC", footprint_text)
+        self.assertIn("9bb38d7e67c561dfa24428686992abeb17d0a9aa", readme_text)
+        self.assertIn("MIT", readme_text)
+        self.assertIn("Waveshare", readme_text)
+
+
 if __name__ == "__main__":
     unittest.main()
