@@ -8,7 +8,7 @@
 | 文件 | 说明 |
 |---|---|
 | `Gateron-LP-Hotswap-Socket-1U / 1.25U / 1.5U / 1.75U / 2U / 2.25U / 2.75U` | Gateron LP 热插拔座（PTH 镀铜），仅 Gateron |
-| `Gateron-LP-or-ChocV1-Hotswap-Socket-1U` | 双兼容：正置 Gateron（焊盘 1/2）+ 倒置 180° Choc V1（焊盘 3/4）。默认按订单二选一焊接；若要支持用户免焊换轴，可尝试两种座子同时贴装，但需实物 coupon 验证机械干涉 |
+| `Gateron-LP-or-ChocV1-Hotswap-Socket-1U` | 双兼容：正置 Gateron + 倒置 180° Choc V1；两套触点都使用 logical pad 1/2。默认按订单二选一焊接；若要支持用户免焊换轴，可尝试两种座子同时贴装，但需实物 coupon 验证机械干涉 |
 
 ## 图层约定
 
@@ -19,6 +19,10 @@
 - `B.CrtYd`：底面座体与完整 land pattern 的几何并集向外偏移 0.25 mm，
   线宽 0.05 mm；双座保留两套独立轮廓；
 - 不增加 `F.CrtYd`：顶面的开关和定位板机械约束由整板结构设计负责。
+- 所有座子 footprint 都设置 `exclude_from_pos_files`，手焊座子不进入 PnP
+  坐标文件，但仍保留 BOM 语义。
+- 单座关联 Gateron STEP；双座同时关联 Gateron 与 Choc STEP，便于在 KiCad 3D
+  Viewer 中检查两套座体。
 
 封装图形由 `tools/update_socket_library.py` 计算并通过 Konnect MCP
 `set_footprint_graphics` 原子写入，不直接编辑 `.kicad_mod`。
@@ -26,8 +30,8 @@
 ## 双座（1U）
 
 Gateron PTH 0° + Choc V1 PTH 180°，中心开关孔合并为 φ5.25（NPTH）。
-焊盘 1/2 = Gateron（thru + smd），3/4 = Choc V1（thru + smd）；四焊盘属同一
-按键的替代触点，布线接同一行列网络。
+Gateron 与 Choc 两套 thru + smd 触点都编号为 1/2；同号的多个铜形状表示同一
+逻辑连接，布线只需连接该按键的行列网络。
 
 电气/钻孔层面已经按源封装复核通过：非合并孔在 0.2mm copper/hole clearance、
 0.25mm hole-to-hole 阈值下无违规。若两种座子同时焊接，目标是让用户后续无需焊接
@@ -39,6 +43,24 @@ socket 独立外形图。
 
 **Choc V2 无法并入**：其定位孔 (5,−5.15) 倒置后落在 (−5,5.15)，与 Gateron 的 φ3
 孔距离 0.75mm，孔壁重叠（实测 −0.25）。
+
+## 可复现 Coupon
+
+`test/generate_socket_coupons.py` 只通过 Konnect MCP 创建并放置 footprint：
+
+```bash
+python test/generate_socket_coupons.py --plan
+python test/generate_socket_coupons.py --apply
+
+KICAD_CLI=~/.local/bin/kicad-cli \
+  python -m unittest -v test.test_socket_library_update test.test_lh60_sockets
+```
+
+- `test/socket-clean.kicad_pcb`：包含 8 个 canonical footprint，预期
+  `0 violations / 0 unconnected items`。
+- `test/socket-conflicts.kicad_pcb`：两个 1U Gateron footprint 同向、中心距
+  17.25 mm，预期只报告 `courtyards_overlap`，用于证明真实 `B.CrtYd` 能发现
+  装配冲突。
 
 ## 关于 `SW_Kailh_Choc_V1V2_HotSwap_Hybrid` 右上角铜通孔
 

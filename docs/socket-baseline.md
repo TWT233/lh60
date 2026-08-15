@@ -80,12 +80,22 @@ beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 
 
 ## 3. 使用注意事项
 
-- 双座封装焊盘编号：1/2 = Gateron，3/4 = Choc；四个焊盘同属一键，接同一行列网络；
+- 双座封装的两套触点都使用 logical pad 1/2；同号的 Gateron/Choc 多铜形状属于
+  同一连接，接该按键的行列网络；
 - Choc 座焊 180°、Choc 轴也旋转 180° 插入（键帽沿十字轴旋转不受影响）；
 - 默认每键只焊一个座子；若追求用户免焊换轴，可两种座子都焊，但必须先通过实物 coupon；
 - 双座仅 1U（字母/符号区）；需多配列的键仍用单 Gateron 座 + 布局替代方案。
+- 座子均标记 `exclude_from_pos_files`，不进入 PnP 坐标文件；单座/双座分别关联
+  一套/两套 STEP 模型供 3D 装配检查。
 
 ## 4. 交付
 
 `lib/lh60-sockets/`：Gateron-LP-Hotswap-Socket-{1,1.25,1.5,1.75,2,2.25,2.75}U
-+ Gateron-LP-or-ChocV1-Hotswap-Socket-1U，已注册 fp-lib-table（`lh60_sockets`）。
++ Gateron-LP-or-ChocV1-Hotswap-Socket-1U，已注册 fp-lib-table（`lh60-sockets`）。
+
+`test/generate_socket_coupons.py` 通过 Konnect MCP 重建两个 board：
+
+- `socket-clean` 放置全部 8 个 canonical footprint，KiCad 10 DRC 预期 0 违规、
+  0 未连接；
+- `socket-conflicts` 放置一对中心距 17.25mm 的 1U Gateron 座，预期只报告
+  `courtyards_overlap`。

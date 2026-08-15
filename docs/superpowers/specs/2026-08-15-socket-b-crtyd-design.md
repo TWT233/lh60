@@ -17,7 +17,8 @@
   - `Gateron-LP-Hotswap-Socket-2.75U`
 - 更新 1 个 Gateron LP + Choc V1 双座 footprint：
   - `Gateron-LP-or-ChocV1-Hotswap-Socket-1U`
-- 不修改 pad、孔位、F.SilkS 键帽框、网络编号或其他 KiCad 工程文件。
+- 不修改 pad/孔位几何；键帽包络由生产 `F.SilkS` 移至 `Dwgs.User`，双座的
+  Choc 触点归一为 logical pad 1/2，并通过 Konnect MCP 生成验收 coupon。
 
 ## Courtyard Rule
 
@@ -116,3 +117,5 @@ land pattern：
 4. 用 KiCad CLI 或 Konnect 导出 footprint/测试板视图，确认 courtyard 在底层且轮廓可见。
 5. 检查 courtyard 不覆盖两种座子之间、塑胶主体凹槽内或端子之间的空白区域。
 6. 更新 `lib/lh60-sockets/README.md`，删除“无 courtyard”旧口径并记录真实轮廓规则。
+7. 通过 `test/generate_socket_coupons.py --apply` 重建 coupon；clean board 的
+   KiCad 10 DRC 为 0/0，17.25mm conflict pair 只报告 `courtyards_overlap`。

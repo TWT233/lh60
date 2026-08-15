@@ -11,6 +11,7 @@ from tools.update_socket_library import (
     choc_courtyard_polygons,
     gateron_courtyard_polygons,
 )
+from test.generate_socket_coupons import coupon_plan
 
 
 class SocketGeometryPlanTest(unittest.TestCase):
@@ -94,6 +95,29 @@ class SocketMcpContractTest(unittest.TestCase):
         self.assertGreaterEqual(
             REQUIRED_TOOL_FIELDS["edit_footprint_pad"],
             {"footprint_path", "pad_number", "new_number", "match_all"},
+        )
+
+    def test_coupon_plan_covers_inventory_and_fixed_conflict_case(self) -> None:
+        plan = coupon_plan()
+        clean = plan["clean"]
+        conflict = plan["conflict"]
+
+        self.assertEqual(
+            {placement["footprint"].split(":", 1)[1] for placement in clean},
+            set(ALL_NAMES),
+        )
+        self.assertEqual(len(clean), len(ALL_NAMES))
+        self.assertEqual(
+            [placement["reference"] for placement in conflict],
+            ["SW_CONFLICT_1", "SW_CONFLICT_2"],
+        )
+        self.assertEqual(
+            conflict[1]["x"] - conflict[0]["x"],
+            17.25,
+        )
+        self.assertEqual(
+            {placement["footprint"] for placement in conflict},
+            {"lh60-sockets:Gateron-LP-Hotswap-Socket-1U"},
         )
 
 
