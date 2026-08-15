@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "region": "enter",
+  "status": "solved",
+  "solved": true,
+  "approved_keys": [
+    {
+      "physical_key_id": "r2_enter_ansi_2.25u",
+      "logical_node_id": "r2_enter_ansi_2.25u",
+      "center_x_mm": 264.31875,
+      "center_y_mm": 47.625,
+      "width_u": 2.25,
+      "single_g_footprint": "Gateron-LP-Hotswap-Socket-2.25U",
+      "approved_rotations_deg": [
+        0,
+        90,
+        180,
+        270
+      ]
+    },
+    {
+      "physical_key_id": "r2_enter_split_left_fn_1u",
+      "logical_node_id": "r2_enter_split_left_fn_1u",
+      "center_x_mm": 252.41250000000002,
+      "center_y_mm": 47.625,
+      "width_u": 1.0,
+      "single_g_footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "approved_rotations_deg": [
+        0,
+        90,
+        180,
+        270
+      ]
+    },
+    {
+      "physical_key_id": "r2_enter_split_right_1.25u",
+      "logical_node_id": "r2_enter_ansi_2.25u",
+      "center_x_mm": 273.84375,
+      "center_y_mm": 47.625,
+      "width_u": 1.25,
+      "single_g_footprint": "Gateron-LP-Hotswap-Socket-1.25U",
+      "approved_rotations_deg": [
+        0,
+        90,
+        180,
+        270
+      ]
+    }
+  ],
+  "solver": {
+    "implementation": "tools.lh60_design.regions.solve_region",
+    "search_order": "approved-key-order-product",
+    "allowed_rotations_deg": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "single_g_first": true,
+    "dual_upgrade_policy": "one-placement-at-a-time-retain-only-hard-check-pass"
+  },
+  "requirements_mm": {
+    "minimum_copper_clearance": 0.25,
+    "minimum_independent_hole_edge_clearance": 0.45,
+    "target_hole_edge_clearance": 0.5,
+    "minimum_courtyard_clearance": 0.0,
+    "courtyard_buffer_per_footprint": 0.5
+  },
+  "single_g_search": {
+    "rotation_combinations_evaluated": 64,
+    "solved": true,
+    "selected_rotations_deg": {
+      "r2_enter_ansi_2.25u": 0,
+      "r2_enter_split_left_fn_1u": 270,
+      "r2_enter_split_right_1.25u": 180
+    }
+  },
+  "placements": [
+    {
+      "socket_ref": "r2_enter_ansi_2.25u",
+      "footprint": "Gateron-LP-Hotswap-Socket-2.25U",
+      "center_x_mm": 264.31875,
+      "center_y_mm": 47.625,
+      "rotation_deg": 0,
+      "logical_node_id": "r2_enter_ansi_2.25u"
+    },
+    {
+      "socket_ref": "r2_enter_split_left_fn_1u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "center_x_mm": 252.41250000000002,
+      "center_y_mm": 47.625,
+      "rotation_deg": 270,
+      "logical_node_id": "r2_enter_split_left_fn_1u"
+    },
+    {
+      "socket_ref": "r2_enter_split_right_1.25u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1.25U",
+      "center_x_mm": 273.84375,
+      "center_y_mm": 47.625,
+      "rotation_deg": 180,
+      "logical_node_id": "r2_enter_ansi_2.25u"
+    }
+  ],
+  "clearances": {
+    "minimum_copper_clearance_mm": 6.373067719906906,
+    "closest_copper_pair": [
+      "r2_enter_ansi_2.25u",
+      "r2_enter_split_left_fn_1u"
+    ],
+    "minimum_hole_edge_clearance_mm": 4.274999999999977,
+    "closest_hole_pair": [
+      "r2_enter_ansi_2.25u:pad-NPTH1:hole",
+      "r2_enter_split_right_1.25u:pad-NPTH1:hole"
+    ],
+    "minimum_courtyard_clearance_mm": 0.6649388737687484,
+    "closest_courtyard_pair": [
+      "r2_enter_ansi_2.25u",
+      "r2_enter_split_left_fn_1u"
+    ]
+  },
+  "hole_edge_target_met": true,
+  "geometry_status": "geometry-pass",
+  "blocking_conflicts": [],
+  "dual_upgrade_attempts": [
+    {
+      "socket_ref": "r2_enter_ansi_2.25u",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-2.25U",
+      "retained": false,
+      "solved": false,
+      "placements": [
+        {
+          "socket_ref": "r2_enter_ansi_2.25u",
+          "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-2.25U",
+          "center_x_mm": 264.31875,
+          "center_y_mm": 47.625,
+          "rotation_deg": 0,
+          "logical_node_id": "r2_enter_ansi_2.25u"
+        },
+        {
+          "socket_ref": "r2_enter_split_left_fn_1u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1U",
+          "center_x_mm": 252.41250000000002,
+          "center_y_mm": 47.625,
+          "rotation_deg": 270,
+          "logical_node_id": "r2_enter_split_left_fn_1u"
+        },
+        {
+          "socket_ref": "r2_enter_split_right_1.25u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1.25U",
+          "center_x_mm": 273.84375,
+          "center_y_mm": 47.625,
+          "rotation_deg": 90,
+          "logical_node_id": "r2_enter_ansi_2.25u"
+        }
+      ],
+      "clearances": {
+        "minimum_copper_clearance_mm": 3.274999999999977,
+        "closest_copper_pair": [
+          "r2_enter_ansi_2.25u",
+          "r2_enter_split_right_1.25u"
+        ],
+        "minimum_hole_edge_clearance_mm": 0.549099999999977,
+        "closest_hole_pair": [
+          "r2_enter_ansi_2.25u:pad-NPTH9:hole",
+          "r2_enter_split_right_1.25u:pad-NPTH1:hole"
+        ],
+        "minimum_courtyard_clearance_mm": -2.0662643315954776,
+        "closest_courtyard_pair": [
+          "r2_enter_ansi_2.25u",
+          "r2_enter_split_right_1.25u"
+        ]
+      },
+      "hole_edge_target_met": true,
+      "blocking_conflicts": [
+        {
+          "domain": "courtyard",
+          "items": [
+            "r2_enter_ansi_2.25u",
+            "r2_enter_split_right_1.25u"
+          ],
+          "actual_mm": -2.0662643315954776,
+          "required_mm": 0.0,
+          "shortfall_mm": 2.0662643315954776
+        }
+      ]
+    },
+    {
+      "socket_ref": "r2_enter_split_left_fn_1u",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+      "retained": false,
+      "solved": false,
+      "placements": [
+        {
+          "socket_ref": "r2_enter_ansi_2.25u",
+          "footprint": "Gateron-LP-Hotswap-Socket-2.25U",
+          "center_x_mm": 264.31875,
+          "center_y_mm": 47.625,
+          "rotation_deg": 0,
+          "logical_node_id": "r2_enter_ansi_2.25u"
+        },
+        {
+          "socket_ref": "r2_enter_split_left_fn_1u",
+          "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+          "center_x_mm": 252.41250000000002,
+          "center_y_mm": 47.625,
+          "rotation_deg": 180,
+          "logical_node_id": "r2_enter_split_left_fn_1u"
+        },
+        {
+          "socket_ref": "r2_enter_split_right_1.25u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1.25U",
+          "center_x_mm": 273.84375,
+          "center_y_mm": 47.625,
+          "rotation_deg": 90,
+          "logical_node_id": "r2_enter_ansi_2.25u"
+        }
+      ],
+      "clearances": {
+        "minimum_copper_clearance_mm": 0.0,
+        "closest_copper_pair": [
+          "r2_enter_ansi_2.25u",
+          "r2_enter_split_left_fn_1u"
+        ],
+        "minimum_hole_edge_clearance_mm": 2.7593875714092757,
+        "closest_hole_pair": [
+          "r2_enter_ansi_2.25u:pad-1:hole",
+          "r2_enter_split_left_fn_1u:pad-NPTH8:hole"
+        ],
+        "minimum_courtyard_clearance_mm": -3.0295191662558025,
+        "closest_courtyard_pair": [
+          "r2_enter_ansi_2.25u",
+          "r2_enter_split_left_fn_1u"
+        ]
+      },
+      "hole_edge_target_met": true,
+      "blocking_conflicts": [
+        {
+          "domain": "copper",
+          "items": [
+            "r2_enter_ansi_2.25u",
+            "r2_enter_split_left_fn_1u"
+          ],
+          "actual_mm": 0.0,
+          "required_mm": 0.25,
+          "shortfall_mm": 0.25
+        },
+        {
+          "domain": "courtyard",
+          "items": [
+            "r2_enter_ansi_2.25u",
+            "r2_enter_split_left_fn_1u"
+          ],
+          "actual_mm": -3.0295191662558025,
+          "required_mm": 0.0,
+          "shortfall_mm": 3.0295191662558025
+        }
+      ]
+    },
+    {
+      "socket_ref": "r2_enter_split_right_1.25u",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1.25U",
+      "retained": false,
+      "solved": false,
+      "placements": [
+        {
+          "socket_ref": "r2_enter_ansi_2.25u",
+          "footprint": "Gateron-LP-Hotswap-Socket-2.25U",
+          "center_x_mm": 264.31875,
+          "center_y_mm": 47.625,
+          "rotation_deg": 270,
+          "logical_node_id": "r2_enter_ansi_2.25u"
+        },
+        {
+          "socket_ref": "r2_enter_split_left_fn_1u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1U",
+          "center_x_mm": 252.41250000000002,
+          "center_y_mm": 47.625,
+          "rotation_deg": 270,
+          "logical_node_id": "r2_enter_split_left_fn_1u"
+        },
+        {
+          "socket_ref": "r2_enter_split_right_1.25u",
+          "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1.25U",
+          "center_x_mm": 273.84375,
+          "center_y_mm": 47.625,
+          "rotation_deg": 0,
+          "logical_node_id": "r2_enter_ansi_2.25u"
+        }
+      ],
+      "clearances": {
+        "minimum_copper_clearance_mm": 4.0069939936287495,
+        "closest_copper_pair": [
+          "r2_enter_ansi_2.25u",
+          "r2_enter_split_right_1.25u"
+        ],
+        "minimum_hole_edge_clearance_mm": 0.5490999999999773,
+        "closest_hole_pair": [
+          "r2_enter_ansi_2.25u:pad-NPTH1:hole",
+          "r2_enter_split_right_1.25u:pad-NPTH8:hole"
+        ],
+        "minimum_courtyard_clearance_mm": -0.8355455302254762,
+        "closest_courtyard_pair": [
+          "r2_enter_ansi_2.25u",
+          "r2_enter_split_right_1.25u"
+        ]
+      },
+      "hole_edge_target_met": true,
+      "blocking_conflicts": [
+        {
+          "domain": "courtyard",
+          "items": [
+            "r2_enter_ansi_2.25u",
+            "r2_enter_split_right_1.25u"
+          ],
+          "actual_mm": -0.8355455302254762,
+          "required_mm": 0.0,
+          "shortfall_mm": 0.8355455302254762
+        }
+      ]
+    }
+  ],
+  "retained_dual_upgrades": [],
+  "drc_evidence": {
+    "tool": "Konnect MCP verification.run_drc",
+    "coupon_project": "/tmp/lh60-region-enter/lh60.kicad_pro",
+    "coupon_board": "/tmp/lh60-region-enter/lh60.kicad_pcb",
+    "library": {
+      "nickname": "lh60-sockets",
+      "repo_relative_path": "lib/lh60-sockets",
+      "scope": "project"
+    },
+    "design_rules": {
+      "min_clearance_mm": 0.25,
+      "min_hole_to_hole_mm": 0.45,
+      "min_trace_width_mm": 0.25,
+      "min_via_drill_mm": 0.3,
+      "min_via_size_mm": 0.7
+    },
+    "board_extents_mm": {
+      "x_min": 0.0,
+      "y_min": 0.0,
+      "x_max": 285.75,
+      "y_max": 95.25,
+      "width": 285.75,
+      "height": 95.25
+    },
+    "placed_footprints": [
+      {
+        "reference": "SW1",
+        "socket_ref": "r2_enter_ansi_2.25u",
+        "footprint_id": "lh60-sockets:Gateron-LP-Hotswap-Socket-2.25U",
+        "center_x_mm": 264.31875,
+        "center_y_mm": 47.625,
+        "rotation_deg": 0
+      },
+      {
+        "reference": "SW2",
+        "socket_ref": "r2_enter_split_left_fn_1u",
+        "footprint_id": "lh60-sockets:Gateron-LP-Hotswap-Socket-1U",
+        "center_x_mm": 252.41250000000002,
+        "center_y_mm": 47.625,
+        "rotation_deg": 270
+      },
+      {
+        "reference": "SW3",
+        "socket_ref": "r2_enter_split_right_1.25u",
+        "footprint_id": "lh60-sockets:Gateron-LP-Hotswap-Socket-1.25U",
+        "center_x_mm": 273.84375,
+        "center_y_mm": 47.625,
+        "rotation_deg": 180
+      }
+    ],
+    "placement_method": "Konnect MCP pcb_components.place_component closed-board fallback",
+    "placement_call_status": [
+      "SW1:ok",
+      "SW2:ok",
+      "SW3:ok"
+    ],
+    "status": "pass",
+    "summary": {
+      "error_count": 0,
+      "warning_count": 0,
+      "violation_count": 0
+    },
+    "violations": [],
+    "production_board_modified": false,
+    "coupon_artifacts_committed": false
+  },
+  "sources": [
+    "tools/lh60_design/layout.py",
+    "tools/lh60_design/regions.py",
+    "lib/lh60-sockets"
+  ],
+  "notes": [
+    "All three mutually exclusive Enter sockets are modeled simultaneously.",
+    "No Dual upgrade passed every hard gate, so the selected solution remains all single Gateron-LP footprints.",
+    "Temporary KiCad coupon artifacts remain outside the repository under /tmp."
+  ]
+}
