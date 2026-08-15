@@ -1,0 +1,17 @@
+(version 1)
+
+(rule "konnect:F.Cu:clearance"
+  (constraint clearance (min 0.25mm))
+  (layer "F.Cu"))
+
+(rule "konnect:F.Cu:track_width"
+  (constraint track_width (min 0.25mm))
+  (layer "F.Cu"))
+
+(rule "konnect:B.Cu:clearance"
+  (constraint clearance (min 0.25mm))
+  (layer "B.Cu"))
+
+(rule "konnect:B.Cu:track_width"
+  (constraint track_width (min 0.25mm))
+  (layer "B.Cu"))
