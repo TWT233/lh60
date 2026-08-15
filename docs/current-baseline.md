@@ -14,6 +14,10 @@
 - Choc V2：不纳入 Gateron 双座。V2 角落定位脚与 Gateron PTH 孔冲突。
 - 底排：保留方向键版底排；旧 6.25u 标准空格版不在当前范围。
 - ISO Enter：不在当前范围。
+- 当前配列：76 个物理 socket、70 个逻辑节点；完整 u/mm 坐标与共享关系见
+  `docs/layout-current.md`。
+- 矩阵：10 × 7，`COL0..COL9 = GP0..GP9`，
+  `ROW0..ROW6 = GP10..GP15, GP26`，空闲 `GP27..GP29`。
 
 ## 多配列功能区
 
@@ -42,6 +46,7 @@
 
 ## 当前文档入口
 
+- `docs/layout-current.md`：当前 15u 物理坐标、70 节点和 10 × 7 GPIO 映射。
 - `docs/glossary.md`：术语表和当前口径。
 - `docs/socket-baseline.md`：socket 基线、PTH 结论、Choc V2 排除原因、免焊换轴验证状态。
 - `lib/lh60-sockets/README.md`：自有 footprint 库说明。
