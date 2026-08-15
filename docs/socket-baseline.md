@@ -93,9 +93,5 @@ beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 
 `lib/lh60-sockets/`：Gateron-LP-Hotswap-Socket-{1,1.25,1.5,1.75,2,2.25,2.75}U
 + Gateron-LP-or-ChocV1-Hotswap-Socket-1U，已注册 fp-lib-table（`lh60-sockets`）。
 
-`test/generate_socket_coupons.py` 通过 Konnect MCP 重建两个 board：
-
-- `socket-clean` 放置全部 8 个 canonical footprint，KiCad 10 DRC 预期 0 违规、
-  0 未连接；
-- `socket-conflicts` 放置一对中心距 17.25mm 的 1U Gateron 座，预期只报告
-  `courtyards_overlap`。
+生产验证通过 Konnect MCP 在 `/tmp` 创建临时 coupon，检查 footprint inventory、
+KiCad 解析与 DRC；仓库不提交测试 KiCad 工程。

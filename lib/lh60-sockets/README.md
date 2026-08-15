@@ -44,23 +44,10 @@ socket 独立外形图。
 **Choc V2 无法并入**：其定位孔 (5,−5.15) 倒置后落在 (−5,5.15)，与 Gateron 的 φ3
 孔距离 0.75mm，孔壁重叠（实测 −0.25）。
 
-## 可复现 Coupon
+## 临时 Coupon
 
-`test/generate_socket_coupons.py` 只通过 Konnect MCP 创建并放置 footprint：
-
-```bash
-python test/generate_socket_coupons.py --plan
-python test/generate_socket_coupons.py --apply
-
-KICAD_CLI=~/.local/bin/kicad-cli \
-  python -m unittest -v test.test_socket_library_update test.test_lh60_sockets
-```
-
-- `test/socket-clean.kicad_pcb`：包含 8 个 canonical footprint，预期
-  `0 violations / 0 unconnected items`。
-- `test/socket-conflicts.kicad_pcb`：两个 1U Gateron footprint 同向、中心距
-  17.25 mm，预期只报告 `courtyards_overlap`，用于证明真实 `B.CrtYd` 能发现
-  装配冲突。
+生产验证只通过 Konnect MCP 在 `/tmp` 创建临时 KiCad coupon，检查 footprint
+inventory、KiCad 解析和 DRC。仓库不提交测试 KiCad 工程。
 
 ## 关于 `SW_Kailh_Choc_V1V2_HotSwap_Hybrid` 右上角铜通孔
 

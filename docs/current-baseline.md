@@ -32,8 +32,7 @@
 - 双座封装的保守装配语义是二选一焊接；若要实现用户免焊换轴，可尝试两种 socket 同时焊接，但量产前必须做 1U coupon 实物验证。
 - 当前自有座子 footprint 使用 `Dwgs.User` 键帽包络、真实 `B.Fab`、
   land-pattern-aware `B.CrtYd`、PnP 排除与 STEP 模型。
-- `test/generate_socket_coupons.py` 可通过 Konnect MCP 重建 clean/conflict coupon；
-  clean DRC 为 0/0，conflict 仅报告 `courtyards_overlap`。
+- 生产验证通过 Konnect MCP 在 `/tmp` 创建临时 coupon；仓库不提交测试 KiCad 工程。
 - Kailh `CPG135001S30` 官方/LCSC 图纸显示 Choc V1 socket 外形约 13.15 × 6.85 mm，推荐 PCB 主孔中心距 5.00 mm、孔径 3.00 mm。
 - Gateron 官网可取得 KS-33 switch 规格书和 PCB layout，但未找到公开的 Gateron LP hotswap socket 独立外形图。
 
