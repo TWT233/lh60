@@ -1,11 +1,11 @@
-(footprint "Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
+(footprint "Gateron-LP-or-ChocV1-Hotswap-Socket-2U"
   (version 20240108)
   (generator "konnect")
   (layer "F.Cu")
-  (descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
+  (descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 2U keycap envelope on Dwgs.User")
   (attr exclude_from_pos_files)
-  (tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
-  (fp_rect (start -9.525 -9.525) (end 9.525 9.525) (stroke (width 0.12) (type solid)) (fill none) (layer "Dwgs.User"))
+  (tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 2u")
+  (fp_rect (start -19.05 -9.525) (end 19.05 9.525) (stroke (width 0.12) (type solid)) (fill none) (layer "Dwgs.User"))
   (fp_poly (pts (xy -8.445 3.615) (xy -8.445 5.785) (xy -6.815 5.785) (xy -6.815 6.875) (xy -2.595 6.875) (xy -0.395 7.925) (xy -0.395 7.7) (xy 0.405 7.7) (xy 0.405 7.925) (xy 5.025 7.925) (xy 5.025 6.835) (xy 6.655 6.835) (xy 6.655 4.665) (xy 5.025 4.665) (xy 5.025 3.575) (xy -0.395 3.575) (xy -2.595 2.525) (xy -6.815 2.525) (xy -6.815 3.615)) (stroke (width 0.1) (type solid)) (fill none) (layer "B.Fab"))
   (fp_line (start -0.2 4.2) (end -1 4.2) (stroke (width 0.1) (type solid)) (layer "B.Fab"))
   (fp_line (start -1 4.2) (end -1 5.6) (stroke (width 0.1) (type solid)) (layer "B.Fab"))
@@ -35,7 +35,7 @@
   (pad "2" smd rect (at 7 -3.8) (size 3.9 1) (layers "B.Cu")  )
   (pad "2" thru_hole circle (at 5 -3.8) (size 4 4) (layers "*.Cu" "B.Mask") (drill 3) )
   (fp_text reference "REF**" (at 0.3375 -9.4000 0) (layer "F.SilkS") (effects (font (size 1 1) (thickness 0.15))))
-  (fp_text value "Gateron-LP-or-ChocV1-Hotswap-Socket-1U" (at 0.3375 9.2500 0) (layer "F.Fab") (effects (font (size 1 1) (thickness 0.15))))
+  (fp_text value "Gateron-LP-or-ChocV1-Hotswap-Socket-2U" (at 0.3375 9.2500 0) (layer "F.Fab") (effects (font (size 1 1) (thickness 0.15))))
   (model "../mxv2/Gateron_KS33_Hotswap.pretty/Gateron-KS33-Socket.step"
     (offset (xyz 5.025 -7.925 -1.838))
     (scale (xyz -1 1 1))

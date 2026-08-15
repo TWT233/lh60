@@ -8,7 +8,9 @@
 - 键距：19.05 × 19.05 mm，15u 键区宽 285.75 mm，面向 MX 键帽生态。
 - 主轴：Gateron LP / KS-33。
 - 主座：siderakb `SW_Gateron_LowProfile_HotSwap_PTH` 镀铜几何。
-- 1U 兼容：普通 1U 可用 `Gateron-LP-or-ChocV1-Hotswap-Socket-1U`，支持 Gateron LP 或 Choc V1。
+- Socket 库：单 G、单 K（Choc V1/V2）和 Gateron LP + Choc V1 Dual 三系列，
+  均覆盖 1U / 1.25U / 1.5U / 1.75U / 2U / 2.25U / 2.75U。
+- 固定且无重叠的键位默认使用 Dual，并同时焊接两种 socket。
 - Choc V2：不纳入 Gateron 双座。V2 角落定位脚与 Gateron PTH 孔冲突。
 - 底排：保留方向键版底排；旧 6.25u 标准空格版不在当前范围。
 - ISO Enter：不在当前范围。
@@ -26,12 +28,14 @@
 
 ## Socket 规则
 
-- 大键和多配列区默认使用单 Gateron LP PTH 座，通过布局替代方案实现多配列。
-- 普通 1U 可用 Gateron + Choc V1 双座封装。
+- 固定键默认使用 Gateron + Choc V1 Dual；U 数不决定是否使用 stabilizer。
+- 多配列区从单 Gateron LP PTH 座开始重新求解；加入 Choc V1 后仍满足生产规则时
+  才升级为 Dual。
 - 双座的两套物理触点共享 logical pad 1/2，原理图与布线不再暴露 3/4。
-- 双座封装的保守装配语义是二选一焊接；若要实现用户免焊换轴，可尝试两种 socket 同时焊接，但量产前必须做 1U coupon 实物验证。
+- 双座目标是两种 socket 同时焊接；量产批准前必须做实物 coupon 验证插拔和导通。
 - 当前自有座子 footprint 使用 `Dwgs.User` 键帽包络、真实 `B.Fab`、
-  land-pattern-aware `B.CrtYd`、PnP 排除与 STEP 模型。
+  外扩 0.50 mm 的 land-pattern-aware `B.CrtYd`、PnP 排除与 STEP 模型。
+- 独立插件孔/开关孔孔边间距目标至少 0.50 mm，绝不低于 0.45 mm。
 - 生产验证通过 Konnect MCP 在 `/tmp` 创建临时 coupon；仓库不提交测试 KiCad 工程。
 - Kailh `CPG135001S30` 官方/LCSC 图纸显示 Choc V1 socket 外形约 13.15 × 6.85 mm，推荐 PCB 主孔中心距 5.00 mm、孔径 3.00 mm。
 - Gateron 官网可取得 KS-33 switch 规格书和 PCB layout，但未找到公开的 Gateron LP hotswap socket 独立外形图。

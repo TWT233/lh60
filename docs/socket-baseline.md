@@ -4,10 +4,11 @@
 
 ## 1. 裁决
 
-1. **以 siderakb PTH 镀铜几何为当前基线**（`SW_Gateron_LowProfile_HotSwap_PTH`）；
-2. **新增各 U 数辅助封装**（Gateron LP PTH 1U–2.75U，键帽轮廓取自 ai03）；
-3. **字母/符号键（1U、无需多配列）采用"正置 Gateron + 倒置 Choc V1"双座**；
-4. **不承诺 Choc V2**：V2 角落定位脚会与 Gateron PTH 孔冲突，不能并入双座。
+1. **以 siderakb PTH 镀铜几何为 Gateron 基线**（`SW_Gateron_LowProfile_HotSwap_PTH`）；
+2. **库提供三套 1U–2.75U 系列**：单 G、单 K（Choc V1/V2）和
+   "正置 Gateron + 倒置 Choc V1" Dual；
+3. **固定且无重叠的键位默认使用 Dual，并同时焊接两种 socket**；
+4. **Dual 不承诺 Choc V2**：V2 角落定位脚会与 Gateron PTH 孔冲突。
 
 > Superseded：早期"以 beekeeb 纯 NPTH 几何为准、删除电气孔/THT"的判断已被后续 PTH
 > 实测推翻。纯 NPTH 仍可作为余量更大的备选，不是当前主基线。
@@ -51,9 +52,9 @@ beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 
 空白区误判为占用空间。
 
 当前版本使用真实 `B.CrtYd`：对底面塑胶座体、金属端子和完整 land pattern
-（SMD 焊盘、铜桥、PTH 焊环）的几何并集整体外扩 0.25 mm。Gateron 单座是一套闭合
-轮廓；双座保留 Gateron 与旋转 180° Choc V1 两套独立闭合轮廓。键帽包络移至
-`Dwgs.User`，不再占用生产 `F.SilkS`。
+（SMD 焊盘、铜桥、PTH 焊环）的几何并集整体外扩 0.50 mm。Dual 对两套已外扩
+courtyard 求并集后输出，避免轮廓相交。键帽包络位于 `Dwgs.User`，不占用生产
+`F.SilkS`。
 
 ### 2.3 "保留镀铜" 验证
 
@@ -83,15 +84,15 @@ beekeeb 座子焊盘对不上（如 pad1 在 x=−8.075，ai03 courtyard 只到 
 - 双座封装的两套触点都使用 logical pad 1/2；同号的 Gateron/Choc 多铜形状属于
   同一连接，接该按键的行列网络；
 - Choc 座焊 180°、Choc 轴也旋转 180° 插入（键帽沿十字轴旋转不受影响）；
-- 默认每键只焊一个座子；若追求用户免焊换轴，可两种座子都焊，但必须先通过实物 coupon；
-- 双座仅 1U（字母/符号区）；需多配列的键仍用单 Gateron 座 + 布局替代方案。
+- 固定 Dual 键位默认同时焊接两种座子，且必须先通过实物 coupon；
+- Dual 覆盖 1U–2.75U；多配列键先用单 Gateron 座求解，再尝试升级 Dual。
 - 座子均标记 `exclude_from_pos_files`，不进入 PnP 坐标文件；单座/双座分别关联
   一套/两套 STEP 模型供 3D 装配检查。
 
 ## 4. 交付
 
-`lib/lh60-sockets/`：Gateron-LP-Hotswap-Socket-{1,1.25,1.5,1.75,2,2.25,2.75}U
-+ Gateron-LP-or-ChocV1-Hotswap-Socket-1U，已注册 fp-lib-table（`lh60-sockets`）。
+`lib/lh60-sockets/`：单 G、单 K、Dual 三系列 × 7 个 U 数，共 21 件。
 
 生产验证通过 Konnect MCP 在 `/tmp` 创建临时 coupon，检查 footprint inventory、
-KiCad 解析与 DRC；仓库不提交测试 KiCad 工程。
+KiCad 解析与 DRC；仓库不提交测试 KiCad 工程。当前 21 件 clean coupon 的
+KiCad 10 DRC 为 `0 violations / 0 unconnected items`。
