@@ -1,0 +1,924 @@
+{
+  "schema_version": 1,
+  "region": "rshift",
+  "status": "blocked",
+  "solved": false,
+  "search_contract": {
+    "socket_source": "tools/lh60_design/layout.py",
+    "socket_order": [
+      "r3_rshift_2.75u",
+      "r3_rshift_left_1.75u",
+      "r3_rshift_right_fn_1u",
+      "r3_rshift_left_fn_1u",
+      "r3_rshift_right_1.75u"
+    ],
+    "allowed_rotations_deg": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "single_g_first": true,
+    "dual_upgrade_policy": "deterministic-one-at-a-time-layout-order",
+    "old_test_board_assumptions_reused": false
+  },
+  "hard_limits_mm": {
+    "minimum_copper_clearance": 0.25,
+    "minimum_independent_component_hole_edge_clearance": 0.45,
+    "target_hole_edge_clearance": 0.5,
+    "minimum_courtyard_clearance_after_footprint_buffer": 0.0,
+    "footprint_courtyard_buffer": 0.5
+  },
+  "placements": [
+    {
+      "socket_ref": "r3_rshift_2.75u",
+      "footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+      "center_x_mm": 259.55625000000003,
+      "center_y_mm": 66.675,
+      "rotation_deg": 0,
+      "logical_node_id": "r3_rshift_2.75u"
+    },
+    {
+      "socket_ref": "r3_rshift_left_1.75u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+      "center_x_mm": 250.03125,
+      "center_y_mm": 66.675,
+      "rotation_deg": 180,
+      "logical_node_id": "r3_rshift_2.75u"
+    },
+    {
+      "socket_ref": "r3_rshift_right_fn_1u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "center_x_mm": 276.225,
+      "center_y_mm": 66.675,
+      "rotation_deg": 90,
+      "logical_node_id": "r3_rshift_left_fn_1u"
+    },
+    {
+      "socket_ref": "r3_rshift_left_fn_1u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "center_x_mm": 242.88750000000002,
+      "center_y_mm": 66.675,
+      "rotation_deg": 270,
+      "logical_node_id": "r3_rshift_left_fn_1u"
+    },
+    {
+      "socket_ref": "r3_rshift_right_1.75u",
+      "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+      "center_x_mm": 269.08125,
+      "center_y_mm": 66.675,
+      "rotation_deg": 180,
+      "logical_node_id": "r3_rshift_2.75u"
+    }
+  ],
+  "minimum_copper_clearance_mm": 1.6639322118466249,
+  "minimum_hole_edge_clearance_mm": 1.31725725802265,
+  "minimum_courtyard_clearance_mm": -1.4357297944333625,
+  "hole_edge_target_met": true,
+  "drc_status": "blocked",
+  "blocking_conflicts": [
+    {
+      "domain": "courtyard",
+      "items": [
+        "r3_rshift_right_fn_1u",
+        "r3_rshift_right_1.75u"
+      ],
+      "actual_mm": -1.4357297944333625,
+      "required_mm": 0.0,
+      "shortfall_mm": 1.4357297944333625
+    },
+    {
+      "domain": "courtyard",
+      "items": [
+        "r3_rshift_2.75u",
+        "r3_rshift_left_1.75u"
+      ],
+      "actual_mm": -0.567829135092444,
+      "required_mm": 0.0,
+      "shortfall_mm": 0.567829135092444
+    }
+  ],
+  "single_g_search": {
+    "candidate_count": 1024,
+    "solved_candidate_count": 0,
+    "selected_report": {
+      "region": "rshift",
+      "solved": false,
+      "placements": [
+        {
+          "socket_ref": "r3_rshift_2.75u",
+          "footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+          "center_x_mm": 259.55625000000003,
+          "center_y_mm": 66.675,
+          "rotation_deg": 0,
+          "logical_node_id": "r3_rshift_2.75u"
+        },
+        {
+          "socket_ref": "r3_rshift_left_1.75u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+          "center_x_mm": 250.03125,
+          "center_y_mm": 66.675,
+          "rotation_deg": 180,
+          "logical_node_id": "r3_rshift_2.75u"
+        },
+        {
+          "socket_ref": "r3_rshift_right_fn_1u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1U",
+          "center_x_mm": 276.225,
+          "center_y_mm": 66.675,
+          "rotation_deg": 90,
+          "logical_node_id": "r3_rshift_left_fn_1u"
+        },
+        {
+          "socket_ref": "r3_rshift_left_fn_1u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1U",
+          "center_x_mm": 242.88750000000002,
+          "center_y_mm": 66.675,
+          "rotation_deg": 270,
+          "logical_node_id": "r3_rshift_left_fn_1u"
+        },
+        {
+          "socket_ref": "r3_rshift_right_1.75u",
+          "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+          "center_x_mm": 269.08125,
+          "center_y_mm": 66.675,
+          "rotation_deg": 180,
+          "logical_node_id": "r3_rshift_2.75u"
+        }
+      ],
+      "minimum_copper_clearance_mm": 1.6639322118466249,
+      "minimum_hole_edge_clearance_mm": 1.31725725802265,
+      "minimum_courtyard_clearance_mm": -1.4357297944333625,
+      "hole_edge_target_met": true,
+      "drc_status": "blocked",
+      "blocking_conflicts": [
+        {
+          "domain": "courtyard",
+          "items": [
+            "r3_rshift_right_fn_1u",
+            "r3_rshift_right_1.75u"
+          ],
+          "actual_mm": -1.4357297944333625,
+          "required_mm": 0.0,
+          "shortfall_mm": 1.4357297944333625
+        },
+        {
+          "domain": "courtyard",
+          "items": [
+            "r3_rshift_2.75u",
+            "r3_rshift_left_1.75u"
+          ],
+          "actual_mm": -0.567829135092444,
+          "required_mm": 0.0,
+          "shortfall_mm": 0.567829135092444
+        }
+      ]
+    }
+  },
+  "dual_upgrade_attempts": [
+    {
+      "order": 1,
+      "socket_ref": "r3_rshift_2.75u",
+      "from_footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-2.75U",
+      "accepted": false,
+      "report": {
+        "region": "rshift",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r3_rshift_2.75u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-2.75U",
+            "center_x_mm": 259.55625000000003,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 250.03125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 66.675,
+            "rotation_deg": 90,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 242.88750000000002,
+            "center_y_mm": 66.675,
+            "rotation_deg": 270,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 269.08125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 0,
+            "logical_node_id": "r3_rshift_2.75u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": -0.2653839391973096,
+        "minimum_courtyard_clearance_mm": -5.963196125741287,
+        "hole_edge_target_met": false,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_left_1.75u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "copper",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_left_1.75u"
+            ],
+            "actual_mm": -5.963196125741287,
+            "required_mm": 0.0,
+            "shortfall_mm": 5.963196125741287
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": -4.501709340332441,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.501709340332441
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_2.75u:pad-2:hole",
+              "r3_rshift_left_1.75u:pad-1:hole"
+            ],
+            "actual_mm": -0.2653839391973096,
+            "required_mm": 0.45,
+            "shortfall_mm": 0.7153839391973096
+          }
+        ]
+      }
+    },
+    {
+      "order": 2,
+      "socket_ref": "r3_rshift_left_1.75u",
+      "from_footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1.75U",
+      "accepted": false,
+      "report": {
+        "region": "rshift",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r3_rshift_2.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+            "center_x_mm": 259.55625000000003,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_1.75u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1.75U",
+            "center_x_mm": 250.03125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 270,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 66.675,
+            "rotation_deg": 90,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 242.88750000000002,
+            "center_y_mm": 66.675,
+            "rotation_deg": 270,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 269.08125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 0,
+            "logical_node_id": "r3_rshift_2.75u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": -1.174993379244731,
+        "minimum_courtyard_clearance_mm": -4.645210125737737,
+        "hole_edge_target_met": false,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_left_1.75u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_left_1.75u",
+              "r3_rshift_left_fn_1u"
+            ],
+            "actual_mm": -4.645210125737737,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.645210125737737
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_left_1.75u"
+            ],
+            "actual_mm": -4.321010507546141,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.321010507546141
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": -0.5678291350924612,
+            "required_mm": 0.0,
+            "shortfall_mm": 0.5678291350924612
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_left_1.75u:pad-2:hole",
+              "r3_rshift_left_fn_1u:pad-NPTH1:hole"
+            ],
+            "actual_mm": -1.174993379244731,
+            "required_mm": 0.45,
+            "shortfall_mm": 1.6249933792447309
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_2.75u:pad-NPTH1:hole",
+              "r3_rshift_left_1.75u:pad-1:hole"
+            ],
+            "actual_mm": -0.4999999999999716,
+            "required_mm": 0.45,
+            "shortfall_mm": 0.9499999999999715
+          }
+        ]
+      }
+    },
+    {
+      "order": 3,
+      "socket_ref": "r3_rshift_right_fn_1u",
+      "from_footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+      "accepted": false,
+      "report": {
+        "region": "rshift",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r3_rshift_2.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+            "center_x_mm": 259.55625000000003,
+            "center_y_mm": 66.675,
+            "rotation_deg": 0,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 250.03125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_fn_1u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 66.675,
+            "rotation_deg": 270,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 242.88750000000002,
+            "center_y_mm": 66.675,
+            "rotation_deg": 270,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 269.08125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": -1.1749933792447171,
+        "minimum_courtyard_clearance_mm": -7.512853953093423,
+        "hole_edge_target_met": false,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r3_rshift_right_fn_1u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_right_fn_1u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": -7.512853953093423,
+            "required_mm": 0.0,
+            "shortfall_mm": 7.512853953093423
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_left_1.75u"
+            ],
+            "actual_mm": -0.567829135092444,
+            "required_mm": 0.0,
+            "shortfall_mm": 0.567829135092444
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_right_fn_1u:pad-2:hole",
+              "r3_rshift_right_1.75u:pad-NPTH1:hole"
+            ],
+            "actual_mm": -1.1749933792447171,
+            "required_mm": 0.45,
+            "shortfall_mm": 1.624993379244717
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_right_fn_1u:pad-1:hole",
+              "r3_rshift_right_1.75u:pad-1:hole"
+            ],
+            "actual_mm": -1.020880483017808,
+            "required_mm": 0.45,
+            "shortfall_mm": 1.470880483017808
+          }
+        ]
+      }
+    },
+    {
+      "order": 4,
+      "socket_ref": "r3_rshift_left_fn_1u",
+      "from_footprint": "Gateron-LP-Hotswap-Socket-1U",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+      "accepted": false,
+      "report": {
+        "region": "rshift",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r3_rshift_2.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+            "center_x_mm": 259.55625000000003,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 250.03125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 0,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 66.675,
+            "rotation_deg": 90,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_fn_1u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1U",
+            "center_x_mm": 242.88750000000002,
+            "center_y_mm": 66.675,
+            "rotation_deg": 90,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 269.08125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 0,
+            "logical_node_id": "r3_rshift_2.75u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": -1.174993379244731,
+        "minimum_courtyard_clearance_mm": -7.512853953093423,
+        "hole_edge_target_met": false,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r3_rshift_left_1.75u",
+              "r3_rshift_left_fn_1u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_left_1.75u",
+              "r3_rshift_left_fn_1u"
+            ],
+            "actual_mm": -7.512853953093423,
+            "required_mm": 0.0,
+            "shortfall_mm": 7.512853953093423
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": -0.5678291350924612,
+            "required_mm": 0.0,
+            "shortfall_mm": 0.5678291350924612
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_left_1.75u:pad-NPTH1:hole",
+              "r3_rshift_left_fn_1u:pad-2:hole"
+            ],
+            "actual_mm": -1.174993379244731,
+            "required_mm": 0.45,
+            "shortfall_mm": 1.6249933792447309
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_left_1.75u:pad-1:hole",
+              "r3_rshift_left_fn_1u:pad-1:hole"
+            ],
+            "actual_mm": -1.020880483017753,
+            "required_mm": 0.45,
+            "shortfall_mm": 1.4708804830177529
+          }
+        ]
+      }
+    },
+    {
+      "order": 5,
+      "socket_ref": "r3_rshift_right_1.75u",
+      "from_footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+      "candidate_footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1.75U",
+      "accepted": false,
+      "report": {
+        "region": "rshift",
+        "solved": false,
+        "placements": [
+          {
+            "socket_ref": "r3_rshift_2.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-2.75U",
+            "center_x_mm": 259.55625000000003,
+            "center_y_mm": 66.675,
+            "rotation_deg": 0,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_1.75u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+            "center_x_mm": 250.03125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 180,
+            "logical_node_id": "r3_rshift_2.75u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 276.225,
+            "center_y_mm": 66.675,
+            "rotation_deg": 90,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_left_fn_1u",
+            "footprint": "Gateron-LP-Hotswap-Socket-1U",
+            "center_x_mm": 242.88750000000002,
+            "center_y_mm": 66.675,
+            "rotation_deg": 270,
+            "logical_node_id": "r3_rshift_left_fn_1u"
+          },
+          {
+            "socket_ref": "r3_rshift_right_1.75u",
+            "footprint": "Gateron-LP-or-ChocV1-Hotswap-Socket-1.75U",
+            "center_x_mm": 269.08125,
+            "center_y_mm": 66.675,
+            "rotation_deg": 90,
+            "logical_node_id": "r3_rshift_2.75u"
+          }
+        ],
+        "minimum_copper_clearance_mm": 0.0,
+        "minimum_hole_edge_clearance_mm": -1.1749933792447171,
+        "minimum_courtyard_clearance_mm": -4.64521012573772,
+        "hole_edge_target_met": false,
+        "drc_status": "blocked",
+        "blocking_conflicts": [
+          {
+            "domain": "copper",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": 0.0,
+            "required_mm": 0.25,
+            "shortfall_mm": 0.25
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_right_fn_1u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": -4.64521012573772,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.64521012573772
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_right_1.75u"
+            ],
+            "actual_mm": -4.321010507546175,
+            "required_mm": 0.0,
+            "shortfall_mm": 4.321010507546175
+          },
+          {
+            "domain": "courtyard",
+            "items": [
+              "r3_rshift_2.75u",
+              "r3_rshift_left_1.75u"
+            ],
+            "actual_mm": -0.567829135092444,
+            "required_mm": 0.0,
+            "shortfall_mm": 0.567829135092444
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_right_fn_1u:pad-NPTH1:hole",
+              "r3_rshift_right_1.75u:pad-2:hole"
+            ],
+            "actual_mm": -1.1749933792447171,
+            "required_mm": 0.45,
+            "shortfall_mm": 1.624993379244717
+          },
+          {
+            "domain": "hole_edge",
+            "items": [
+              "r3_rshift_2.75u:pad-NPTH1:hole",
+              "r3_rshift_right_1.75u:pad-1:hole"
+            ],
+            "actual_mm": -0.5,
+            "required_mm": 0.45,
+            "shortfall_mm": 0.95
+          }
+        ]
+      }
+    }
+  ],
+  "retained_dual_upgrades": [],
+  "smallest_alternatives": {
+    "search_kind": "center-preserving-socket-exclusion",
+    "minimum_removed_socket_count": 1,
+    "solutions": [
+      {
+        "removed_socket_refs": [
+          "r3_rshift_2.75u"
+        ],
+        "report": {
+          "region": "rshift",
+          "solved": true,
+          "placements": [
+            {
+              "socket_ref": "r3_rshift_left_1.75u",
+              "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+              "center_x_mm": 250.03125,
+              "center_y_mm": 66.675,
+              "rotation_deg": 180,
+              "logical_node_id": "r3_rshift_2.75u"
+            },
+            {
+              "socket_ref": "r3_rshift_right_fn_1u",
+              "footprint": "Gateron-LP-Hotswap-Socket-1U",
+              "center_x_mm": 276.225,
+              "center_y_mm": 66.675,
+              "rotation_deg": 180,
+              "logical_node_id": "r3_rshift_left_fn_1u"
+            },
+            {
+              "socket_ref": "r3_rshift_left_fn_1u",
+              "footprint": "Gateron-LP-Hotswap-Socket-1U",
+              "center_x_mm": 242.88750000000002,
+              "center_y_mm": 66.675,
+              "rotation_deg": 0,
+              "logical_node_id": "r3_rshift_left_fn_1u"
+            },
+            {
+              "socket_ref": "r3_rshift_right_1.75u",
+              "footprint": "Gateron-LP-Hotswap-Socket-1.75U",
+              "center_x_mm": 269.08125,
+              "center_y_mm": 66.675,
+              "rotation_deg": 0,
+              "logical_node_id": "r3_rshift_2.75u"
+            }
+          ],
+          "minimum_copper_clearance_mm": 6.861668893206662,
+          "minimum_hole_edge_clearance_mm": 1.893749999999983,
+          "minimum_courtyard_clearance_mm": 0.5317540631718777,
+          "hole_edge_target_met": true,
+          "drc_status": "geometry-pass",
+          "blocking_conflicts": []
+        }
+      }
+    ],
+    "requires_user_approval": true,
+    "not_applied": true
+  },
+  "coupon_evidence": {
+    "temporary": true,
+    "committed": false,
+    "created_via": "Konnect MCP",
+    "project_directory": "/tmp/lh60-region-rshift",
+    "project_file": "/tmp/lh60-region-rshift/lh60-region-rshift.kicad_pro",
+    "board_file": "/tmp/lh60-region-rshift/lh60-region-rshift.kicad_pcb",
+    "library": {
+      "nickname": "lh60-sockets",
+      "path": "lib/lh60-sockets",
+      "scope": "project",
+      "registered": true
+    },
+    "board_size_mm": {
+      "width": 300.0,
+      "height": 100.0
+    },
+    "rules_mm": {
+      "minimum_copper_clearance": 0.25,
+      "minimum_trace_width": 0.25,
+      "minimum_hole_to_hole": 0.45,
+      "minimum_via_drill": 0.3,
+      "minimum_via_size": 0.7
+    },
+    "placements": [
+      {
+        "reference": "SW_RSHIFT_1",
+        "socket_ref": "r3_rshift_2.75u",
+        "footprint": "lh60-sockets:Gateron-LP-Hotswap-Socket-2.75U",
+        "x_mm": 259.55625000000003,
+        "y_mm": 66.675,
+        "rotation_deg": 0
+      },
+      {
+        "reference": "SW_RSHIFT_2",
+        "socket_ref": "r3_rshift_left_1.75u",
+        "footprint": "lh60-sockets:Gateron-LP-Hotswap-Socket-1.75U",
+        "x_mm": 250.03125,
+        "y_mm": 66.675,
+        "rotation_deg": 180
+      },
+      {
+        "reference": "SW_RSHIFT_3",
+        "socket_ref": "r3_rshift_right_fn_1u",
+        "footprint": "lh60-sockets:Gateron-LP-Hotswap-Socket-1U",
+        "x_mm": 276.225,
+        "y_mm": 66.675,
+        "rotation_deg": 90
+      },
+      {
+        "reference": "SW_RSHIFT_4",
+        "socket_ref": "r3_rshift_left_fn_1u",
+        "footprint": "lh60-sockets:Gateron-LP-Hotswap-Socket-1U",
+        "x_mm": 242.88750000000002,
+        "y_mm": 66.675,
+        "rotation_deg": 270
+      },
+      {
+        "reference": "SW_RSHIFT_5",
+        "socket_ref": "r3_rshift_right_1.75u",
+        "footprint": "lh60-sockets:Gateron-LP-Hotswap-Socket-1.75U",
+        "x_mm": 269.08125,
+        "y_mm": 66.675,
+        "rotation_deg": 180
+      }
+    ],
+    "drc": {
+      "executed": true,
+      "tool": "run_drc",
+      "status": "blocked",
+      "violation_count": 7,
+      "error_count": 3,
+      "warning_count": 4,
+      "violations": [
+        {
+          "severity": "error",
+          "description": "Courtyards overlap",
+          "pos": null
+        },
+        {
+          "severity": "error",
+          "description": "Courtyards overlap",
+          "pos": null
+        },
+        {
+          "severity": "error",
+          "description": "NPTH inside courtyard",
+          "pos": null
+        },
+        {
+          "severity": "warning",
+          "description": "Silkscreen clearance",
+          "pos": null
+        },
+        {
+          "severity": "warning",
+          "description": "Silkscreen clearance",
+          "pos": null
+        },
+        {
+          "severity": "warning",
+          "description": "Silkscreen clipped by solder mask",
+          "pos": null
+        },
+        {
+          "severity": "warning",
+          "description": "Silkscreen clipped by solder mask",
+          "pos": null
+        }
+      ],
+      "output_file": "/tmp/lh60-region-rshift/rshift-drc.json",
+      "kicad_version": "10.0.5"
+    }
+  },
+  "production_pcb_modified": false,
+  "decision_required": true
+}

@@ -14,7 +14,7 @@
 - Choc V2：不纳入 Gateron 双座。V2 角落定位脚与 Gateron PTH 孔冲突。
 - 底排：保留方向键版底排；旧 6.25u 标准空格版不在当前范围。
 - ISO Enter：不在当前范围。
-- 当前配列：76 个物理 socket、70 个逻辑节点；完整 u/mm 坐标与共享关系见
+- 当前配列：75 个物理 socket、70 个逻辑节点；完整 u/mm 坐标与共享关系见
   `docs/layout-current.md`。
 - 矩阵：10 × 7，`COL0..COL9 = GP0..GP9`，
   `ROW0..ROW6 = GP10..GP15, GP26`，空闲 `GP27..GP29`。
@@ -25,10 +25,10 @@
 
 | 区域 | 支持方案 | 状态 |
 |---|---|---|
-| 顶排右端 | 2u / 1u + 1u | 待按 Gateron PTH 方案重新画通 |
-| Enter | 2.25u ANSI / 1u Fn + 1.25u Enter | 待按 Gateron PTH 方案重新画通 |
-| LShift | 2.25u / 1u Fn + 1.25u Shift | 待按 Gateron PTH 方案重新画通 |
-| RShift | 2.75u / 1.75u Shift + 1u Fn / 1u Fn + 1.75u Shift | 已实测三方案共存，需在最终板复现并清制造紧点 |
+| 顶排右端 | 2u / 1u + 1u | 生产位置与 GUI 旋转已通过当前几何门禁 |
+| Enter | 2.25u ANSI / 1u Fn + 1.25u Enter | 生产位置与 GUI 旋转已通过当前几何门禁 |
+| LShift | 2.25u / 1u Fn + 1.25u Shift | 生产位置与 GUI 旋转已通过当前几何门禁 |
+| RShift | 1.75u Shift + 1u Fn / 1u Fn + 1.75u Shift | 2.75u 方案已删除；四座子生产布局通过几何门禁 |
 
 ## Socket 规则
 

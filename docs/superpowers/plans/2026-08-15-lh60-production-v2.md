@@ -433,7 +433,7 @@ Row 0: 13 fixed 1u + 2u/split-right shared node + split-left independent node
 Row 1: 1.5u + 12 fixed keys + 1.5u
 Row 2: 1.75u + 11 fixed keys + 2.25u/split-right shared node + split-left independent node
 Row 3: split-left independent + 2.25u/1.25u shared + 10 fixed keys
-       + 2.75u/left-1.75u/right-1.75u shared
+       + left-1.75u/right-1.75u shared
        + left-Fn/right-Fn physical sockets sharing one logical Fn node
 Row 4: 1.25u Ctrl/Win/Alt + 2.25u Space + 1u Fn + four arrows + four 1u right modifiers
 ```
@@ -459,7 +459,7 @@ Also assert all five shared-node groups:
 top-right 2u + split-right 1u
 ANSI Enter 2.25u + split-right Enter 1.25u
 LShift 2.25u + split Shift 1.25u
-RShift 2.75u + left 1.75u + right 1.75u
+RShift left 1.75u + right 1.75u
 RShift left Fn 1u + RShift right Fn 1u
 ```
 
@@ -555,7 +555,7 @@ Use `get_project_info`, `get_design_rules`, `kicad-cli sch upgrade`, and `kicad-
 - Modify: `tools/verify_lh60.py`
 
 **Interfaces:**
-- 1 MCU, 70 diodes, 76 switch symbols (one per physical socket), and test-point symbols for `VSYS`, `3V3`, `GND`, `COL0..COL9`, `ROW0..ROW6`, `GP27..GP29`.
+- 1 MCU, 70 diodes, 75 switch symbols (one per active physical socket), and test-point symbols for `VSYS`, `3V3`, `GND`, `COL0..COL9`, `ROW0..ROW6`, `GP27..GP29`.
 - Every switch symbol footprint is assigned from the G/K/Dual selection rule.
 
 **Library gate:** before placement, search the registered KiCad libraries for the actual diode, switch, and test-point symbol/footprint IDs. If system libraries are unavailable, create project-local passive switch/test-point symbols and footprints through Konnect; do not guess library IDs.

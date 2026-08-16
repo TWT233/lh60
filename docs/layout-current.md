@@ -7,7 +7,9 @@
 
 - 键区：15u × 5 行，键距 19.05 × 19.05 mm，左上角为物理原点。
 - 键中心：`(x + width / 2, row + 0.5)` u；毫米坐标为 u 坐标乘 19.05。
-- 物理 socket：76 个；逻辑节点：70 个；每个逻辑节点一颗二极管。
+- 物理 socket：75 个；逻辑节点：70 个；每个逻辑节点一颗二极管。
+- `SW59` 是已退休的 `r3_rshift_2.75u` 引用槽；为避免已有 PCB 引用整体
+  重编号，现役引用保持 `SW1..SW58, SW60..SW76`。
 - 矩阵：10 × 7，节点按首次出现的物理顺序分配：
   `matrix_row, matrix_column = divmod(logical_index, 10)`。
 - 方向：QMK `COL2ROW`。
@@ -82,11 +84,10 @@
 | `r3_comma_1u` | , | 3 | 9.25 / 1 | 9.75, 3.5 | 185.738, 66.675 | `r3_comma_1u` | fixed / fixed |
 | `r3_period_1u` | . | 3 | 10.25 / 1 | 10.75, 3.5 | 204.787, 66.675 | `r3_period_1u` | fixed / fixed |
 | `r3_slash_1u` | / | 3 | 11.25 / 1 | 11.75, 3.5 | 223.838, 66.675 | `r3_slash_1u` | fixed / fixed |
-| `r3_rshift_2.75u` | RShift | 3 | 12.25 / 2.75 | 13.625, 3.5 | 259.556, 66.675 | `r3_rshift_2.75u` | rshift / wide |
-| `r3_rshift_left_1.75u` | Left split RShift | 3 | 12.25 / 1.75 | 13.125, 3.5 | 250.031, 66.675 | `r3_rshift_2.75u` | rshift / split-left-shift |
+| `r3_rshift_left_1.75u` | Left split RShift | 3 | 12.25 / 1.75 | 13.125, 3.5 | 250.031, 66.675 | `r3_rshift_1.75u` | rshift / split-left-shift |
 | `r3_rshift_right_fn_1u` | Right split Fn | 3 | 14 / 1 | 14.5, 3.5 | 276.225, 66.675 | `r3_rshift_left_fn_1u` | rshift / split-right-fn |
 | `r3_rshift_left_fn_1u` | Left split Fn | 3 | 12.25 / 1 | 12.75, 3.5 | 242.888, 66.675 | `r3_rshift_left_fn_1u` | rshift / split-left-fn |
-| `r3_rshift_right_1.75u` | Right split RShift | 3 | 13.25 / 1.75 | 14.125, 3.5 | 269.081, 66.675 | `r3_rshift_2.75u` | rshift / split-right-shift |
+| `r3_rshift_right_1.75u` | Right split RShift | 3 | 13.25 / 1.75 | 14.125, 3.5 | 269.081, 66.675 | `r3_rshift_1.75u` | rshift / split-right-shift |
 | `r4_left_ctrl_1.25u` | Left Ctrl | 4 | 0 / 1.25 | 0.625, 4.5 | 11.906, 85.725 | `r4_left_ctrl_1.25u` | fixed / fixed |
 | `r4_left_win_1.25u` | Left Win | 4 | 1.25 / 1.25 | 1.875, 4.5 | 35.719, 85.725 | `r4_left_win_1.25u` | fixed / fixed |
 | `r4_left_alt_1.25u` | Left Alt | 4 | 2.5 / 1.25 | 3.125, 4.5 | 59.531, 85.725 | `r4_left_alt_1.25u` | fixed / fixed |
@@ -163,7 +164,7 @@ GPIO 列按 `GP0..GP9`，GPIO 行按 `GP10..GP15, GP26`。表中多个 physical 
 | 52 | `r3_comma_1u` | ROW5 / COL2 | D53 | `r3_comma_1u` |
 | 53 | `r3_period_1u` | ROW5 / COL3 | D54 | `r3_period_1u` |
 | 54 | `r3_slash_1u` | ROW5 / COL4 | D55 | `r3_slash_1u` |
-| 55 | `r3_rshift_2.75u` | ROW5 / COL5 | D56 | `r3_rshift_2.75u`, `r3_rshift_left_1.75u`, `r3_rshift_right_1.75u` |
+| 55 | `r3_rshift_1.75u` | ROW5 / COL5 | D56 | `r3_rshift_left_1.75u`, `r3_rshift_right_1.75u` |
 | 56 | `r3_rshift_left_fn_1u` | ROW5 / COL6 | D57 | `r3_rshift_left_fn_1u`, `r3_rshift_right_fn_1u` |
 | 57 | `r4_left_ctrl_1.25u` | ROW5 / COL7 | D58 | `r4_left_ctrl_1.25u` |
 | 58 | `r4_left_win_1.25u` | ROW5 / COL8 | D59 | `r4_left_win_1.25u` |
@@ -184,7 +185,7 @@ GPIO 列按 `GP0..GP9`，GPIO 行按 `GP10..GP15, GP26`。表中多个 physical 
 1. 顶排 `2u` 与 split-right `1u`。
 2. ANSI Enter `2.25u` 与 split-right Enter `1.25u`。
 3. LShift `2.25u` 与 split Shift `1.25u`。
-4. RShift `2.75u`、left `1.75u`、right `1.75u`。
+4. RShift left `1.75u` 与 right `1.75u`。
 5. RShift left Fn `1u` 与 right Fn `1u`。
 
 顶排、Enter 和 LShift 的 split-left Fn 各自是独立逻辑节点。区域求解报告提供

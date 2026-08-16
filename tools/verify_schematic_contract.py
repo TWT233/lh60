@@ -123,15 +123,20 @@ class SchematicPlanContractTest(unittest.TestCase):
             by_kind.setdefault(component.kind, []).append(component)
 
         self.assertEqual(len(by_kind["mcu"]), 1)
-        self.assertEqual(len(by_kind["switch"]), 76)
+        self.assertEqual(len(by_kind["switch"]), 75)
         self.assertEqual(len(by_kind["diode"]), 70)
         self.assertEqual(len(by_kind["test_point"]), 23)
         self.assertEqual(len(by_kind["power_flag"]), 3)
-        self.assertEqual(len(plan.components), 173)
-        self.assertEqual(len({component.reference for component in plan.components}), 173)
+        self.assertEqual(len(plan.components), 172)
+        self.assertEqual(len({component.reference for component in plan.components}), 172)
+        self.assertNotIn(
+            "SW59",
+            {component.reference for component in plan.components},
+        )
 
     def test_every_physical_key_has_one_traceable_switch(self):
         from tools.lh60_design.layout import physical_keys
+        from tools.lh60_design.schematic import switch_references
 
         switches = {
             component.physical_key_id: component
@@ -141,6 +146,10 @@ class SchematicPlanContractTest(unittest.TestCase):
         keys = physical_keys()
 
         self.assertEqual(set(switches), {key.physical_key_id for key in keys})
+        references = switch_references()
+        self.assertNotIn("SW59", set(references.values()))
+        self.assertEqual(references["r3_rshift_left_1.75u"], "SW60")
+        self.assertEqual(references["r4_right_ctrl_1u"], "SW76")
         for key in keys:
             component = switches[key.physical_key_id]
             self.assertEqual(component.logical_node_id, key.logical_node_id)
@@ -271,7 +280,7 @@ class SchematicPlanContractTest(unittest.TestCase):
         ]
 
         self.assertEqual(len(assignments), len(set(assignments)))
-        expected_pin_count = 23 + 76 * 2 + 70 * 2 + 23 + 3
+        expected_pin_count = 23 + 75 * 2 + 70 * 2 + 23 + 3
         self.assertEqual(len(assignments), expected_pin_count)
         self.assertEqual(
             {connection.net_name for connection in plan.connections}
@@ -286,6 +295,33 @@ class SchematicPlanContractTest(unittest.TestCase):
                 "3V3",
                 "GND",
             },
+        )
+
+
+class ProductionSchematicOutputTest(unittest.TestCase):
+    SCHEMATIC = Path(__file__).resolve().parents[1] / "lh60.kicad_sch"
+
+    def test_retired_rshift_symbol_is_absent(self):
+        text = self.SCHEMATIC.read_text()
+
+        self.assertNotIn('"SW59"', text)
+        self.assertNotIn("r3_rshift_2.75u", text)
+        self.assertNotIn(
+            '(label "KEY_55"\n    (at 123.19 148.59 180)',
+            text,
+        )
+        self.assertNotIn(
+            '(label "ROW5"\n    (at 135.89 148.59 0)',
+            text,
+        )
+        self.assertEqual(
+            len(
+                __import__("re").findall(
+                    r'\(property "Reference" "SW[0-9]+"',
+                    text,
+                )
+            ),
+            75,
         )
 
 

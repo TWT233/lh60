@@ -8,7 +8,6 @@ EXPECTED_SHARED_GROUPS = {
     frozenset({"r3_lshift_2.25u", "r3_lshift_split_1.25u"}),
     frozenset(
         {
-            "r3_rshift_2.75u",
             "r3_rshift_left_1.75u",
             "r3_rshift_right_1.75u",
         }
@@ -24,11 +23,15 @@ class LayoutMatrixContractTest(unittest.TestCase):
         from tools.lh60_design.layout import KEY_PITCH_MM, physical_keys
 
         keys = physical_keys()
-        self.assertEqual(len(keys), 76)
-        self.assertEqual(len({key.physical_key_id for key in keys}), 76)
+        self.assertEqual(len(keys), 75)
+        self.assertEqual(len({key.physical_key_id for key in keys}), 75)
         self.assertEqual(
             tuple(sum(key.row == row for key in keys) for row in range(5)),
-            (16, 14, 15, 18, 13),
+            (16, 14, 15, 17, 13),
+        )
+        self.assertNotIn(
+            "r3_rshift_2.75u",
+            {key.physical_key_id for key in keys},
         )
 
         for row in range(5):
@@ -75,6 +78,15 @@ class LayoutMatrixContractTest(unittest.TestCase):
         self.assertEqual(set(grouped_ids), physical_ids)
         self.assertEqual(len(grouped_ids), len(set(grouped_ids)))
         self.assertEqual(shared_groups, EXPECTED_SHARED_GROUPS)
+        rshift = next(
+            node
+            for node in nodes
+            if "r3_rshift_left_1.75u" in node.physical_key_ids
+        )
+        self.assertEqual(
+            rshift.logical_node_id,
+            "r3_rshift_1.75u",
+        )
 
     def test_split_left_function_keys_remain_independent_nodes(self):
         from tools.lh60_design.matrix import node_for_physical_key

@@ -21,6 +21,9 @@ MCU_SYMBOL = "lh60-mcu:RP2040-Tiny"
 MCU_FOOTPRINT = "lh60-mcu:MCU_RP2040-Tiny_SMD"
 DIODE_FOOTPRINT = "lh60-core:D_SOD-323_Bottom"
 TEST_POINT_FOOTPRINT = "lh60-core:TestPoint_Pad_D1.5mm_Bottom"
+RETIRED_SWITCH_REFERENCES = {
+    "r3_rshift_2.75u": "SW59",
+}
 
 
 @dataclass(frozen=True)
@@ -52,9 +55,16 @@ class SchematicPlan:
 
 
 def switch_references() -> dict[str, str]:
+    keys = physical_keys()
+    active_ids = {key.physical_key_id for key in keys}
+    reference_order = [key.physical_key_id for key in keys]
+    for retired_id, reference in RETIRED_SWITCH_REFERENCES.items():
+        slot = int(reference.removeprefix("SW")) - 1
+        reference_order.insert(slot, retired_id)
     return {
-        key.physical_key_id: f"SW{index + 1}"
-        for index, key in enumerate(physical_keys())
+        physical_key_id: f"SW{index + 1}"
+        for index, physical_key_id in enumerate(reference_order)
+        if physical_key_id in active_ids
     }
 
 

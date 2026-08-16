@@ -263,7 +263,7 @@ No `5V`, SWD, RUN, BOOTSEL, or USB data pins exist on the carrier-board symbol.
 
 ```text
 logical nodes: 70
-physical socket symbols: 76
+physical socket symbols: 75
 matrix: 10 columns × 7 rows
 COL0..COL9: GP0..GP9
 ROW0..ROW6: GP10..GP15, GP26
@@ -277,8 +277,11 @@ Five shared logical-node groups:
 1. top-right `2u` + split-right `1u`
 2. ANSI Enter `2.25u` + split-right Enter `1.25u`
 3. LShift `2.25u` + split Shift `1.25u`
-4. RShift `2.75u` + left `1.75u` + right `1.75u`
+4. RShift left `1.75u` + right `1.75u`
 5. RShift left Fn `1u` + RShift right Fn `1u`
+
+`r3_rshift_2.75u` / `SW59` was retired after this parallel handoff was first
+issued. Active references remain stable as `SW1..SW58, SW60..SW76`.
 
 Independent split-left Fn nodes:
 
@@ -434,7 +437,7 @@ Important isolation choice:
 
 Required contracts:
 
-- 76 physical sockets;
+- 75 physical sockets;
 - 70 unique logical nodes;
 - five shared-node groups;
 - 10×7 row-major allocation;
@@ -769,8 +772,9 @@ Exclusive write scope:
 
 Do not edit tools/verify_lh60.py or any KiCad source file.
 
-Implement 76 physical sockets, 70 logical nodes, five shared-node groups, 10×7 row-major
-allocation, GP0..GP9 columns, GP10..GP15+GP26 rows, GP27..GP29 spares.
+Implement 75 physical sockets, 70 logical nodes, five shared-node groups, 10×7 row-major
+allocation, GP0..GP9 columns, GP10..GP15+GP26 rows, GP27..GP29 spares. Preserve
+the retired `SW59` reference slot and keep active references through `SW76`.
 Use current approved 15u×5 layout only; do not copy test-board coordinates or rotations.
 
 Run handoff acceptance, commit and push.

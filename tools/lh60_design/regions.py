@@ -14,13 +14,9 @@ from tools.lh60_design.socket_geometry import (
     FootprintSpec,
     PadSpec,
     build_footprint_specs,
-    choc_v1_pads_rotated_180,
-    choc_v1_v2_pads,
-    gateron_pads,
 )
 from tools.lh60_design.socket_library import (
-    choc_physical_geometry,
-    gateron_physical_geometry,
+    _courtyard_geometry,
 )
 
 
@@ -189,44 +185,6 @@ def _copper_geometry(pads: Iterable[PadSpec]):
         and any("Cu" in layer for layer in pad.layers)
     ]
     return unary_union(copper)
-
-
-def _land_pattern(pads: Iterable[PadSpec]):
-    return unary_union([_pad_geometry(pad) for pad in pads])
-
-
-def _courtyard_geometry(spec: FootprintSpec):
-    gateron = unary_union(
-        [gateron_physical_geometry(), _land_pattern(gateron_pads())]
-    ).buffer(
-        spec.courtyard_clearance_mm,
-        quad_segs=8,
-        join_style="round",
-    )
-    choc = unary_union(
-        [choc_physical_geometry(), _land_pattern(choc_v1_v2_pads())]
-    ).buffer(
-        spec.courtyard_clearance_mm,
-        quad_segs=8,
-        join_style="round",
-    )
-    if spec.series == "Gateron-LP":
-        return gateron
-    if spec.series == "Kailh-Choc-V1V2":
-        return choc
-    rotated_choc_body = affinity.rotate(
-        choc_physical_geometry(),
-        180,
-        origin=(0, 0),
-    )
-    rotated_choc = unary_union(
-        [rotated_choc_body, _land_pattern(choc_v1_pads_rotated_180())]
-    ).buffer(
-        spec.courtyard_clearance_mm,
-        quad_segs=8,
-        join_style="round",
-    )
-    return unary_union([gateron, rotated_choc])
 
 
 def _transform_geometry(geometry, placement: RegionPlacement):

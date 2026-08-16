@@ -1878,13 +1878,6 @@
       (justify left bottom))
     (uuid "9cc25b6a-15a5-48c4-8abd-f7f3eef86a89"))
 
-  (label "ROW5"
-    (at 135.89 148.59 0)
-    (effects
-      (font
-        (size 1.27 1.27))
-      (justify left bottom))
-    (uuid "5c143dfc-0233-4b31-a3a7-6ca3de970177"))
 
   (label "ROW5"
     (at 135.89 154.94 0)
@@ -3078,13 +3071,6 @@
       (justify right bottom))
     (uuid "46a42720-e628-4d13-bde5-3143c9545de0"))
 
-  (label "KEY_55"
-    (at 123.19 148.59 180)
-    (effects
-      (font
-        (size 1.27 1.27))
-      (justify right bottom))
-    (uuid "c610abc0-8921-4ecd-ae4a-a5038ac0e34b"))
 
   (label "KEY_55"
     (at 123.19 154.94 180)
@@ -8410,41 +8396,6 @@
           (reference "D56")
           (unit 1)))))
 
-  (symbol
-    (lib_id "lh60-core:KeySwitch")
-    (at 129.54 148.59 0)
-    (unit 1)
-    (in_bom yes)
-    (on_board yes)
-    (dnp no)
-    (uuid "2acc951b-516d-49e0-96d1-640045bd5610")
-    (property "Reference" "SW59"
-      (at 129.54 143.51 0)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Value" "r3_rshift_2.75u"
-      (at 129.54 153.67 0)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Footprint" "lh60-sockets:Gateron-LP-Hotswap-Socket-2.75U"
-      (at 129.54 148.59 0)
-      (hide yes)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Datasheet" ""
-      (at 129.54 148.59 0)
-      (hide yes)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (instances
-      (project "lh60"
-        (path "/1ff94ced-4ad0-4573-85e6-3ea048ef8c2d"
-          (reference "SW59")
-          (unit 1)))))
 
   (symbol
     (lib_id "lh60-core:KeySwitch")

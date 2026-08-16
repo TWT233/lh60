@@ -11,8 +11,18 @@ class SocketPlacementPlanTest(unittest.TestCase):
         references = switch_references()
         plan = socket_placement_plan()
 
-        self.assertEqual(len(plan), 76)
-        self.assertEqual(len({placement.reference for placement in plan}), 76)
+        self.assertEqual(len(plan), 75)
+        self.assertEqual(len({placement.reference for placement in plan}), 75)
+        self.assertNotIn("SW59", {placement.reference for placement in plan})
+        self.assertEqual(
+            next(
+                placement.reference
+                for placement in plan
+                if placement.physical_key_id == "r3_rshift_left_1.75u"
+            ),
+            "SW60",
+        )
+        self.assertEqual(plan[-1].reference, "SW76")
         self.assertEqual(
             [placement.physical_key_id for placement in plan],
             [key.physical_key_id for key in keys],
@@ -57,9 +67,7 @@ class SocketPlacementPlanTest(unittest.TestCase):
                 "r2_enter_ansi_2.25u": 180.0,
                 "r3_lshift_2.25u": 180.0,
                 "r3_rshift_left_1.75u": 180.0,
-                "r3_rshift_right_fn_1u": 90.0,
-                "r3_rshift_left_fn_1u": 270.0,
-                "r3_rshift_right_1.75u": 180.0,
+                "r3_rshift_right_fn_1u": 180.0,
             },
         )
 
