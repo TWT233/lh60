@@ -1,15 +1,16 @@
 # LH60 Core Library
 
-The production environment has no installed KiCad system symbol or footprint
-collection: the Konnect library gate searched for switch, diode, test-point,
-SOD-323, and test-pad entries; the system library search returned zero results.
-This project-local library prevents the production schematic from
-depending on an untracked workstation setup.
+The production schematic uses KiCad's standard `Switch:SW_Push` and
+`Device:D` symbols. The official KiCad symbol libraries must therefore be
+installed in the workstation environment before regenerating or updating the
+schematic.
+
+This project-local library keeps only the support symbols and custom
+bottom-side footprints that are not supplied directly by the standard symbol
+contract.
 
 ## Symbols
 
-- `lh60-core:KeySwitch`: passive logical pads 1 and 2.
-- `lh60-core:MatrixDiode`: pin 1 cathode, pin 2 anode.
 - `lh60-core:TestPoint`: one passive pin.
 - `lh60-core:PowerFlag`: power-output marker for the carrier-provided
   `VSYS`, `3V3`, and `GND` rails so ERC can verify the otherwise passive

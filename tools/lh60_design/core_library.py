@@ -14,6 +14,7 @@ LIBRARY_ROOT = ROOT / "lib" / "lh60-core"
 SYMBOL_LIBRARY = LIBRARY_ROOT / "lh60-core.kicad_sym"
 FOOTPRINT_LIBRARY = LIBRARY_ROOT / "lh60-core.pretty"
 PROJECT = ROOT / "lh60.kicad_pro"
+RETIRED_SYMBOLS = ("KeySwitch", "MatrixDiode")
 
 
 @dataclass(frozen=True)
@@ -71,18 +72,6 @@ def _horizontal_pins(
 
 def core_symbol_specs() -> tuple[CoreSymbolSpec, ...]:
     return (
-        CoreSymbolSpec(
-            name="KeySwitch",
-            reference_prefix="SW",
-            value="KeySwitch",
-            pins=_horizontal_pins("1", "1", "2", "2"),
-        ),
-        CoreSymbolSpec(
-            name="MatrixDiode",
-            reference_prefix="D",
-            value="1N4148WS",
-            pins=_horizontal_pins("1", "K", "2", "A"),
-        ),
         CoreSymbolSpec(
             name="TestPoint",
             reference_prefix="TP",
@@ -358,6 +347,16 @@ def apply_core_library(client: McpClient) -> None:
     client.tool_schemas("library")
     LIBRARY_ROOT.mkdir(parents=True, exist_ok=True)
     FOOTPRINT_LIBRARY.mkdir(parents=True, exist_ok=True)
+
+    for symbol_name in RETIRED_SYMBOLS:
+        for _ in range(_symbol_definition_count(symbol_name)):
+            client.call_tool(
+                "delete_symbol",
+                {
+                    "library_path": str(SYMBOL_LIBRARY),
+                    "symbol_name": symbol_name,
+                },
+            )
 
     for symbol in core_symbol_specs():
         for _ in range(_symbol_definition_count(symbol.name)):

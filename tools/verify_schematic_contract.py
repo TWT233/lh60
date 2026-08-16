@@ -16,21 +16,13 @@ class CoreLibraryContractTest(unittest.TestCase):
 
         return core_symbol_specs(), core_footprint_specs()
 
-    def test_symbol_contract_has_switch_diode_and_test_point(self):
+    def test_symbol_contract_keeps_only_project_support_symbols(self):
         symbols, _ = self.specs()
         by_name = {symbol.name: symbol for symbol in symbols}
 
         self.assertEqual(
             set(by_name),
-            {"KeySwitch", "MatrixDiode", "TestPoint", "PowerFlag"},
-        )
-        self.assertEqual(
-            [(pin.number, pin.name, pin.pin_type) for pin in by_name["KeySwitch"].pins],
-            [("1", "1", "passive"), ("2", "2", "passive")],
-        )
-        self.assertEqual(
-            [(pin.number, pin.name, pin.pin_type) for pin in by_name["MatrixDiode"].pins],
-            [("1", "K", "passive"), ("2", "A", "passive")],
+            {"TestPoint", "PowerFlag"},
         )
         self.assertEqual(
             [(pin.number, pin.name, pin.pin_type) for pin in by_name["TestPoint"].pins],
@@ -81,6 +73,8 @@ class CoreLibraryContractTest(unittest.TestCase):
                 1,
                 symbol.name,
             )
+        self.assertNotIn('\n  (symbol "KeySwitch"\n', symbol_text)
+        self.assertNotIn('\n  (symbol "MatrixDiode"\n', symbol_text)
         for footprint in footprints:
             path = self.FOOTPRINT_LIBRARY / f"{footprint.name}.kicad_mod"
             text = path.read_text()
@@ -99,11 +93,12 @@ class CoreLibraryContractTest(unittest.TestCase):
             symbol_table,
         )
 
-    def test_provenance_documents_system_library_gate(self):
+    def test_provenance_documents_default_symbols_and_custom_footprints(self):
         readme = (self.LIBRARY_ROOT / "README.md").read_text()
         license_text = (self.LIBRARY_ROOT / "LICENSE-KICAD-LIBRARIES.md").read_text()
 
-        self.assertIn("system library search returned zero results", readme)
+        self.assertIn("`Switch:SW_Push`", readme)
+        self.assertIn("`Device:D`", readme)
         self.assertIn("flipped to the back side during PCB placement", readme)
         self.assertIn("D_SOD-323", readme)
         self.assertIn("TestPoint_Pad_D1.5mm", readme)
@@ -132,6 +127,14 @@ class SchematicPlanContractTest(unittest.TestCase):
         self.assertNotIn(
             "SW59",
             {component.reference for component in plan.components},
+        )
+        self.assertEqual(
+            {component.lib_id for component in by_kind["switch"]},
+            {"Switch:SW_Push"},
+        )
+        self.assertEqual(
+            {component.lib_id for component in by_kind["diode"]},
+            {"Device:D"},
         )
 
     def test_every_physical_key_has_one_traceable_switch(self):
@@ -323,6 +326,14 @@ class ProductionSchematicOutputTest(unittest.TestCase):
             ),
             75,
         )
+
+    def test_switches_and_diodes_use_kicad_default_symbols(self):
+        text = self.SCHEMATIC.read_text()
+
+        self.assertEqual(text.count('(lib_id "lh60-core:KeySwitch")'), 0)
+        self.assertEqual(text.count('(lib_id "lh60-core:MatrixDiode")'), 0)
+        self.assertEqual(text.count('(lib_id "Switch:SW_Push")'), 75)
+        self.assertEqual(text.count('(lib_id "Device:D")'), 70)
 
 
 if __name__ == "__main__":

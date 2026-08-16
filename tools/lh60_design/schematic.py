@@ -13,8 +13,8 @@ from tools.lh60_design.mcp import McpClient
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMATIC = ROOT / "lh60.kicad_sch"
-CORE_SWITCH = "lh60-core:KeySwitch"
-CORE_DIODE = "lh60-core:MatrixDiode"
+CORE_SWITCH = "Switch:SW_Push"
+CORE_DIODE = "Device:D"
 CORE_TEST_POINT = "lh60-core:TestPoint"
 CORE_POWER_FLAG = "lh60-core:PowerFlag"
 MCU_SYMBOL = "lh60-mcu:RP2040-Tiny"
