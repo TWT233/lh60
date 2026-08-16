@@ -187,5 +187,11 @@ GPIO 列按 `GP0..GP9`，GPIO 行按 `GP10..GP15, GP26`。表中多个 physical 
 4. RShift `2.75u`、left `1.75u`、right `1.75u`。
 5. RShift left Fn `1u` 与 right Fn `1u`。
 
-顶排、Enter 和 LShift 的 split-left Fn 各自是独立逻辑节点。四个区域的旋转和
-最小铜、孔边、courtyard 间距由后续区域求解报告决定，不在本文预判。
+顶排、Enter 和 LShift 的 split-left Fn 各自是独立逻辑节点。区域求解报告提供
+初始可行角度；生产 PCB 在 GUI 检查后允许仅为统一装配方向调整旋转，当前
+post-review override 记录在 `tools/lh60_design/pcb.py`，不会改变冻结中心。
+
+Socket 中心轴孔用于插入开关轴心柱，不是会向外扩张的装配实体。因此它仍参与
+钻孔到钻孔、铜到孔和制造孔径检查，但 `NPTH inside courtyard` 不作为 socket
+之间的装配干涉判据。`B.CrtYd` 仍用于 socket 塑胶本体、端子和实际 land pattern
+之间的装配检查。

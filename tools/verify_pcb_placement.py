@@ -24,13 +24,28 @@ class SocketPlacementPlanTest(unittest.TestCase):
                 self.assertAlmostEqual(placement.y_mm, key.center_y_mm)
                 self.assertEqual(placement.layer, "F.Cu")
 
-    def test_region_rotations_come_from_the_selected_reports(self):
-        from tools.lh60_design.pcb import socket_placement_plan
+    def test_reviewed_rotations_override_the_solver_reports(self):
+        from tools.lh60_design.pcb import (
+            REVIEWED_ROTATION_OVERRIDES_DEG,
+            socket_placement_plan,
+        )
 
         rotations = {
             placement.physical_key_id: placement.rotation_deg
             for placement in socket_placement_plan()
         }
+        self.assertEqual(
+            REVIEWED_ROTATION_OVERRIDES_DEG,
+            {
+                "r0_top_split_left_fn_1u": 0.0,
+                "r2_enter_ansi_2.25u": 180.0,
+                "r2_enter_split_left_fn_1u": 0.0,
+                "r2_enter_split_right_1.25u": 0.0,
+                "r3_lshift_split_left_fn_1u": 0.0,
+                "r3_lshift_2.25u": 180.0,
+                "r3_lshift_split_1.25u": 0.0,
+            },
+        )
         self.assertEqual(
             {
                 key_id: rotation
@@ -39,11 +54,8 @@ class SocketPlacementPlanTest(unittest.TestCase):
             },
             {
                 "r0_top_2u": 180.0,
-                "r0_top_split_left_fn_1u": 270.0,
-                "r2_enter_split_left_fn_1u": 270.0,
-                "r2_enter_split_right_1.25u": 180.0,
-                "r3_lshift_split_left_fn_1u": 270.0,
-                "r3_lshift_split_1.25u": 180.0,
+                "r2_enter_ansi_2.25u": 180.0,
+                "r3_lshift_2.25u": 180.0,
                 "r3_rshift_left_1.75u": 180.0,
                 "r3_rshift_right_fn_1u": 90.0,
                 "r3_rshift_left_fn_1u": 270.0,

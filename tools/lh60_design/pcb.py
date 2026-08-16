@@ -13,6 +13,15 @@ from tools.lh60_design.schematic import switch_references
 ROOT = Path(__file__).resolve().parents[2]
 BOARD = ROOT / "lh60.kicad_pcb"
 REGION_REPORTS = ROOT / "docs" / "regions"
+REVIEWED_ROTATION_OVERRIDES_DEG = {
+    "r0_top_split_left_fn_1u": 0.0,
+    "r2_enter_ansi_2.25u": 180.0,
+    "r2_enter_split_left_fn_1u": 0.0,
+    "r2_enter_split_right_1.25u": 0.0,
+    "r3_lshift_split_left_fn_1u": 0.0,
+    "r3_lshift_2.25u": 180.0,
+    "r3_lshift_split_1.25u": 0.0,
+}
 
 
 @dataclass(frozen=True)
@@ -152,6 +161,7 @@ def _region_rotations() -> dict[str, float]:
 def socket_placement_plan() -> tuple[FootprintPlacement, ...]:
     references = switch_references()
     rotations = _region_rotations()
+    rotations.update(REVIEWED_ROTATION_OVERRIDES_DEG)
     keys = physical_keys()
     regional_key_ids = {
         key.physical_key_id for key in keys if key.region is not None
