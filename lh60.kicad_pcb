@@ -84,11 +84,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "0041e066-ab01-4f69-8daf-37c2b889ebeb")
-		(at 74.03125 118.95)
+		(at 209.55 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW27"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "b8de6b60-b49f-46a9-b839-94f71604cd4e")
 			(effects
@@ -99,7 +99,7 @@
 			)
 		)
 		(property "Value" "r1_p_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "a8e2f76d-9abf-43e5-9fb5-5f0045c4f497")
 			(effects
@@ -110,7 +110,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "32da36c3-9263-4758-9721-78ab48185186")
@@ -121,7 +121,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "7262c15f-1297-4e15-8b2c-595e65d3612f")
@@ -572,11 +572,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "029de1fd-2a8c-4605-a145-98c3aa1fc7e4")
-		(at 180.90125 34.798)
+		(at 257.175 9.525 270)
 		(descr "Gateron-LP bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1u")
 		(property "Reference" "SW15"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125 90)
 			(layer "F.SilkS")
 			(uuid "f88b0eca-bc5f-4f09-8c64-7e1f3e81ed41")
 			(effects
@@ -587,7 +587,7 @@
 			)
 		)
 		(property "Value" "r0_top_split_left_fn_1u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25 90)
 			(layer "F.Fab")
 			(uuid "00db8f06-d039-4870-9f3f-40331f3a6910")
 			(effects
@@ -598,7 +598,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f915c6a8-8d76-4c74-aa39-1413b9a6087b")
@@ -609,7 +609,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "45874899-ab34-4c91-bc0b-6222d2afa3ec")
@@ -751,14 +751,14 @@
 			(uuid "139cc310-602f-4ad3-bd51-1ec5af073a38")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 270)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "b096ec35-009e-4834-b145-5d8fdfd5ca0e")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -768,7 +768,7 @@
 			(uuid "03dbb722-6207-4ece-bfff-03de7c75fb4d")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 270)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_14")
@@ -777,7 +777,7 @@
 			(uuid "835662dc-111c-4334-8fec-e250eb76fc8b")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -788,7 +788,7 @@
 			(uuid "809af347-b990-4057-aa5a-c3542c6166df")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -799,7 +799,7 @@
 			(uuid "9199ee86-fc84-4588-9363-4652e40a74c1")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 270)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW1")
@@ -808,7 +808,7 @@
 			(uuid "28544fcb-174f-4836-a531-c61e43ae4ab8")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -833,11 +833,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "04600dcd-887d-4f9d-bc2b-216f7bf758a2")
-		(at 74.03125 137.175)
+		(at 228.6 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW28"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "dfb6bdb9-6a7a-4456-b126-83623148105e")
 			(effects
@@ -848,7 +848,7 @@
 			)
 		)
 		(property "Value" "r1_left_bracket_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "458e35d7-1aae-4128-add1-83bcaa8fee8d")
 			(effects
@@ -859,7 +859,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9a9f8c93-ec56-47fc-99b2-6f7aa79724fd")
@@ -870,7 +870,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8b338ca-5064-4b53-91db-d52b2ce28723")
@@ -1321,11 +1321,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "057316fd-642c-49cb-b21c-bd3a363e8e4b")
-		(at 218.70125 34.798)
+		(at 276.225 66.675 90)
 		(descr "Gateron-LP bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1u")
 		(property "Reference" "SW61"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125 90)
 			(layer "F.SilkS")
 			(uuid "ff2b2e55-56c4-4d07-9723-ba3355a53e7b")
 			(effects
@@ -1336,7 +1336,7 @@
 			)
 		)
 		(property "Value" "r3_rshift_right_fn_1u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25 90)
 			(layer "F.Fab")
 			(uuid "adce893f-2a7f-4af0-9bac-9568ae2a6874")
 			(effects
@@ -1347,7 +1347,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f2231124-f69b-469c-9433-b5685067abb0")
@@ -1358,7 +1358,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6140c7aa-a826-4512-9a86-69ebf2a21ff8")
@@ -1500,14 +1500,14 @@
 			(uuid "611146e0-7926-4007-90d7-06857cabb723")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 90)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "4a0b4442-d94a-4ac6-b598-d5daa15a4c02")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 90)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -1517,7 +1517,7 @@
 			(uuid "59a0aadc-bcd2-4e49-9b12-bcf765b29e63")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 90)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_56")
@@ -1526,7 +1526,7 @@
 			(uuid "c28d1c47-903a-4620-a25f-db5ed07249b6")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 90)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -1537,7 +1537,7 @@
 			(uuid "65769b0f-ffea-4669-bead-d3e06300e9e7")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 90)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -1548,7 +1548,7 @@
 			(uuid "0722bdce-e2ee-46ed-9f07-a62a37a247c8")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 90)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW5")
@@ -1557,7 +1557,7 @@
 			(uuid "1902d23a-6060-4d03-8b02-be7c4623e437")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 90)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -1755,11 +1755,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "0873fc54-cc76-4505-8b25-e967bf74d6e5")
-		(at 74.03125 82.5)
+		(at 171.45 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW25"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "37226506-d89a-4416-939c-c64626cc9fc2")
 			(effects
@@ -1770,7 +1770,7 @@
 			)
 		)
 		(property "Value" "r1_i_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "282979a2-cc9a-4563-a3dc-a8b94df2a133")
 			(effects
@@ -1781,7 +1781,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d748180c-4383-45b2-890e-04302f113f65")
@@ -1792,7 +1792,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f3b2150e-d2b1-4010-b0e6-eb4c29c6b1fa")
@@ -2243,11 +2243,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "097aaca6-4cd4-4041-862f-16d0812bf887")
-		(at 159.53125 137.175)
+		(at 257.175 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW75"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "57a0dfa1-6c78-47f1-bd95-6bac3d94da35")
 			(effects
@@ -2258,7 +2258,7 @@
 			)
 		)
 		(property "Value" "r4_right_win_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "717d98a8-931d-4189-9f4d-aa787857da83")
 			(effects
@@ -2269,7 +2269,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "2ff653af-ef0b-4c5f-b8c0-de0d2eee61d8")
@@ -2280,7 +2280,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9bb19a93-333f-4865-bf11-de36f5b61165")
@@ -2731,11 +2731,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "0adead9a-a429-4ecf-84f9-65c9033ada3e")
-		(at 95.40625 155.4)
+		(at 157.1625 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW38"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "bdef9de2-32a5-4a33-a8a4-0b54e3c48a9f")
 			(effects
@@ -2746,7 +2746,7 @@
 			)
 		)
 		(property "Value" "r2_j_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "086819fe-9415-4764-84e9-7001ebcbd7c6")
 			(effects
@@ -2757,7 +2757,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e0bd06df-4632-4184-950b-d7bee4e44c70")
@@ -2768,7 +2768,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "2fdf1305-3532-441b-b3c2-a900bf644868")
@@ -3219,11 +3219,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "0b1e8d9b-b100-44a6-84ed-004889ef7c47")
-		(at 31.28125 27.825)
+		(at 9.525 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW1"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "8e57d98a-4ce3-4dc3-b751-83fa61514e7c")
 			(effects
@@ -3234,7 +3234,7 @@
 			)
 		)
 		(property "Value" "r0_esc_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "f6e21526-0d74-4c3d-9955-31af074b0432")
 			(effects
@@ -3245,7 +3245,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4e77f8a3-64b9-4601-a193-407824e94638")
@@ -3256,7 +3256,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "497d69a5-061e-4c2f-8e37-39559d43877f")
@@ -4341,11 +4341,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "158af6ea-7395-467c-aa74-af3639731298")
-		(at 95.40625 173.625)
+		(at 176.2125 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW39"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "025b2bb8-23e1-4907-a79d-179372f93481")
 			(effects
@@ -4356,7 +4356,7 @@
 			)
 		)
 		(property "Value" "r2_k_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "a4705da1-c795-4083-bfb7-f1ca47620ce0")
 			(effects
@@ -4367,7 +4367,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "27602a24-9afd-4a38-8f72-6d2675717992")
@@ -4378,7 +4378,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e315d9cc-3be5-48e9-9d4e-53f49ce4f0f6")
@@ -4944,11 +4944,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "18d4809a-daa7-4559-8db8-93d983be6a03")
-		(at 95.40625 137.175)
+		(at 138.1125 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW37"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "04700fcd-1845-49e9-a5a2-34d6ac98a3ac")
 			(effects
@@ -4959,7 +4959,7 @@
 			)
 		)
 		(property "Value" "r2_h_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "1b4c98b9-82b6-4d57-9247-bfdb71945a3c")
 			(effects
@@ -4970,7 +4970,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1873b22b-2115-42ef-a784-4b8d5fb21541")
@@ -4981,7 +4981,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9e65038f-7188-45e3-9bcb-513c463e5106")
@@ -6354,11 +6354,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "25ed70ef-dec7-4065-9108-e90ce5422fa3")
-		(at 138.15625 82.5)
+		(at 223.8375 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW58"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "b3aead39-b7a9-4a07-8901-ef58b4431baf")
 			(effects
@@ -6369,7 +6369,7 @@
 			)
 		)
 		(property "Value" "r3_slash_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "3b89cd27-df30-4950-800a-e1e480b9cd87")
 			(effects
@@ -6380,7 +6380,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "2d16f9d1-9df8-48fa-978f-bbbf660c6341")
@@ -6391,7 +6391,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1a73b7dd-53f0-499a-8f91-227f369ab300")
@@ -6842,11 +6842,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "27f0486a-6387-4a22-9f1c-83b5612e983c")
-		(at 138.15625 27.825)
+		(at 166.6875 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW55"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "356a46f7-91f3-47e8-b624-aed98c9f3f63")
 			(effects
@@ -6857,7 +6857,7 @@
 			)
 		)
 		(property "Value" "r3_m_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "2386f1c7-2234-4c91-be32-0174dc8c8bae")
 			(effects
@@ -6868,7 +6868,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "750ca290-0ecd-4298-bb54-8f2d480ae47a")
@@ -6879,7 +6879,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "cc6ed5a5-f5e9-40ae-b26f-6560313d9215")
@@ -7503,11 +7503,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1.25U"
 		(layer "F.Cu")
 		(uuid "2901097e-8c0b-47fc-9101-a1e20bf3c5cc")
-		(at 199.80125 22.199)
+		(at 273.84375 47.625 180)
 		(descr "Gateron-LP bottom-side hotswap socket, 1.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1.25u")
 		(property "Reference" "SW45"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "40299ada-298b-4ba9-93c9-5bf2dec28bc6")
 			(effects
@@ -7518,7 +7518,7 @@
 			)
 		)
 		(property "Value" "r2_enter_split_right_1.25u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "51ea696c-128f-45a7-b10a-d25aff984cfa")
 			(effects
@@ -7529,7 +7529,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0b3a6b8f-b5c7-46eb-8983-b7cf1a32a009")
@@ -7540,7 +7540,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "46ca1bb9-9be1-4bf5-b845-f805e6318e0f")
@@ -7682,14 +7682,14 @@
 			(uuid "edf1367f-9cb6-4ae2-829f-8b9ace5cb018")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 180)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "56d3a0a3-6852-480c-bab0-2ace68e6bbb6")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -7699,7 +7699,7 @@
 			(uuid "f99aaf02-2d82-44a4-8318-2c9b8515831d")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 180)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_41")
@@ -7708,7 +7708,7 @@
 			(uuid "a8c9cf07-0cb1-4b72-856c-664263816e41")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -7719,7 +7719,7 @@
 			(uuid "091370f4-85b0-4851-a6bd-2a7ce6e03c0f")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -7730,7 +7730,7 @@
 			(uuid "042aa5aa-d430-492b-acd6-ff61672485c8")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 180)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW4")
@@ -7739,7 +7739,7 @@
 			(uuid "290a2f25-7aae-4d9e-ab19-513120eb7d2c")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -7937,11 +7937,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "2b39ffca-1065-4110-b2f4-3a6afb11b97d")
-		(at 31.28125 118.95)
+		(at 104.775 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW6"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "35b2dcd5-39ff-429b-9ea2-5002b4419577")
 			(effects
@@ -7952,7 +7952,7 @@
 			)
 		)
 		(property "Value" "r0_5_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "6f6fa0b5-fc23-4662-972e-dae0857585b8")
 			(effects
@@ -7963,7 +7963,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0bacd3e7-d401-422c-a10d-ae4f826c5a8d")
@@ -7974,7 +7974,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b7d8708a-13b9-4bff-ab9e-3e9f519d9ae9")
@@ -8598,11 +8598,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "2cb6955a-6a84-4ecf-a510-bf4741154ebb")
-		(at 95.40625 118.95)
+		(at 119.0625 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW36"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "5cf2237c-78f2-40c6-9511-6c97c1133fad")
 			(effects
@@ -8613,7 +8613,7 @@
 			)
 		)
 		(property "Value" "r2_g_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "cf5a5b13-34ad-444b-a99b-824fe6d80360")
 			(effects
@@ -8624,7 +8624,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1e97a37f-fc41-46f5-b6a1-5f052387a86d")
@@ -8635,7 +8635,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "56a5fb25-f966-45af-9ae6-e33e8b695d75")
@@ -10066,11 +10066,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "3928fc11-5828-4714-a32b-70cbafc8ebe7")
-		(at 159.53125 100.725)
+		(at 219.075 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW73"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "20a4fa83-e2ec-400a-8e46-91be39b69f41")
 			(effects
@@ -10081,7 +10081,7 @@
 			)
 		)
 		(property "Value" "r4_right_fn_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "24ff4640-7f1e-4f4c-ae93-4c7fad8ed116")
 			(effects
@@ -10092,7 +10092,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "56c908a8-fdf3-4149-9756-d5efe76d389f")
@@ -10103,7 +10103,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "26c11b4d-f4f4-433d-bf6a-b966e613b4a2")
@@ -10554,11 +10554,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "3969e1a1-22f1-4acf-9538-210c4e2383b1")
-		(at 159.53125 82.5)
+		(at 200.025 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW72"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "df9bf250-c0a7-4bd0-b2dc-884b9a99a17d")
 			(effects
@@ -10569,7 +10569,7 @@
 			)
 		)
 		(property "Value" "r4_right_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "1e7eb019-a316-4962-b837-bda003992dfd")
 			(effects
@@ -10580,7 +10580,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "fad1e8dd-be82-4e07-80b5-950ee6fe4544")
@@ -10591,7 +10591,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "86c4d864-863c-4785-9477-104ddb15347b")
@@ -11042,11 +11042,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "39ee4407-887c-45c6-92e2-23809f5a6d53")
-		(at 52.65625 82.5)
+		(at 238.125 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW13"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "5b8e62de-b49d-425a-9aa2-ffc534fb7a2a")
 			(effects
@@ -11057,7 +11057,7 @@
 			)
 		)
 		(property "Value" "r0_equal_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "964e2cf8-3a92-41f7-ab22-edff653df55c")
 			(effects
@@ -11068,7 +11068,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "038fc5aa-78c5-4e17-bfdc-81b5e2e01361")
@@ -11079,7 +11079,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "89a5706c-0feb-4769-a708-935fe561b559")
@@ -11530,11 +11530,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "39f4a457-9881-4690-ab98-f033d7f346f6")
-		(at 52.65625 27.825)
+		(at 180.975 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW10"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "e288a1bf-bd2a-4b23-8044-f6ca4dddbdae")
 			(effects
@@ -11545,7 +11545,7 @@
 			)
 		)
 		(property "Value" "r0_9_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "d616d023-71a6-4baa-8b64-94c900e0b678")
 			(effects
@@ -11556,7 +11556,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e0253486-6a00-4b2c-81f9-c13f2832f9a8")
@@ -11567,7 +11567,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9e9cd7d1-3d0b-42bb-aaee-431c4d999946")
@@ -12018,11 +12018,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "3a0b01fa-a41a-4590-bb96-725da64efd6d")
-		(at 74.03125 27.825)
+		(at 114.3 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW22"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "ca1e061f-c35e-46d1-8db4-81a0c7181da3")
 			(effects
@@ -12033,7 +12033,7 @@
 			)
 		)
 		(property "Value" "r1_t_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "5cd33b57-3ae5-4223-9853-f399f2df86d9")
 			(effects
@@ -12044,7 +12044,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "441c1c95-32f0-43a0-9d88-d01b757b2e52")
@@ -12055,7 +12055,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "25e8de44-d3c1-4205-8a8b-0b408e5ce778")
@@ -13486,11 +13486,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "49264ba3-bdd7-44a1-9af0-a8ad6b3b4a74")
-		(at 95.40625 46.05)
+		(at 42.8625 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW32"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "db63b815-34be-439e-85a7-5e655f1457ee")
 			(effects
@@ -13501,7 +13501,7 @@
 			)
 		)
 		(property "Value" "r2_a_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "12cb618a-ab09-4382-9d0c-49093dfd08af")
 			(effects
@@ -13512,7 +13512,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "a3420002-173e-4d91-895e-c87676446ae7")
@@ -13523,7 +13523,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8b526d2-0794-4dd3-84f6-b5054d6c5a1a")
@@ -13974,11 +13974,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-2.75U"
 		(layer "F.Cu")
 		(uuid "493c2c32-3aa4-4f0c-972b-11a74694048e")
-		(at 199.80125 72.595)
+		(at 259.55625 66.675)
 		(descr "Gateron-LP bottom-side hotswap socket, 2.75U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 2.75u")
 		(property "Reference" "SW59"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "f324a15a-d7ce-45fe-bd04-bca69599fc3d")
 			(effects
@@ -13989,7 +13989,7 @@
 			)
 		)
 		(property "Value" "r3_rshift_2.75u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "3b7c1863-20a8-4d34-9ecb-80dedf0ab996")
 			(effects
@@ -14000,7 +14000,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "424a90fe-0d67-4b47-a64b-dd89988b7d4e")
@@ -14011,7 +14011,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "a9580c22-2de7-4e22-90a5-f5a8112c48b9")
@@ -14235,11 +14235,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "4a27a306-6de7-4c99-861e-7330cf9930a5")
-		(at 116.78125 173.625)
+		(at 147.6375 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW54"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "ffc7f67d-f091-44ae-97d0-bac5e1cddd85")
 			(effects
@@ -14250,7 +14250,7 @@
 			)
 		)
 		(property "Value" "r3_n_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "0514c1d5-24c4-4a1f-bee7-d22a3a045f2b")
 			(effects
@@ -14261,7 +14261,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0a142d66-9bae-4573-9d3b-895477f8a881")
@@ -14272,7 +14272,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "eebd21ff-afc0-454e-bf24-0a94557f9c5c")
@@ -14723,11 +14723,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "4b0af5e3-8910-44ee-bd11-fb1eb704437b")
-		(at 95.40625 82.5)
+		(at 80.9625 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW34"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "f77594c4-933d-4a4c-9e64-9b06e736d953")
 			(effects
@@ -14738,7 +14738,7 @@
 			)
 		)
 		(property "Value" "r2_d_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "7f1074c1-705b-4d8b-b8f6-e8576b8f2a5a")
 			(effects
@@ -14749,7 +14749,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6c90724c-369e-400d-a4ad-8d4a1e317db3")
@@ -14760,7 +14760,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "8e8747aa-a70b-4e98-b260-9673d5b9c091")
@@ -15384,11 +15384,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1.25U"
 		(layer "F.Cu")
 		(uuid "4c082d89-f165-400d-ba53-2efe2e8c1d4c")
-		(at 138.15625 118.95)
+		(at 35.71875 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1.25u")
 		(property "Reference" "SW65"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "7b115835-1202-46c6-8b09-80dc802144a8")
 			(effects
@@ -15399,7 +15399,7 @@
 			)
 		)
 		(property "Value" "r4_left_win_1.25u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "1fcf35f4-b9c4-4ad0-acfd-6beaca6123bf")
 			(effects
@@ -15410,7 +15410,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "26e2e66d-e25d-4946-b46b-81784d8c5c8a")
@@ -15421,7 +15421,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6c7eaa7f-854a-4b0f-8587-765b6360e6db")
@@ -15872,11 +15872,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-2.25U"
 		(layer "F.Cu")
 		(uuid "4c412287-96b8-4abf-bbb9-51d7bc1f4f33")
-		(at 138.15625 155.4)
+		(at 92.86875 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 2.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 2.25u")
 		(property "Reference" "SW67"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "9f6c5a48-cf02-406c-ac3f-5bf0870fb8f8")
 			(effects
@@ -15887,7 +15887,7 @@
 			)
 		)
 		(property "Value" "r4_space_2.25u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "94343d23-41a6-429b-9e55-e164bccb12fc")
 			(effects
@@ -15898,7 +15898,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0a721616-0a68-4933-8a90-a19f3088c9d4")
@@ -15909,7 +15909,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f8be902c-76eb-450f-ac80-a0fad3893e1a")
@@ -16706,11 +16706,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "50cce69d-af5e-4eab-8cdc-038f07227a1b")
-		(at 31.28125 155.4)
+		(at 142.875 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW8"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "5b686039-ab0b-4be5-8060-02c6702ff41e")
 			(effects
@@ -16721,7 +16721,7 @@
 			)
 		)
 		(property "Value" "r0_7_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "d67c19c5-5206-48b6-9d12-eecdb8226f82")
 			(effects
@@ -16732,7 +16732,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "bdaeb272-4403-41f1-a596-bf175d274bdb")
@@ -16743,7 +16743,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6e7702d4-a1f5-4d78-8bf0-1cabd96acda8")
@@ -17770,11 +17770,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "584044b5-907f-4969-905b-65358f2b3347")
-		(at 74.03125 64.275)
+		(at 152.4 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW24"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "aba872fa-0029-410b-b212-634f035b447f")
 			(effects
@@ -17785,7 +17785,7 @@
 			)
 		)
 		(property "Value" "r1_u_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "97dd4782-73de-40c2-82fa-61ba55e19ede")
 			(effects
@@ -17796,7 +17796,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d963a1ed-17fe-4adb-a9af-3a79aed96238")
@@ -17807,7 +17807,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3f21e920-1a84-4fe5-baeb-5aa2e5ab6bba")
@@ -18604,11 +18604,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-2.25U"
 		(layer "F.Cu")
 		(uuid "602e5fa7-bbe2-482a-a598-24a14d793cc5")
-		(at 199.80125 47.397)
+		(at 21.43125 66.675)
 		(descr "Gateron-LP bottom-side hotswap socket, 2.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 2.25u")
 		(property "Reference" "SW47"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "f366e9fb-2598-4b2f-99ee-df785433d065")
 			(effects
@@ -18619,7 +18619,7 @@
 			)
 		)
 		(property "Value" "r3_lshift_2.25u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "9ed32794-8856-4dd4-befb-717b343e8dc2")
 			(effects
@@ -18630,7 +18630,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1c8fd149-fc53-4d1b-a79c-54625ca6f2df")
@@ -18641,7 +18641,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "62f968ff-7441-4d87-8b26-8c7ed0914223")
@@ -19038,11 +19038,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1.25U"
 		(layer "F.Cu")
 		(uuid "650c86df-01ab-4a76-baf7-4779081bb01e")
-		(at 138.15625 137.175)
+		(at 59.53125 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1.25u")
 		(property "Reference" "SW66"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "914ebba6-87e6-49ef-83cb-0889a5c40194")
 			(effects
@@ -19053,7 +19053,7 @@
 			)
 		)
 		(property "Value" "r4_left_alt_1.25u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "268448a6-773a-4881-b07b-535c68d01e9d")
 			(effects
@@ -19064,7 +19064,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3297ef0b-8170-401a-bbfa-132b1f5c98d2")
@@ -19075,7 +19075,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0502e734-f1d1-44ef-8239-6dd04d42dbfb")
@@ -19526,11 +19526,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "652445aa-3f69-4b5e-ae90-bb349c63d28a")
-		(at 138.15625 173.625)
+		(at 123.825 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW68"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "d47ccfa6-4609-45c0-b274-1b9a977c46dc")
 			(effects
@@ -19541,7 +19541,7 @@
 			)
 		)
 		(property "Value" "r4_fn_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "d69ca8ba-c581-4007-ace9-266e09e04e41")
 			(effects
@@ -19552,7 +19552,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3219621d-b16e-4da1-8697-0c58cc63787d")
@@ -19563,7 +19563,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4925fc79-8581-4fa5-ab9a-1d887a0a8a53")
@@ -21340,11 +21340,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "6b7b5211-63c0-46c7-b489-9cf7f11b695c")
-		(at 31.28125 100.725)
+		(at 85.725 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW5"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "5500267c-f586-41a5-88dd-e5aa4d78f39a")
 			(effects
@@ -21355,7 +21355,7 @@
 			)
 		)
 		(property "Value" "r0_4_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "709d1589-7ddd-4e95-a6a4-7a48c3002a9e")
 			(effects
@@ -21366,7 +21366,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "43e2f117-a361-484d-be6f-8b5f66718af2")
@@ -21377,7 +21377,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "53bc24d5-0907-48d2-b531-241db753e6ed")
@@ -22116,11 +22116,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "6ecb9c26-46d5-4e91-8c23-608390024d3e")
-		(at 116.78125 64.275)
+		(at 233.3625 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW42"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "8ce31197-a53b-42f8-9fb0-ab3101531f23")
 			(effects
@@ -22131,7 +22131,7 @@
 			)
 		)
 		(property "Value" "r2_quote_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "56f28331-2ce7-41bb-85b2-5765e82ef2c4")
 			(effects
@@ -22142,7 +22142,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d6afb3bc-c663-4e29-ba80-adcc3d118da3")
@@ -22153,7 +22153,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6a9b8757-3f7c-4210-86e8-0a3476c30aa7")
@@ -23584,11 +23584,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "7caecca4-496c-4acb-9149-8d25e2280965")
-		(at 159.53125 118.95)
+		(at 238.125 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW74"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "a75ff05a-cdc9-4ffd-943a-1088752014fb")
 			(effects
@@ -23599,7 +23599,7 @@
 			)
 		)
 		(property "Value" "r4_right_alt_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "d2802eba-f796-4889-a0c4-dc936ef153f8")
 			(effects
@@ -23610,7 +23610,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e434ad3e-fd2a-4df8-bfd8-ec0786f0f9af")
@@ -23621,7 +23621,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b4b39837-bb2d-438b-a73c-582e5747ce1a")
@@ -24533,11 +24533,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "81474b4a-7577-40d5-929a-2dfa75a8ef2a")
-		(at 138.15625 64.275)
+		(at 204.7875 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW57"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "0d2cef3b-7dc8-4a54-a80e-b92dbb9f79ab")
 			(effects
@@ -24548,7 +24548,7 @@
 			)
 		)
 		(property "Value" "r3_period_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "c9bf4417-4fba-4f3a-a8bc-16e0005d7862")
 			(effects
@@ -24559,7 +24559,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "77efe45d-105a-419f-b2eb-54dc3563a0d8")
@@ -24570,7 +24570,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "194d8640-925f-435a-b02e-20fd3dbde60f")
@@ -25021,11 +25021,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "85a6a5aa-acab-4bee-8aa9-cd4ef9bc8011")
-		(at 116.78125 27.825)
+		(at 195.2625 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW40"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "0c844f0b-3a70-4b66-95e1-8ed48b0d0cf0")
 			(effects
@@ -25036,7 +25036,7 @@
 			)
 		)
 		(property "Value" "r2_l_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "6b9b2910-3a41-477c-a332-9bff89c0c64b")
 			(effects
@@ -25047,7 +25047,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "04e2af0d-ac46-4942-9a12-9254b7ee0593")
@@ -25058,7 +25058,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0d96e1eb-4b99-4771-be3f-9532816b5ce0")
@@ -25970,11 +25970,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "8a98e070-959a-4422-8263-d03b01923c44")
-		(at 199.80125 34.798)
+		(at 9.525 66.675 270)
 		(descr "Gateron-LP bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1u")
 		(property "Reference" "SW46"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125 90)
 			(layer "F.SilkS")
 			(uuid "9eef4c93-249d-4f60-934d-cbe911e7512e")
 			(effects
@@ -25985,7 +25985,7 @@
 			)
 		)
 		(property "Value" "r3_lshift_split_left_fn_1u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25 90)
 			(layer "F.Fab")
 			(uuid "29514503-193c-4591-88b0-52818e3525b0")
 			(effects
@@ -25996,7 +25996,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "8eb29e23-3fec-43b7-9bd4-6af3928aad8c")
@@ -26007,7 +26007,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6047e93b-cf25-4f76-879e-6b623e4aa862")
@@ -26149,14 +26149,14 @@
 			(uuid "144c017a-1b44-42b1-9298-b5ce03782d8c")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 270)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "866b5492-b1a0-4459-9e8d-24801a1608fe")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -26166,7 +26166,7 @@
 			(uuid "7e64f583-5646-4f13-a416-62816d377b52")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 270)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_43")
@@ -26175,7 +26175,7 @@
 			(uuid "94296eaa-b93b-46c4-91c1-6739194389e1")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -26186,7 +26186,7 @@
 			(uuid "8e4122df-423f-4b62-98a7-71b04c28dec7")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -26197,7 +26197,7 @@
 			(uuid "28877203-ee51-49dc-8095-b277b63cab4b")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 270)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW4")
@@ -26206,7 +26206,7 @@
 			(uuid "ca55481f-665d-4c85-8433-c5468dd3b907")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -26231,11 +26231,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "8addf5d7-a301-41a3-b056-1cd419a39239")
-		(at 31.28125 64.275)
+		(at 47.625 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW3"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "863fb26c-a181-4c53-8bc9-78bde01dd0bf")
 			(effects
@@ -26246,7 +26246,7 @@
 			)
 		)
 		(property "Value" "r0_2_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "74494bb0-502b-4525-96b0-d0b6ca817bd9")
 			(effects
@@ -26257,7 +26257,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "dbb1a748-e78c-4f2f-bfe6-64933b89cfd0")
@@ -26268,7 +26268,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "a9b8aa14-4861-4c09-b0a0-8c27d6db73f0")
@@ -27426,11 +27426,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "918d4e29-1c1d-4d33-b52e-824ed707c58a")
-		(at 52.65625 46.05)
+		(at 200.025 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW11"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "3305c6f1-0aed-4afe-b5c9-2cf546478ff9")
 			(effects
@@ -27441,7 +27441,7 @@
 			)
 		)
 		(property "Value" "r0_0_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "9093a088-6b10-4f4b-ba40-1d208681a06c")
 			(effects
@@ -27452,7 +27452,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c3e0ec30-7cea-4a9b-9ccc-060a780e5554")
@@ -27463,7 +27463,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1e30ef99-5b73-4035-af28-035e36f3965b")
@@ -28029,11 +28029,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "94330e39-ce19-41aa-8b0f-0187a4204ec1")
-		(at 138.15625 46.05)
+		(at 185.7375 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW56"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "f6791c35-e000-4d0b-ace4-dde6ec3b4e38")
 			(effects
@@ -28044,7 +28044,7 @@
 			)
 		)
 		(property "Value" "r3_comma_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "123d0eb8-bfe6-4674-ab3b-f157c6923266")
 			(effects
@@ -28055,7 +28055,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "81f46df1-b81c-4529-b18b-e0bcd59cbe1d")
@@ -28066,7 +28066,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "97b0ea1c-52bd-4367-9993-97c635cf5d26")
@@ -28863,11 +28863,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1.75U"
 		(layer "F.Cu")
 		(uuid "99bc9261-c02a-45ef-af79-89daed30eafe")
-		(at 218.70125 22.199)
+		(at 250.03125 66.675 180)
 		(descr "Gateron-LP bottom-side hotswap socket, 1.75U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1.75u")
 		(property "Reference" "SW60"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "3d74a535-aa47-4db3-89a7-70c0b0814328")
 			(effects
@@ -28878,7 +28878,7 @@
 			)
 		)
 		(property "Value" "r3_rshift_left_1.75u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "eff024f8-a358-4c53-afe9-5b481d7f398b")
 			(effects
@@ -28889,7 +28889,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b97374a5-31dc-4668-abdb-9666059e1a2c")
@@ -28900,7 +28900,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "863f1f89-eaa3-4019-b5f3-53726fb79458")
@@ -29042,14 +29042,14 @@
 			(uuid "2059c173-be1c-4384-84c6-57fccd1d21aa")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 180)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "3607f7a4-a151-437c-a9d5-5f36d6d3741e")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -29059,7 +29059,7 @@
 			(uuid "a814f94e-23ec-433a-b26c-dac66cb9e24f")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 180)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_55")
@@ -29068,7 +29068,7 @@
 			(uuid "e91d8572-9766-4fca-a6ea-d1a6b68621cb")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -29079,7 +29079,7 @@
 			(uuid "021456de-47a3-442d-be74-8ec3e494ff80")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -29090,7 +29090,7 @@
 			(uuid "fe6d8562-4b36-454b-be9c-a88cb6f2123e")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 180)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW5")
@@ -29099,7 +29099,7 @@
 			(uuid "b34b8ccf-23bb-43f6-9d22-ebbd47d73cb8")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -29239,11 +29239,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "9d30d5da-76ec-42ad-9b95-d723b50d6359")
-		(at 159.53125 46.05)
+		(at 161.925 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW70"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "361d221a-f238-4a13-abe2-222237fb6d6d")
 			(effects
@@ -29254,7 +29254,7 @@
 			)
 		)
 		(property "Value" "r4_down_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "efae74ee-a5df-4e61-8a43-02bf63ceae67")
 			(effects
@@ -29265,7 +29265,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "13102abf-0d96-4a6a-b5a3-f337d73e0e9f")
@@ -29276,7 +29276,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d7be71c5-5a3a-47c6-bbe9-65e9bcdde3db")
@@ -29727,11 +29727,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "9eb855be-1bdb-488b-b1b9-3ee28226b43a")
-		(at 74.03125 100.725)
+		(at 190.5 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW26"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "60c70440-6be0-4c2e-a96a-3e4ce95a8a02")
 			(effects
@@ -29742,7 +29742,7 @@
 			)
 		)
 		(property "Value" "r1_o_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "794ac9f3-9495-43ec-89b1-be1a46abb46a")
 			(effects
@@ -29753,7 +29753,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "cc1f5ee2-f6b0-4768-9d90-482060ee4307")
@@ -29764,7 +29764,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1b743904-e788-4dcd-ac1b-613fa9777a33")
@@ -30618,11 +30618,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1.5U"
 		(layer "F.Cu")
 		(uuid "a40db4e8-9bd8-4692-87e7-6c3c4a370f68")
-		(at 52.65625 100.725)
+		(at 14.2875 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1.5U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1.5u")
 		(property "Reference" "SW17"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "852f48d6-0ac3-4581-9aa6-d5fd0f22aa67")
 			(effects
@@ -30633,7 +30633,7 @@
 			)
 		)
 		(property "Value" "r1_tab_1.5u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "48d827c5-56a2-43e2-99b0-0803df7e3c78")
 			(effects
@@ -30644,7 +30644,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "81583fca-ec42-4e1a-8ee9-fd0c9f170373")
@@ -30655,7 +30655,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "cd168163-a294-4209-817f-d76909fc9d2b")
@@ -31106,11 +31106,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-2U"
 		(layer "F.Cu")
 		(uuid "a7ea0a99-5ea2-4de7-8d6e-e47be83a0e46")
-		(at 180.90125 22.199)
+		(at 266.7 9.525 180)
 		(descr "Gateron-LP bottom-side hotswap socket, 2U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 2u")
 		(property "Reference" "SW14"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "cc3fe8c6-7347-49a0-84d0-6d403d06020d")
 			(effects
@@ -31121,7 +31121,7 @@
 			)
 		)
 		(property "Value" "r0_top_2u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "9406277e-01a4-4d36-b044-8d706ec7a5ca")
 			(effects
@@ -31132,7 +31132,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "abc35ca4-e97c-466b-8b29-ba3be9722098")
@@ -31143,7 +31143,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "de95fe2b-f0ab-49b6-9c48-3a211dc61bb0")
@@ -31285,14 +31285,14 @@
 			(uuid "bacac5c0-cf3a-4cb2-b5cc-29b0752aa86f")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 180)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "864c97aa-7032-4028-9012-42ca711d05a9")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -31302,7 +31302,7 @@
 			(uuid "1b15d174-07bc-4320-8915-a3d979cc4e5c")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 180)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_13")
@@ -31311,7 +31311,7 @@
 			(uuid "301e7da4-79b6-4864-9af9-3cc1612c03f0")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -31322,7 +31322,7 @@
 			(uuid "68a5762b-cda0-4912-907c-d760376b82bf")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -31333,7 +31333,7 @@
 			(uuid "2fa9a0e7-bef3-4f3a-a65b-3764024c5094")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 180)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW1")
@@ -31342,7 +31342,7 @@
 			(uuid "723d728c-ada6-41d6-8920-6f85d0072b2b")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -31540,11 +31540,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-2.25U"
 		(layer "F.Cu")
 		(uuid "aab19e56-fe95-4b47-8aa3-776575617c72")
-		(at 180.90125 59.996)
+		(at 264.31875 47.625)
 		(descr "Gateron-LP bottom-side hotswap socket, 2.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 2.25u")
 		(property "Reference" "SW43"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "c1f75a3f-e91e-4bf3-9364-1c8ac9bc8a18")
 			(effects
@@ -31555,7 +31555,7 @@
 			)
 		)
 		(property "Value" "r2_enter_ansi_2.25u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "de95a261-e92e-479c-9ce8-7c4f03d59520")
 			(effects
@@ -31566,7 +31566,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "251b83b1-e90e-42f7-8a42-6011970ef5f7")
@@ -31577,7 +31577,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "35fb336f-47a6-49c6-9858-fd27e214f466")
@@ -32089,11 +32089,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "ae1985bf-89e8-44a5-898e-12c7b9835784")
-		(at 159.53125 155.4)
+		(at 276.225 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW76"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "45e9a09a-d932-480d-9e7e-fea045d00b6d")
 			(effects
@@ -32104,7 +32104,7 @@
 			)
 		)
 		(property "Value" "r4_right_ctrl_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "256a81bb-b20f-4008-8ef9-88ade93786d2")
 			(effects
@@ -32115,7 +32115,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "da4ddce2-c953-405e-ab4d-f6fbb1d1a872")
@@ -32126,7 +32126,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1da36718-b445-4b41-ad6d-d98df8c222fd")
@@ -32577,11 +32577,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "ae9bd7a9-b12b-4972-865e-5b2d1db646a4")
-		(at 52.65625 64.275)
+		(at 219.075 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW12"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "c7656ad6-b6c0-4d08-9986-8bfc13596ea3")
 			(effects
@@ -32592,7 +32592,7 @@
 			)
 		)
 		(property "Value" "r0_minus_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "d19ad66e-e958-4742-877f-64f5185feefc")
 			(effects
@@ -32603,7 +32603,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c4cbf84f-1612-440a-b4dd-e3eed24793b9")
@@ -32614,7 +32614,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d0449bb6-3d1c-4879-b611-26a11283b193")
@@ -33757,11 +33757,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "b80b5a74-c861-4fc1-94e3-fe06f5617880")
-		(at 74.03125 155.4)
+		(at 247.65 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW29"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "e5de8284-0c32-404a-959f-4c087c316b37")
 			(effects
@@ -33772,7 +33772,7 @@
 			)
 		)
 		(property "Value" "r1_right_bracket_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "97dfb554-0d37-4337-9ffc-e80f619f2b46")
 			(effects
@@ -33783,7 +33783,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ebda5961-d5e3-4a3e-8f16-80d1fd28de17")
@@ -33794,7 +33794,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "00d0f7a3-63f6-4dd0-bcd2-1906c5dee281")
@@ -34245,11 +34245,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1.75U"
 		(layer "F.Cu")
 		(uuid "b9611012-2cc4-4b8b-8e96-829ce8aa99e1")
-		(at 95.40625 27.825)
+		(at 16.66875 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1.75U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1.75u")
 		(property "Reference" "SW31"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "1d02aa19-60ea-4d9b-8759-793a8f3e4b36")
 			(effects
@@ -34260,7 +34260,7 @@
 			)
 		)
 		(property "Value" "r2_caps_1.75u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "c97fc813-adcf-4e64-87f0-105b1634231a")
 			(effects
@@ -34271,7 +34271,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "a4f6c1c3-9b02-44c6-82c8-707f84a5f574")
@@ -34282,7 +34282,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "5a26fae8-7f87-40c3-8a93-529d1a9f9de4")
@@ -34733,11 +34733,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1.75U"
 		(layer "F.Cu")
 		(uuid "ba02f163-31ae-4159-8401-9217cb2e4a97")
-		(at 218.70125 59.996)
+		(at 269.08125 66.675 180)
 		(descr "Gateron-LP bottom-side hotswap socket, 1.75U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1.75u")
 		(property "Reference" "SW63"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "5305b320-aab6-4eb3-9eb4-e8f0b886c66c")
 			(effects
@@ -34748,7 +34748,7 @@
 			)
 		)
 		(property "Value" "r3_rshift_right_1.75u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "79929760-101d-4e27-9ff3-cd3131e7e011")
 			(effects
@@ -34759,7 +34759,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b0c361a1-4171-4399-bcd4-de14de29d218")
@@ -34770,7 +34770,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ea5972af-4622-416b-aead-5fe4d0e8dc23")
@@ -34912,14 +34912,14 @@
 			(uuid "5600ecde-e4ee-459f-9e15-e58202782c64")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 180)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "b41801d0-ea08-42ba-8881-f39c75b122ac")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -34929,7 +34929,7 @@
 			(uuid "cc8fc52c-31eb-4185-80a8-b3db5be16b99")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 180)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_55")
@@ -34938,7 +34938,7 @@
 			(uuid "e7d50a0c-5814-49c3-ac14-db9f72d7bc52")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -34949,7 +34949,7 @@
 			(uuid "b8738e96-22c2-4096-a911-144fb17e44ca")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -34960,7 +34960,7 @@
 			(uuid "4faf2e3c-0a3b-4000-914e-628168e114e9")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 180)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW5")
@@ -34969,7 +34969,7 @@
 			(uuid "c04b8d22-5aab-4df5-a263-7a18dbe5b738")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -34994,11 +34994,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "ba58d56b-15fb-4719-b220-96637425bed1")
-		(at 116.78125 46.05)
+		(at 214.3125 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW41"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "aaeafc4c-7f8f-41f3-8807-249dc0a22132")
 			(effects
@@ -35009,7 +35009,7 @@
 			)
 		)
 		(property "Value" "r2_semicolon_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "216af8a8-19ed-42a1-9770-3002e1fdef11")
 			(effects
@@ -35020,7 +35020,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1800321c-d111-4a75-aa07-0ff50aff5a11")
@@ -35031,7 +35031,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b96cb967-a597-4078-b7f1-b5d1c5172d1f")
@@ -35482,11 +35482,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "bd600fe5-b3d2-4ef3-b0a9-818b88a8a37c")
-		(at 218.70125 47.397)
+		(at 242.8875 66.675 270)
 		(descr "Gateron-LP bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1u")
 		(property "Reference" "SW62"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125 90)
 			(layer "F.SilkS")
 			(uuid "5c722d60-55b3-4f52-b8d3-fb5d1c3174e1")
 			(effects
@@ -35497,7 +35497,7 @@
 			)
 		)
 		(property "Value" "r3_rshift_left_fn_1u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25 90)
 			(layer "F.Fab")
 			(uuid "ea240273-735e-4d36-b662-96ff0543a8c9")
 			(effects
@@ -35508,7 +35508,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b75cb456-0f58-4261-89d7-db33ed5a94a6")
@@ -35519,7 +35519,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "657b4ea1-8670-4869-8747-b2cc2dcd8a4c")
@@ -35661,14 +35661,14 @@
 			(uuid "dfb15a25-0001-4e05-bc61-1e1c034151d2")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 270)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "b71d19e2-8f43-4429-b05a-fb265086d2dd")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -35678,7 +35678,7 @@
 			(uuid "9a8b738e-620a-4192-b40f-8ab0804a8c5f")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 270)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_56")
@@ -35687,7 +35687,7 @@
 			(uuid "1298b05b-d133-4740-9371-727d75c791b2")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -35698,7 +35698,7 @@
 			(uuid "01e4eb58-3418-4eab-ac82-673eac5c7a17")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -35709,7 +35709,7 @@
 			(uuid "0d301db7-04e3-4b2b-b6ee-1512fad6bbea")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 270)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW5")
@@ -35718,7 +35718,7 @@
 			(uuid "4a768048-28a8-47d7-9fb1-23f7a746eb94")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -36319,11 +36319,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "cb5b3f64-d825-4c7e-b88f-1cc8caf91e2e")
-		(at 116.78125 118.95)
+		(at 90.4875 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW51"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "9721c98a-1d26-45cc-b5d6-ced950f2e011")
 			(effects
@@ -36334,7 +36334,7 @@
 			)
 		)
 		(property "Value" "r3_c_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "ab160b08-9ce2-447f-9c82-65ac614a562f")
 			(effects
@@ -36345,7 +36345,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ac17f758-d2de-44ee-8a45-1deebb68884a")
@@ -36356,7 +36356,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "fda15bb8-2622-428a-92db-998d139631a6")
@@ -36807,11 +36807,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "ccc37222-83e7-4b8b-8987-a3f917e2a52e")
-		(at 116.78125 100.725)
+		(at 71.4375 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW50"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "46e2c629-ea47-47d6-822b-aadcf5cb3755")
 			(effects
@@ -36822,7 +36822,7 @@
 			)
 		)
 		(property "Value" "r3_x_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "27ca14ca-3574-4717-ba76-433facd023c9")
 			(effects
@@ -36833,7 +36833,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "acbaf6f2-4eb5-4f74-82d5-da39fe3c9cac")
@@ -36844,7 +36844,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "25db2f3b-44cd-4202-9a43-5fbf1a4ed461")
@@ -37410,11 +37410,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "cd871a7a-2110-4ea7-8469-1dd1093721f6")
-		(at 52.65625 137.175)
+		(at 57.15 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW19"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "6c26f509-0e2b-42db-8c3d-46312384adc7")
 			(effects
@@ -37425,7 +37425,7 @@
 			)
 		)
 		(property "Value" "r1_w_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "b704754c-a788-487b-b025-b7bcaa97476b")
 			(effects
@@ -37436,7 +37436,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "278fa268-7a66-42b7-a7f8-008a140e7415")
@@ -37447,7 +37447,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "22bd5513-3101-4cdf-b65d-334e53c7ad58")
@@ -37898,11 +37898,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "ce59ce7e-57f0-41cc-8fbf-7bcb6eff649a")
-		(at 31.28125 82.5)
+		(at 66.675 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW4"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "748373e3-c87d-4b94-bd85-96a1585efa33")
 			(effects
@@ -37913,7 +37913,7 @@
 			)
 		)
 		(property "Value" "r0_3_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "f2d01dec-5390-48be-8d98-0d93e69b8e44")
 			(effects
@@ -37924,7 +37924,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f56e0c53-09a1-44de-b550-abeb4b8fcb14")
@@ -37935,7 +37935,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d4c45d81-bc92-4dbe-88a4-dbb9da0bc378")
@@ -38386,11 +38386,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "d273d81c-70da-4dd8-9c9d-ca1a8285e8ba")
-		(at 116.78125 82.5)
+		(at 52.3875 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW49"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "b1708142-cc9e-4fdd-9b05-e16f3b67194e")
 			(effects
@@ -38401,7 +38401,7 @@
 			)
 		)
 		(property "Value" "r3_z_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "a6163a82-451a-460d-af3d-c51c14ee813d")
 			(effects
@@ -38412,7 +38412,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "7e2fcb39-40dd-4496-a06f-08cdf5da5063")
@@ -38423,7 +38423,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "dbf41f25-d8ce-410a-bd45-1d0b8e000130")
@@ -39047,11 +39047,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "d7ef5ff6-7404-4a64-b377-617eaeb5b226")
-		(at 180.90125 47.397)
+		(at 276.225 9.525)
 		(descr "Gateron-LP bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1u")
 		(property "Reference" "SW16"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "ed9dadfc-4e43-4fbf-9c70-32afc59765f2")
 			(effects
@@ -39062,7 +39062,7 @@
 			)
 		)
 		(property "Value" "r0_top_split_right_1u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "fda99309-254e-4b87-b49f-d930215d8e48")
 			(effects
@@ -39073,7 +39073,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "29751d1a-473b-4da3-a4f7-7d2cfedd56a3")
@@ -39084,7 +39084,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4a79ba68-1d11-4c99-8403-bb659ddbd644")
@@ -39481,11 +39481,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "d93871a3-913e-4c67-a70a-30d023a9a58f")
-		(at 159.53125 64.275)
+		(at 180.975 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW71"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "95346f41-8222-4f34-a838-84be030224ff")
 			(effects
@@ -39496,7 +39496,7 @@
 			)
 		)
 		(property "Value" "r4_up_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "8ffa4bfd-b541-4a3d-806e-69bedd859d27")
 			(effects
@@ -39507,7 +39507,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f87b6b7a-fb16-47cc-8709-26b8f7a3c6d3")
@@ -39518,7 +39518,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ed1c1c50-8810-4b5e-acec-2e5bff3bb61a")
@@ -39969,11 +39969,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "da68b569-b6b8-4f80-b50c-91980e93735d")
-		(at 31.28125 46.05)
+		(at 28.575 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW2"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "b3047df5-7d02-4476-92e6-a69e69d30e60")
 			(effects
@@ -39984,7 +39984,7 @@
 			)
 		)
 		(property "Value" "r0_1_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "c71109fd-4595-4bbc-a360-a635c4dfe9eb")
 			(effects
@@ -39995,7 +39995,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "925d035e-6184-46bb-be2f-5fb91bbe8433")
@@ -40006,7 +40006,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "00c2bb4b-f00b-446b-8cc1-4381f2f89694")
@@ -40457,11 +40457,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1.25U"
 		(layer "F.Cu")
 		(uuid "daa6eadf-add1-4feb-91e8-33d75ac1d3f9")
-		(at 199.80125 59.996)
+		(at 30.95625 66.675 180)
 		(descr "Gateron-LP bottom-side hotswap socket, 1.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1.25u")
 		(property "Reference" "SW48"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125)
 			(layer "F.SilkS")
 			(uuid "c64f4fa3-ad70-4db9-8f57-9912f8f9e182")
 			(effects
@@ -40472,7 +40472,7 @@
 			)
 		)
 		(property "Value" "r3_lshift_split_1.25u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25)
 			(layer "F.Fab")
 			(uuid "dd08eee0-0800-4b11-90c9-b2730d8ad21d")
 			(effects
@@ -40483,7 +40483,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "61d7d98f-9aa1-4169-a40a-7255a2204982")
@@ -40494,7 +40494,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3b3ddc17-1e11-4a0a-8d35-776c167d7197")
@@ -40636,14 +40636,14 @@
 			(uuid "b33171a2-ac6e-4636-b4c8-12ba5e41e45c")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 180)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "3277093d-fa20-4d36-b98e-5565b14fe23c")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -40653,7 +40653,7 @@
 			(uuid "0a0399bd-5d56-4438-b530-aa27d1c34215")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 180)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_44")
@@ -40662,7 +40662,7 @@
 			(uuid "663fbfc7-d9dc-47c1-bde4-e319ea60c07c")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -40673,7 +40673,7 @@
 			(uuid "77922ec8-69ff-4be5-87bc-8ba87ba5f5f9")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 180)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -40684,7 +40684,7 @@
 			(uuid "1dca8fa3-07a2-4eb1-9a40-34bed75d9eb0")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 180)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW4")
@@ -40693,7 +40693,7 @@
 			(uuid "42ad4992-0b75-402e-a1df-17a5b8c88fb0")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 180)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -40891,11 +40891,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "dc933803-9d46-4404-a0d0-099716e9450e")
-		(at 31.28125 137.175)
+		(at 123.825 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW7"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "d031932e-7325-4d1c-9c21-7f72f1d12ff0")
 			(effects
@@ -40906,7 +40906,7 @@
 			)
 		)
 		(property "Value" "r0_6_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "496ccdee-435f-47eb-ac85-0b6408f3d9b9")
 			(effects
@@ -40917,7 +40917,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ed4fbd16-bacd-461e-bb2d-0f5b2e6dc154")
@@ -40928,7 +40928,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ee10d11b-3b35-4386-8e84-9e4a19f00b21")
@@ -41379,11 +41379,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "df9764b5-4256-4f4d-abdc-2c90d80b612c")
-		(at 52.65625 118.95)
+		(at 38.1 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW18"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "04296234-fbb4-466b-8aa6-c91f56936322")
 			(effects
@@ -41394,7 +41394,7 @@
 			)
 		)
 		(property "Value" "r1_q_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "439886ef-4a48-4c04-93f7-7015394ea0dc")
 			(effects
@@ -41405,7 +41405,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "8e165efb-2311-4ab3-b1de-8193b053e4c4")
@@ -41416,7 +41416,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "7626c0cf-5696-43cd-8d26-77a2063140a9")
@@ -42040,11 +42040,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "e0005591-cb25-4d93-ae6e-41576ea5381d")
-		(at 52.65625 173.625)
+		(at 95.25 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW21"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "b8bd4346-3a7b-499a-b9b1-b9fef78943e4")
 			(effects
@@ -42055,7 +42055,7 @@
 			)
 		)
 		(property "Value" "r1_r_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "b014710d-1efc-4095-beea-4265fcf44868")
 			(effects
@@ -42066,7 +42066,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4ae8ac5b-71bc-44a9-8d4c-7545bb73a70d")
@@ -42077,7 +42077,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "85e05c15-4139-43b3-8a23-36ca48eddc7c")
@@ -42528,11 +42528,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1.5U"
 		(layer "F.Cu")
 		(uuid "e0ddd999-09e7-428d-9ec0-017e5b2de82f")
-		(at 74.03125 173.625)
+		(at 271.4625 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1.5U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1.5u")
 		(property "Reference" "SW30"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "8ae16576-d388-44f7-b436-fcbb65f918c1")
 			(effects
@@ -42543,7 +42543,7 @@
 			)
 		)
 		(property "Value" "r1_backslash_1.5u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "b416635b-03c6-47bd-b23e-7f9b207999e8")
 			(effects
@@ -42554,7 +42554,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c567e0eb-6fbb-4faa-aabd-ff760db0aea9")
@@ -42565,7 +42565,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "aadce582-be0c-44ff-9f8c-37d5124be33e")
@@ -43016,11 +43016,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "e34db8b4-de04-4817-81b2-756f66bd88bb")
-		(at 116.78125 155.4)
+		(at 128.5875 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW53"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "7bc79562-61b6-42de-b889-4e19a6f7d36b")
 			(effects
@@ -43031,7 +43031,7 @@
 			)
 		)
 		(property "Value" "r3_b_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "17c20271-2269-4e0c-b85a-41572f6ce3e0")
 			(effects
@@ -43042,7 +43042,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "45260e46-c45c-4b50-a222-6882b91e7b0f")
@@ -43053,7 +43053,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "990de25c-6cbe-4b4e-8ec6-359422a6cad9")
@@ -43850,11 +43850,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "e77e8531-da16-447f-9ddd-0b4d3d304f38")
-		(at 52.65625 155.4)
+		(at 76.2 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW20"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "d1f49c10-309c-4858-8d09-f1479ea46d4c")
 			(effects
@@ -43865,7 +43865,7 @@
 			)
 		)
 		(property "Value" "r1_e_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "a8179c83-8933-42cb-915d-9cfec2a7a51c")
 			(effects
@@ -43876,7 +43876,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "41bf2118-59aa-4ed0-bd7a-40f91721a3d5")
@@ -43887,7 +43887,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3c5794f4-5873-4490-8a8c-f3a23c976b5a")
@@ -44972,11 +44972,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "ed52688d-5bd0-484d-8b40-cbe4b0265ead")
-		(at 74.03125 46.05)
+		(at 133.35 28.575)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW23"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "8315a4bd-1a1b-4730-a373-713ae8a1ac56")
 			(effects
@@ -44987,7 +44987,7 @@
 			)
 		)
 		(property "Value" "r1_y_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "e170492d-89e2-4a62-bed5-187485010b3c")
 			(effects
@@ -44998,7 +44998,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "dccb2600-0520-4d1c-9a63-a48e9359c1e9")
@@ -45009,7 +45009,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "dfa39596-80ab-4fb3-9e0f-84fb168d4511")
@@ -45806,11 +45806,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1.25U"
 		(layer "F.Cu")
 		(uuid "f41b6f33-7b9f-4cb9-9084-913f317bf1bd")
-		(at 138.15625 100.725)
+		(at 11.90625 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1.25U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1.25u")
 		(property "Reference" "SW64"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "70416a36-c710-4813-a500-e2ce43f96b74")
 			(effects
@@ -45821,7 +45821,7 @@
 			)
 		)
 		(property "Value" "r4_left_ctrl_1.25u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "cc36533c-1c39-4aa7-a6e2-3aad4216d41f")
 			(effects
@@ -45832,7 +45832,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e9cf206f-d2af-4aba-baf0-cc06c1779804")
@@ -45843,7 +45843,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "94c79695-16db-4ec1-a4d9-381acc079b69")
@@ -46294,11 +46294,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "f46384ca-83e9-41c5-954e-610078d2aef7")
-		(at 159.53125 27.825)
+		(at 142.875 85.725)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW69"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "ef90e22f-0121-41b4-b4c0-01617d4ddd48")
 			(effects
@@ -46309,7 +46309,7 @@
 			)
 		)
 		(property "Value" "r4_left_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "35621220-abe6-4c83-aa72-308c4ed23a76")
 			(effects
@@ -46320,7 +46320,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4ea355d0-5feb-4979-8495-b6b7707229e1")
@@ -46331,7 +46331,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f1d61cc0-9527-4c14-a9c5-1386a8c78a7f")
@@ -46782,11 +46782,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "f58acefb-bf13-4eba-bf9a-c26a609558ce")
-		(at 31.28125 173.625)
+		(at 161.925 9.525)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW9"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "b77cf0ac-a26e-4f20-ba3d-cf246f23c003")
 			(effects
@@ -46797,7 +46797,7 @@
 			)
 		)
 		(property "Value" "r0_8_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "2d370fe3-0f45-4ca5-93ad-8b862794ba57")
 			(effects
@@ -46808,7 +46808,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "09391791-d6de-491f-a978-74e34ec7b020")
@@ -46819,7 +46819,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c0ffc4f6-45af-4d6e-8858-767208ea5055")
@@ -47270,11 +47270,11 @@
 	(footprint "lh60-sockets:Gateron-LP-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "f806b358-e18e-40f9-a487-e5b16de53050")
-		(at 180.90125 72.595)
+		(at 252.4125 47.625 270)
 		(descr "Gateron-LP bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp 1u")
 		(property "Reference" "SW44"
-			(at -0.9 -4.125 0)
+			(at -0.9 -4.125 90)
 			(layer "F.SilkS")
 			(uuid "b9717908-85c6-4e06-8e91-e140380e0040")
 			(effects
@@ -47285,7 +47285,7 @@
 			)
 		)
 		(property "Value" "r2_enter_split_left_fn_1u"
-			(at -0.9 9.25 0)
+			(at -0.9 9.25 90)
 			(layer "F.Fab")
 			(uuid "d6373117-0c19-40a1-987d-13d765e67fe7")
 			(effects
@@ -47296,7 +47296,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "28e69246-d95f-4a27-9122-0df157886adf")
@@ -47307,7 +47307,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "c20823df-2315-49a8-aa4d-7716b2d63d33")
@@ -47449,14 +47449,14 @@
 			(uuid "ffb7327a-8dcb-4ec5-b7be-c754b76e6389")
 		)
 		(pad "" np_thru_hole circle
-			(at 0 0)
+			(at 0 0 270)
 			(size 5.25 5.25)
 			(drill 5.25)
 			(layers "*.Mask")
 			(uuid "db849f72-c66d-4162-8942-90013e952279")
 		)
 		(pad "1" smd roundrect
-			(at -8.075 4.7)
+			(at -8.075 4.7 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -47466,7 +47466,7 @@
 			(uuid "1a969cf6-e7fc-4a0c-a673-17e275cb2e4d")
 		)
 		(pad "1" smd rect
-			(at -6.35 4.7)
+			(at -6.35 4.7 270)
 			(size 3.9 1)
 			(layers "B.Cu")
 			(net "/KEY_42")
@@ -47475,7 +47475,7 @@
 			(uuid "11da76dc-0e05-405a-9501-b30c0f4dba3a")
 		)
 		(pad "1" thru_hole circle
-			(at -4.4 4.7)
+			(at -4.4 4.7 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -47486,7 +47486,7 @@
 			(uuid "ce48614d-8a96-4035-ac5e-2d952530cfc8")
 		)
 		(pad "2" thru_hole circle
-			(at 2.6 5.75)
+			(at 2.6 5.75 270)
 			(size 4 4)
 			(drill 3)
 			(layers "*.Cu" "B.Mask")
@@ -47497,7 +47497,7 @@
 			(uuid "752156b7-b7bc-4ac4-81b4-15181c8568d4")
 		)
 		(pad "2" smd rect
-			(at 4.475 5.75)
+			(at 4.475 5.75 270)
 			(size 3.75 1)
 			(layers "B.Cu")
 			(net "/ROW4")
@@ -47506,7 +47506,7 @@
 			(uuid "6c3bd308-38bc-41f5-ae76-d87e70d941bd")
 		)
 		(pad "2" smd roundrect
-			(at 6.275 5.75)
+			(at 6.275 5.75 270)
 			(size 2.5 2.55)
 			(layers "B.Cu" "B.Mask" "B.Paste")
 			(roundrect_rratio 0.2)
@@ -47531,11 +47531,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "fb594d62-905d-4f2c-b4b1-d3233cd6b67a")
-		(at 116.78125 137.175)
+		(at 109.5375 66.675)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW52"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "18843799-e9f9-4830-9d4a-61961a66dc3a")
 			(effects
@@ -47546,7 +47546,7 @@
 			)
 		)
 		(property "Value" "r3_v_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "4971e2b4-fcd4-4493-b1f0-fb9cce80e810")
 			(effects
@@ -47557,7 +47557,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "27cc8b42-3825-4d7f-ae14-73c66ab6dadd")
@@ -47568,7 +47568,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "3db3cd72-5109-4632-a285-8130fc12f58a")
@@ -48019,11 +48019,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "fcaa7f60-4cf1-4e03-ac11-5038adbc3b9e")
-		(at 95.40625 64.275)
+		(at 61.9125 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW33"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "5045a911-5891-43ef-8d37-2ce50b21b8be")
 			(effects
@@ -48034,7 +48034,7 @@
 			)
 		)
 		(property "Value" "r2_s_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "374cb156-1067-4e5e-b08a-a0e18d4e0d6b")
 			(effects
@@ -48045,7 +48045,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "be29ca51-4e38-49aa-8a36-f0ffaceb6ba5")
@@ -48056,7 +48056,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "1b851fe4-6244-4626-82c0-48fba16ef040")
@@ -48507,11 +48507,11 @@
 	(footprint "lh60-sockets:Gateron-LP-or-ChocV1-Hotswap-Socket-1U"
 		(layer "F.Cu")
 		(uuid "fe77482f-4e73-488a-8048-3efd600f832c")
-		(at 95.40625 100.725)
+		(at 100.0125 47.625)
 		(descr "Gateron-LP-or-ChocV1 bottom-side hotswap socket, 1U keycap envelope on Dwgs.User")
 		(tags "keyboard low_profile hot_swap gateron_lp_or_chocv1 1u")
 		(property "Reference" "SW35"
-			(at 0.3375 -9.4 0)
+			(at 0.3375 -9.4)
 			(layer "F.SilkS")
 			(uuid "3a56f6d4-ad99-45eb-91d0-e2be444f5f07")
 			(effects
@@ -48522,7 +48522,7 @@
 			)
 		)
 		(property "Value" "r2_f_1u"
-			(at 0.3375 9.25 0)
+			(at 0.3375 9.25)
 			(layer "F.Fab")
 			(uuid "3c8bf438-ea97-4e12-a2cd-5f8c8708bf02")
 			(effects
@@ -48533,7 +48533,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "78f4ed15-c5ce-4964-88ea-afcac5c3de8b")
@@ -48544,7 +48544,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 0)
+			(at 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9efef588-1843-4328-b1a5-2e878056882f")
