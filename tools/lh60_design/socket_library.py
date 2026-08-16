@@ -202,7 +202,9 @@ def _pad_geometry(pad: PadSpec) -> Polygon:
 
 
 def _land_pattern(pads: Iterable[PadSpec]) -> Polygon:
-    return unary_union([_pad_geometry(pad) for pad in pads])
+    return unary_union(
+        [_pad_geometry(pad) for pad in pads if pad.expands_courtyard]
+    )
 
 
 def _rounded(value: float) -> float:
@@ -302,7 +304,7 @@ def _body_graphics(spec: FootprintSpec) -> list[dict[str, Any]]:
     ]
 
 
-def _courtyard_graphics(spec: FootprintSpec) -> list[dict[str, Any]]:
+def _courtyard_geometry(spec: FootprintSpec):
     gateron = unary_union(
         [gateron_physical_geometry(), _land_pattern(gateron_pads())]
     ).buffer(spec.courtyard_clearance_mm, quad_segs=8, join_style="round")
@@ -310,24 +312,22 @@ def _courtyard_graphics(spec: FootprintSpec) -> list[dict[str, Any]]:
         [choc_physical_geometry(), _land_pattern(choc_v1_v2_pads())]
     ).buffer(spec.courtyard_clearance_mm, quad_segs=8, join_style="round")
     if spec.series == "Gateron-LP":
-        geometries = [gateron]
-    elif spec.series == "Kailh-Choc-V1V2":
-        geometries = [choc]
-    else:
-        rotated_choc_body = affinity.rotate(
-            choc_physical_geometry(), 180, origin=(0, 0)
-        )
-        rotated_choc = unary_union(
-            [rotated_choc_body, _land_pattern(choc_v1_pads_rotated_180())]
-        ).buffer(spec.courtyard_clearance_mm, quad_segs=8, join_style="round")
-        merged = unary_union([gateron, rotated_choc])
-        geometries = [
-            Polygon(polygon.exterior)
-            for polygon in _polygons(merged)
-        ]
+        return gateron
+    if spec.series == "Kailh-Choc-V1V2":
+        return choc
+    rotated_choc_body = affinity.rotate(
+        choc_physical_geometry(), 180, origin=(0, 0)
+    )
+    rotated_choc = unary_union(
+        [rotated_choc_body, _land_pattern(choc_v1_pads_rotated_180())]
+    ).buffer(spec.courtyard_clearance_mm, quad_segs=8, join_style="round")
+    return unary_union([gateron, rotated_choc])
+
+
+def _courtyard_graphics(spec: FootprintSpec) -> list[dict[str, Any]]:
     return [
         graphic
-        for geometry in geometries
+        for geometry in _polygons(_courtyard_geometry(spec))
         for graphic in _polygon_graphics(geometry, stroke_width_mm=0.05)
     ]
 

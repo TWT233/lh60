@@ -46,6 +46,56 @@ class SocketGeometryMathTest(unittest.TestCase):
             for right in polygons[left_index + 1 :]:
                 self.assertLessEqual(left.intersection(right).area, 1e-9)
 
+    def test_center_stem_hole_does_not_expand_socket_courtyard(self):
+        from shapely.geometry import Point
+
+        from tools.lh60_design.socket_library import _courtyard_geometry
+        from tools.lh60_design.socket_geometry import build_footprint_specs
+
+        spec = next(
+            spec
+            for spec in build_footprint_specs()
+            if spec.name == "Gateron-LP-Hotswap-Socket-1U"
+        )
+        courtyard = _courtyard_geometry(spec)
+        center_hole_with_clearance = Point(0, 0).buffer(
+            5.25 / 2 + spec.courtyard_clearance_mm,
+            quad_segs=16,
+        )
+
+        self.assertGreater(
+            center_hole_with_clearance.difference(courtyard).area,
+            1.0,
+            "the switch stem hole must not be treated as expanding assembly volume",
+        )
+
+    def test_center_stem_hole_remains_in_hole_clearance_checks(self):
+        from tools.lh60_design.regions import (
+            RegionPlacement,
+            _placed_geometry,
+        )
+
+        placement = RegionPlacement(
+            socket_ref="SW1",
+            footprint="Gateron-LP-Hotswap-Socket-1U",
+            center_x_mm=0,
+            center_y_mm=0,
+            rotation_deg=0,
+            logical_node_id="node",
+        )
+
+        holes = _placed_geometry(placement).holes
+
+        self.assertTrue(
+            any(
+                label.endswith("NPTH1:hole")
+                and x == 0
+                and y == 0
+                and radius == 5.25 / 2
+                for label, x, y, radius in holes
+            )
+        )
+
 
 class SocketSpecTest(unittest.TestCase):
     def specs(self):

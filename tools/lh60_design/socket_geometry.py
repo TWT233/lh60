@@ -25,6 +25,7 @@ class PadSpec:
     drill: float | None = None
     rotation: float = 0.0
     roundrect_rratio: float | None = None
+    expands_courtyard: bool = True
 
     def signature(self) -> tuple[object, ...]:
         return (
@@ -39,6 +40,7 @@ class PadSpec:
             self.drill,
             self.rotation,
             self.roundrect_rratio,
+            self.expands_courtyard,
         )
 
 
@@ -79,6 +81,7 @@ def _npth(
     diameter: float,
     *,
     layers: tuple[str, ...] = ("*.Cu", "*.Mask"),
+    expands_courtyard: bool = True,
 ) -> PadSpec:
     return PadSpec(
         number="",
@@ -90,6 +93,7 @@ def _npth(
         height=diameter,
         drill=diameter,
         layers=layers,
+        expands_courtyard=expands_courtyard,
     )
 
 
@@ -144,7 +148,13 @@ def _smd(
 
 def gateron_pads() -> tuple[PadSpec, ...]:
     return (
-        _npth(0.0, 0.0, 5.25, layers=("*.Mask",)),
+        _npth(
+            0.0,
+            0.0,
+            5.25,
+            layers=("*.Mask",),
+            expands_courtyard=False,
+        ),
         _smd("1", "roundrect", -8.075, 4.7, 2.5, 2.55, paste_and_mask=True),
         _smd("1", "rect", -6.35, 4.7, 3.9, 1.0, paste_and_mask=False),
         _pth("1", -4.4, 4.7, 4.0, 3.0),
@@ -171,7 +181,13 @@ def choc_v1_v2_pads() -> tuple[PadSpec, ...]:
     return (
         _npth(-5.5, 0.0, 1.7018),
         _npth(-5.0, 3.8, 3.0, layers=("*.Cu", "*.Mask")),
-        _npth(0.0, 0.0, 5.0, layers=("*.Cu", "*.Mask")),
+        _npth(
+            0.0,
+            0.0,
+            5.0,
+            layers=("*.Cu", "*.Mask"),
+            expands_courtyard=False,
+        ),
         _npth(0.0, 5.9, 3.0, layers=("*.Cu", "*.Mask")),
         _pth("", 5.0, -5.15, 1.65, 1.0),
         _npth(5.5, 0.0, 1.7018),
