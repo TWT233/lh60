@@ -21,11 +21,16 @@ def complete_schematic_schemas():
         "sch_components": {
             "set_schematic_page": schema(("schematic", "size"), "schematic", "size", "portrait"),
             "update_symbols_from_library": schema(("schematic",), "schematic", "dry_run", "allow_pin_moves", "references"),
+            "reset_schematic_field_positions": schema(("schematic",), "schematic", "dry_run", "references"),
         },
         "library": {
             "create_symbol": schema(("library_path", "name", "reference_prefix"), "library_path", "name", "reference_prefix", "reference_at", "value_at"),
         },
     }
+
+
+def tool_text_result(payload):
+    return {"content": [{"type": "text", "text": __import__("json").dumps(payload)}]}
 
 
 class SchematicApplyContractTest(unittest.TestCase):
@@ -118,6 +123,10 @@ class SchematicApplyContractTest(unittest.TestCase):
             ("sch_batch", "batch_connect_to_net", "pins", "required"),
             ("sch_batch", "batch_set_schematic_field_visibility", "edits", "properties"),
             ("sch_components", "update_symbols_from_library", "allow_pin_moves", "properties"),
+            ("sch_components", "update_symbols_from_library", "references", "properties"),
+            ("sch_components", "reset_schematic_field_positions", "schematic", "required"),
+            ("sch_components", "reset_schematic_field_positions", "dry_run", "properties"),
+            ("sch_components", "reset_schematic_field_positions", "references", "properties"),
         )
         for toolset, tool, field, container in cases:
             with self.subTest(tool=tool, field=field, container=container):
@@ -137,6 +146,43 @@ class SchematicApplyContractTest(unittest.TestCase):
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
+                if name == "update_symbols_from_library":
+                    references = arguments.get("references")
+                    if references == ["U1"]:
+                        return tool_text_result(
+                            {
+                                "errors": [],
+                                "pins_moved": [],
+                                "updated": ["lh60-mcu:RP2040-Tiny"],
+                                "unchanged": [],
+                            }
+                        )
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": [
+                                "lh60-core:Conn_01x03",
+                                "lh60-core:Conn_01x04",
+                                "lh60-core:Conn_01x05",
+                                "lh60-core:PowerFlag",
+                                "Device:D",
+                                "Switch:SW_Push",
+                                "lh60-mcu:RP2040-Tiny",
+                            ],
+                        }
+                    )
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(
+                        {
+                            "no_library_anchor": [],
+                            "no_property": [],
+                            "not_found": [],
+                            "moved": ["U1.Reference", "U1.Value"],
+                            "unchanged": [],
+                        }
+                    )
                 return {}
 
         client = FakeClient()
@@ -148,6 +194,8 @@ class SchematicApplyContractTest(unittest.TestCase):
             "set_schematic_page",
             "batch_place_components",
             "batch_edit_schematic_components",
+            "update_symbols_from_library",
+            "reset_schematic_field_positions",
             *(["batch_connect_to_net"] * len({connection.net_name for connection in plan.connections})),
             "batch_set_schematic_field_visibility",
             "update_symbols_from_library",
@@ -186,8 +234,32 @@ class SchematicApplyContractTest(unittest.TestCase):
         self.assertEqual(edit_arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
         self.assertEqual(len(edit_arguments["edits"]), 155)
 
+        self.assertEqual(
+            client.calls[7],
+            (
+                "update_symbols_from_library",
+                {
+                    "schematic": "/tmp/lh60-debug.kicad_sch",
+                    "references": ["U1"],
+                    "dry_run": False,
+                    "allow_pin_moves": True,
+                },
+            ),
+        )
+        self.assertEqual(
+            client.calls[8],
+            (
+                "reset_schematic_field_positions",
+                {
+                    "schematic": "/tmp/lh60-debug.kicad_sch",
+                    "references": ["U1"],
+                    "dry_run": False,
+                },
+            ),
+        )
+
         grouped_connections = {}
-        for name, arguments in client.calls[7:-2]:
+        for name, arguments in client.calls[9:-2]:
             self.assertEqual(name, "batch_connect_to_net")
             self.assertEqual(arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
             grouped_connections[arguments["net_name"]] = arguments["pins"]
@@ -260,6 +332,151 @@ class SchematicApplyContractTest(unittest.TestCase):
                 },
             ),
         )
+
+    def test_apply_aborts_before_wiring_on_early_refresh_diagnostics(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, refresh_payload):
+                self.calls = []
+                self.refresh_payload = refresh_payload
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+                    return tool_text_result(self.refresh_payload)
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(
+                        {
+                            "no_library_anchor": [],
+                            "no_property": [],
+                            "not_found": [],
+                            "moved": ["U1.Reference", "U1.Value"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "update_symbols_from_library":
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                        }
+                    )
+                return {}
+
+        bad_payloads = (
+            {"errors": ["stale"], "pins_moved": [], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": []},
+            {"errors": [], "pins_moved": ["U1.1"], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": []},
+            {"errors": [], "pins_moved": [], "updated": [], "unchanged": []},
+            {"errors": [], "pins_moved": [], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": ["lh60-mcu:RP2040-Tiny"]},
+        )
+        for payload in bad_payloads:
+            client = FakeClient(payload)
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(RuntimeError, "U1|pins_moved|errors|lh60-mcu:RP2040-Tiny"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
+
+    def test_apply_aborts_before_wiring_on_reset_diagnostics(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, reset_payload):
+                self.calls = []
+                self.reset_payload = reset_payload
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": ["lh60-mcu:RP2040-Tiny"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(self.reset_payload)
+                if name == "update_symbols_from_library":
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                        }
+                    )
+                return {}
+
+        bad_payloads = (
+            {"no_library_anchor": ["U1.Reference"], "no_property": [], "not_found": [], "moved": ["U1.Value"], "unchanged": []},
+            {"no_library_anchor": [], "no_property": ["U1.Value"], "not_found": [], "moved": ["U1.Reference"], "unchanged": []},
+            {"no_library_anchor": [], "no_property": [], "not_found": ["U1.Reference"], "moved": ["U1.Value"], "unchanged": []},
+            {"no_library_anchor": [], "no_property": [], "not_found": [], "moved": ["U1.Reference"], "unchanged": []},
+        )
+        for payload in bad_payloads:
+            client = FakeClient(payload)
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(RuntimeError, "U1.Reference|U1.Value|no_library_anchor|no_property|not_found"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
+
+    def test_apply_aborts_on_final_conservative_refresh_diagnostics(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, final_payload):
+                self.calls = []
+                self.final_payload = final_payload
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": ["lh60-mcu:RP2040-Tiny"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(
+                        {
+                            "no_library_anchor": [],
+                            "no_property": [],
+                            "not_found": [],
+                            "moved": ["U1.Reference", "U1.Value"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "update_symbols_from_library":
+                    return tool_text_result(self.final_payload)
+                return {}
+
+        for payload in (
+            {"errors": ["stale"], "pins_moved": [], "updated": [], "unchanged": ["lh60-mcu:RP2040-Tiny"]},
+            {"errors": [], "pins_moved": ["U1.1"], "updated": [], "unchanged": ["lh60-mcu:RP2040-Tiny"]},
+        ):
+            client = FakeClient(payload)
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(RuntimeError, "pins_moved|errors"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
 
 
 if __name__ == "__main__":
