@@ -34,7 +34,7 @@ def disjoint_acceptance_schemas():
         },
         "sch_export": {
             "export_netlist_summary": schema(("schematic",), "schematic"),
-            "run_erc": schema(("schematic", "severity"), "schematic", "severity"),
+            "run_erc": schema(("schematic",), "schematic", "severity"),
             "export_schematic_svg": schema(("schematic", "output"), "schematic", "output"),
         },
         "library": {
@@ -312,6 +312,25 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "list_schematic_wires"):
             _load_acceptance_toolsets(FakeClient())
+
+    def test_acceptance_schema_gate_allows_property_only_erc_severity_and_rejects_missing_property(self):
+        from tools.check_schematic_acceptance import _load_acceptance_toolsets
+
+        class FakeClient:
+            def tool_schemas(self, toolset):
+                return deepcopy(disjoint_acceptance_schemas()[toolset])
+
+        _load_acceptance_toolsets(FakeClient())
+
+        class MissingSeverity(FakeClient):
+            def tool_schemas(self, toolset):
+                schemas = super().tool_schemas(toolset)
+                if toolset == "sch_export":
+                    schemas["run_erc"]["properties"].pop("severity")
+                return schemas
+
+        with self.assertRaisesRegex(RuntimeError, "run_erc.*severity"):
+            _load_acceptance_toolsets(MissingSeverity())
 
     def test_acceptance_rejects_component_contract_or_layout_drift(self):
         from tools import check_schematic_acceptance as checker
