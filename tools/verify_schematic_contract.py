@@ -1,12 +1,73 @@
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 class SchematicPlanContractTest(unittest.TestCase):
+    EXPECTED_CONNECTORS = {
+        "J1": (
+            "PWR",
+            "lh60-core:Conn_01x03",
+            "lh60-core:PinHeader_1x03_P2.54mm_Vertical",
+            (("1", "VSYS"), ("2", "3V3"), ("3", "GND")),
+        ),
+        "J2": (
+            "COL_A",
+            "lh60-core:Conn_01x05",
+            "lh60-core:PinHeader_1x05_P2.54mm_Vertical",
+            (
+                ("1", "COL0"),
+                ("2", "COL1"),
+                ("3", "COL2"),
+                ("4", "COL3"),
+                ("5", "COL4"),
+            ),
+        ),
+        "J3": (
+            "COL_B",
+            "lh60-core:Conn_01x05",
+            "lh60-core:PinHeader_1x05_P2.54mm_Vertical",
+            (
+                ("1", "COL5"),
+                ("2", "COL6"),
+                ("3", "COL7"),
+                ("4", "COL8"),
+                ("5", "COL9"),
+            ),
+        ),
+        "J4": (
+            "ROW_A",
+            "lh60-core:Conn_01x04",
+            "lh60-core:PinHeader_1x04_P2.54mm_Vertical",
+            (("1", "ROW0"), ("2", "ROW1"), ("3", "ROW2"), ("4", "ROW3")),
+        ),
+        "J5": (
+            "ROW_B",
+            "lh60-core:Conn_01x03",
+            "lh60-core:PinHeader_1x03_P2.54mm_Vertical",
+            (("1", "ROW4"), ("2", "ROW5"), ("3", "ROW6")),
+        ),
+        "J6": (
+            "AUX",
+            "lh60-core:Conn_01x03",
+            "lh60-core:PinHeader_1x03_P2.54mm_Vertical",
+            (("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
+        ),
+    }
+
     def plan(self):
         from tools.lh60_design.schematic import build_schematic_plan
 
         return build_schematic_plan()
+
+    def field_state(self):
+        return {
+            visibility.reference: (
+                visibility.reference_visible,
+                visibility.value_visible,
+            )
+            for visibility in self.plan().field_visibility
+        }
 
     def test_inventory_matches_the_frozen_design(self):
         plan = self.plan()
@@ -17,13 +78,22 @@ class SchematicPlanContractTest(unittest.TestCase):
         self.assertEqual(len(by_kind["mcu"]), 1)
         self.assertEqual(len(by_kind["switch"]), 75)
         self.assertEqual(len(by_kind["diode"]), 70)
-        self.assertEqual(len(by_kind["test_point"]), 23)
+        self.assertEqual(len(by_kind["connector"]), 6)
         self.assertEqual(len(by_kind["power_flag"]), 3)
-        self.assertEqual(len(plan.components), 172)
-        self.assertEqual(len({component.reference for component in plan.components}), 172)
+        self.assertEqual(len(plan.components), 155)
+        self.assertEqual(
+            len({component.reference for component in plan.components}),
+            155,
+        )
         self.assertNotIn(
             "SW59",
             {component.reference for component in plan.components},
+        )
+        self.assertFalse(
+            any(
+                component.reference.startswith("TP")
+                for component in plan.components
+            )
         )
         self.assertEqual(
             {component.lib_id for component in by_kind["switch"]},
@@ -32,6 +102,10 @@ class SchematicPlanContractTest(unittest.TestCase):
         self.assertEqual(
             {component.lib_id for component in by_kind["diode"]},
             {"Device:D"},
+        )
+        self.assertEqual(
+            {component.lib_id for component in by_kind["connector"]},
+            {"lh60-core:Conn_01x03", "lh60-core:Conn_01x04", "lh60-core:Conn_01x05"},
         )
 
     def test_every_physical_key_has_one_traceable_switch(self):
@@ -134,43 +208,144 @@ class SchematicPlanContractTest(unittest.TestCase):
             set(expected),
         )
 
-    def test_test_points_cover_power_matrix_and_spare_gpio(self):
+    def test_connector_groups_cover_power_matrix_and_spare_gpio(self):
         plan = self.plan()
-        test_points = [
-            component
+        connectors = {
+            component.reference: component
             for component in plan.components
-            if component.kind == "test_point"
-        ]
+            if component.kind == "connector"
+        }
         pin_nets = {
             (connection.reference, connection.pin_number): connection.net_name
             for connection in plan.connections
         }
-        expected_nets = {
-            "VSYS",
-            "3V3",
-            "GND",
-            *(f"COL{index}" for index in range(10)),
-            *(f"ROW{index}" for index in range(7)),
-            "GP27",
-            "GP28",
-            "GP29",
-        }
 
-        self.assertEqual({component.value for component in test_points}, expected_nets)
+        self.assertEqual(set(connectors), set(self.EXPECTED_CONNECTORS))
+        for reference, (
+            value,
+            lib_id,
+            footprint,
+            pin_map,
+        ) in self.EXPECTED_CONNECTORS.items():
+            component = connectors[reference]
+            self.assertEqual(component.value, value)
+            self.assertEqual(component.lib_id, lib_id)
+            self.assertEqual(component.footprint, footprint)
+            for pin_number, net_name in pin_map:
+                self.assertEqual(pin_nets[(reference, pin_number)], net_name)
+
         self.assertEqual(
-            {
-                pin_nets[(component.reference, "1")]
-                for component in test_points
-            },
-            expected_nets,
+            [
+                (connection.reference, connection.pin_number)
+                for connection in plan.connections
+                if connection.reference.startswith("J")
+                and connection.net_name == "GND"
+            ],
+            [("J1", "3")],
         )
+
+    def test_page_layout_grid_and_switch_bands_are_frozen(self):
+        from tools.lh60_design.matrix import logical_nodes
+        from tools.lh60_design.schematic import (
+            MATRIX_X0_MM,
+            MATRIX_X_PITCH_MM,
+            MATRIX_Y0_MM,
+            MATRIX_Y_PITCH_MM,
+            SWITCH_Y_OFFSETS_MM,
+        )
+
+        plan = self.plan()
+        diodes = {
+            component.logical_node_id: component
+            for component in plan.components
+            if component.kind == "diode"
+        }
+        switches_by_node = {}
+        row_offsets = {}
+        switches = [
+            component
+            for component in plan.components
+            if component.kind == "switch"
+        ]
+        longest_length = max(len(component.value) for component in switches)
+
+        self.assertEqual((plan.page_size, plan.portrait), ("A3", False))
+        self.assertEqual(longest_length, 26)
+        self.assertEqual(MATRIX_X_PITCH_MM, 30.48)
+        self.assertGreaterEqual(SWITCH_Y_OFFSETS_MM[0], 0.0)
         self.assertTrue(
             all(
-                component.footprint
-                == "lh60-core:TestPoint_Pad_D1.5mm_Bottom"
-                for component in test_points
+                earlier < later
+                for earlier, later in zip(
+                    SWITCH_Y_OFFSETS_MM,
+                    SWITCH_Y_OFFSETS_MM[1:],
+                )
             )
         )
+        self.assertLess(SWITCH_Y_OFFSETS_MM[-1], MATRIX_Y_PITCH_MM)
+        for component in plan.components:
+            self.assertAlmostEqual(component.x / 1.27, round(component.x / 1.27), places=9)
+            self.assertAlmostEqual(component.y / 1.27, round(component.y / 1.27), places=9)
+
+        for switch in switches:
+            switches_by_node.setdefault(switch.logical_node_id, []).append(switch)
+        for node in logical_nodes():
+            diode = diodes[node.logical_node_id]
+            self.assertAlmostEqual(
+                diode.x,
+                MATRIX_X0_MM + node.column * MATRIX_X_PITCH_MM,
+                places=9,
+            )
+            self.assertAlmostEqual(
+                diode.y,
+                MATRIX_Y0_MM + node.row * MATRIX_Y_PITCH_MM,
+                places=9,
+            )
+            offsets = {
+                round(switch.y - diode.y, 9)
+                for switch in switches_by_node[node.logical_node_id]
+            }
+            self.assertEqual(
+                offsets,
+                {
+                    round(offset, 9)
+                    for offset in SWITCH_Y_OFFSETS_MM[:len(node.physical_key_ids)]
+                },
+            )
+            if len(node.physical_key_ids) == 2:
+                self.assertEqual(
+                    offsets,
+                    {round(offset, 9) for offset in SWITCH_Y_OFFSETS_MM},
+                )
+
+    def test_field_visibility_contract_is_frozen(self):
+        states = self.field_state()
+
+        self.assertEqual(len(states), 152)
+        self.assertEqual(states["D1"], (False, False))
+        self.assertEqual(states["SW1"], (False, True))
+        self.assertEqual(states["J1"], (True, True))
+        self.assertEqual(states["U1"], (True, True))
+        self.assertFalse(any(reference.startswith("#FLG") for reference in states))
+        self.assertEqual(
+            sum(reference.startswith("D") for reference in states),
+            70,
+        )
+        self.assertEqual(
+            sum(reference.startswith("SW") for reference in states),
+            75,
+        )
+        self.assertEqual(
+            {reference for reference in states if reference.startswith("J")},
+            {"J1", "J2", "J3", "J4", "J5", "J6"},
+        )
+
+    def test_switch_offset_overflow_is_rejected(self):
+        from tools.lh60_design import schematic
+
+        with mock.patch.object(schematic, "SWITCH_Y_OFFSETS_MM", (10.16,)):
+            with self.assertRaisesRegex(ValueError, "switch offsets"):
+                schematic.build_schematic_plan()
 
     def test_connection_plan_has_one_assignment_per_pin(self):
         plan = self.plan()

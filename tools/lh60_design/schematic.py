@@ -15,12 +15,31 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMATIC = ROOT / "lh60.kicad_sch"
 CORE_SWITCH = "Switch:SW_Push"
 CORE_DIODE = "Device:D"
-CORE_TEST_POINT = "lh60-core:TestPoint"
 CORE_POWER_FLAG = "lh60-core:PowerFlag"
 MCU_SYMBOL = "lh60-mcu:RP2040-Tiny"
 MCU_FOOTPRINT = "lh60-mcu:MCU_RP2040-Tiny_SMD"
 DIODE_FOOTPRINT = "lh60-core:D_SOD-323_Bottom"
-TEST_POINT_FOOTPRINT = "lh60-core:TestPoint_Pad_D1.5mm_Bottom"
+PAGE_SIZE = "A3"
+PAGE_PORTRAIT = False
+MATRIX_X0_MM = 20.32
+MATRIX_Y0_MM = 20.32
+MATRIX_X_PITCH_MM = 30.48
+MATRIX_Y_PITCH_MM = 33.02
+SWITCH_Y_OFFSETS_MM = (10.16, 17.78)
+MCU_POSITION_MM = (350.52, 45.72)
+CONNECTOR_POSITIONS_MM = {
+    "J1": (330.20, 96.52),
+    "J2": (330.20, 134.62),
+    "J3": (330.20, 177.80),
+    "J4": (373.38, 134.62),
+    "J5": (373.38, 175.26),
+    "J6": (373.38, 215.90),
+}
+POWER_FLAG_POSITIONS_MM = {
+    "#FLG01": (381.00, 86.36),
+    "#FLG02": (381.00, 96.52),
+    "#FLG03": (381.00, 106.68),
+}
 RETIRED_SWITCH_REFERENCES = {
     "r3_rshift_2.75u": "SW59",
 }
@@ -49,9 +68,100 @@ class PinConnection:
 
 
 @dataclass(frozen=True)
+class ConnectorGroup:
+    reference: str
+    value: str
+    lib_id: str
+    footprint: str
+    pin_map: tuple[tuple[str, str], ...]
+    x: float
+    y: float
+
+
+@dataclass(frozen=True)
+class FieldVisibility:
+    reference: str
+    reference_visible: bool
+    value_visible: bool
+
+
+@dataclass(frozen=True)
 class SchematicPlan:
     components: tuple[SchematicComponent, ...]
     connections: tuple[PinConnection, ...]
+    page_size: str
+    portrait: bool
+    field_visibility: tuple[FieldVisibility, ...]
+
+
+CONNECTOR_GROUPS = (
+    ConnectorGroup(
+        reference="J1",
+        value="PWR",
+        lib_id="lh60-core:Conn_01x03",
+        footprint="lh60-core:PinHeader_1x03_P2.54mm_Vertical",
+        pin_map=(("1", "VSYS"), ("2", "3V3"), ("3", "GND")),
+        x=CONNECTOR_POSITIONS_MM["J1"][0],
+        y=CONNECTOR_POSITIONS_MM["J1"][1],
+    ),
+    ConnectorGroup(
+        reference="J2",
+        value="COL_A",
+        lib_id="lh60-core:Conn_01x05",
+        footprint="lh60-core:PinHeader_1x05_P2.54mm_Vertical",
+        pin_map=(
+            ("1", "COL0"),
+            ("2", "COL1"),
+            ("3", "COL2"),
+            ("4", "COL3"),
+            ("5", "COL4"),
+        ),
+        x=CONNECTOR_POSITIONS_MM["J2"][0],
+        y=CONNECTOR_POSITIONS_MM["J2"][1],
+    ),
+    ConnectorGroup(
+        reference="J3",
+        value="COL_B",
+        lib_id="lh60-core:Conn_01x05",
+        footprint="lh60-core:PinHeader_1x05_P2.54mm_Vertical",
+        pin_map=(
+            ("1", "COL5"),
+            ("2", "COL6"),
+            ("3", "COL7"),
+            ("4", "COL8"),
+            ("5", "COL9"),
+        ),
+        x=CONNECTOR_POSITIONS_MM["J3"][0],
+        y=CONNECTOR_POSITIONS_MM["J3"][1],
+    ),
+    ConnectorGroup(
+        reference="J4",
+        value="ROW_A",
+        lib_id="lh60-core:Conn_01x04",
+        footprint="lh60-core:PinHeader_1x04_P2.54mm_Vertical",
+        pin_map=(("1", "ROW0"), ("2", "ROW1"), ("3", "ROW2"), ("4", "ROW3")),
+        x=CONNECTOR_POSITIONS_MM["J4"][0],
+        y=CONNECTOR_POSITIONS_MM["J4"][1],
+    ),
+    ConnectorGroup(
+        reference="J5",
+        value="ROW_B",
+        lib_id="lh60-core:Conn_01x03",
+        footprint="lh60-core:PinHeader_1x03_P2.54mm_Vertical",
+        pin_map=(("1", "ROW4"), ("2", "ROW5"), ("3", "ROW6")),
+        x=CONNECTOR_POSITIONS_MM["J5"][0],
+        y=CONNECTOR_POSITIONS_MM["J5"][1],
+    ),
+    ConnectorGroup(
+        reference="J6",
+        value="AUX",
+        lib_id="lh60-core:Conn_01x03",
+        footprint="lh60-core:PinHeader_1x03_P2.54mm_Vertical",
+        pin_map=(("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
+        x=CONNECTOR_POSITIONS_MM["J6"][0],
+        y=CONNECTOR_POSITIONS_MM["J6"][1],
+    ),
+)
 
 
 def switch_references() -> dict[str, str]:
@@ -84,8 +194,8 @@ def _matrix_components() -> tuple[SchematicComponent, ...]:
     references = switch_references()
     components: list[SchematicComponent] = []
     for node in logical_nodes():
-        x = 15.24 + node.column * 22.86
-        y = 15.24 + node.row * 25.40
+        x = MATRIX_X0_MM + node.column * MATRIX_X_PITCH_MM
+        y = MATRIX_Y0_MM + node.row * MATRIX_Y_PITCH_MM
         components.append(
             SchematicComponent(
                 kind="diode",
@@ -99,6 +209,8 @@ def _matrix_components() -> tuple[SchematicComponent, ...]:
                 fields=(("LogicalNode", node.logical_node_id),),
             )
         )
+        if len(node.physical_key_ids) > len(SWITCH_Y_OFFSETS_MM):
+            raise ValueError("switch offsets are exhausted")
         for socket_index, physical_key_id in enumerate(node.physical_key_ids):
             key = keys_by_id[physical_key_id]
             components.append(
@@ -109,7 +221,7 @@ def _matrix_components() -> tuple[SchematicComponent, ...]:
                     value=physical_key_id,
                     footprint=_switch_footprint(key),
                     x=x,
-                    y=y + 6.35 * (socket_index + 1),
+                    y=y + SWITCH_Y_OFFSETS_MM[socket_index],
                     physical_key_id=physical_key_id,
                     logical_node_id=node.logical_node_id,
                     fields=(
@@ -121,19 +233,6 @@ def _matrix_components() -> tuple[SchematicComponent, ...]:
     return tuple(components)
 
 
-def test_point_nets() -> tuple[str, ...]:
-    return (
-        "VSYS",
-        "3V3",
-        "GND",
-        *(f"COL{index}" for index in range(10)),
-        *(f"ROW{index}" for index in range(7)),
-        "GP27",
-        "GP28",
-        "GP29",
-    )
-
-
 def _support_components() -> tuple[SchematicComponent, ...]:
     components = [
         SchematicComponent(
@@ -142,34 +241,36 @@ def _support_components() -> tuple[SchematicComponent, ...]:
             reference="U1",
             value="RP2040-Tiny",
             footprint=MCU_FOOTPRINT,
-            x=259.08,
-            y=68.58,
+            x=MCU_POSITION_MM[0],
+            y=MCU_POSITION_MM[1],
         )
     ]
-    for index, net_name in enumerate(test_point_nets()):
-        column, row = divmod(index, 8)
+    for group in CONNECTOR_GROUPS:
         components.append(
             SchematicComponent(
-                kind="test_point",
-                lib_id=CORE_TEST_POINT,
-                reference=f"TP{index + 1}",
-                value=net_name,
-                footprint=TEST_POINT_FOOTPRINT,
-                x=243.84 + column * 20.32,
-                y=124.46 + row * 10.16,
-                fields=(("Net", net_name),),
+                kind="connector",
+                lib_id=group.lib_id,
+                reference=group.reference,
+                value=group.value,
+                footprint=group.footprint,
+                x=group.x,
+                y=group.y,
             )
         )
-    for index, net_name in enumerate(("VSYS", "3V3", "GND")):
+    for reference, net_name in (
+        ("#FLG01", "VSYS"),
+        ("#FLG02", "3V3"),
+        ("#FLG03", "GND"),
+    ):
         components.append(
             SchematicComponent(
                 kind="power_flag",
                 lib_id=CORE_POWER_FLAG,
-                reference=f"#FLG0{index + 1}",
+                reference=reference,
                 value="PWR_FLAG",
                 footprint="",
-                x=304.80,
-                y=124.46 + index * 10.16,
+                x=POWER_FLAG_POSITIONS_MM[reference][0],
+                y=POWER_FLAG_POSITIONS_MM[reference][1],
                 fields=(("Net", net_name),),
             )
         )
@@ -221,16 +322,40 @@ def _matrix_connections() -> tuple[PinConnection, ...]:
     return tuple(connections)
 
 
-def _test_point_connections() -> tuple[PinConnection, ...]:
-    test_points = tuple(
-        PinConnection(f"TP{index + 1}", "1", net_name)
-        for index, net_name in enumerate(test_point_nets())
+def _connector_connections() -> tuple[PinConnection, ...]:
+    return tuple(
+        PinConnection(group.reference, pin_number, net_name)
+        for group in CONNECTOR_GROUPS
+        for pin_number, net_name in group.pin_map
     )
-    flags = tuple(
-        PinConnection(f"#FLG0{index + 1}", "1", net_name)
-        for index, net_name in enumerate(("VSYS", "3V3", "GND"))
+
+
+def _power_flag_connections() -> tuple[PinConnection, ...]:
+    return tuple(
+        PinConnection(reference, "1", net_name)
+        for reference, net_name in (
+            ("#FLG01", "VSYS"),
+            ("#FLG02", "3V3"),
+            ("#FLG03", "GND"),
+        )
     )
-    return (*test_points, *flags)
+
+
+def _field_visibility() -> tuple[FieldVisibility, ...]:
+    switches = sorted(
+        (
+            component.reference
+            for component in _matrix_components()
+            if component.kind == "switch"
+        ),
+        key=lambda reference: int(reference.removeprefix("SW")),
+    )
+    return tuple(
+        [FieldVisibility(f"D{index}", False, False) for index in range(1, 71)]
+        + [FieldVisibility(reference, False, True) for reference in switches]
+        + [FieldVisibility(group.reference, True, True) for group in CONNECTOR_GROUPS]
+        + [FieldVisibility("U1", True, True)]
+    )
 
 
 def build_schematic_plan() -> SchematicPlan:
@@ -238,11 +363,15 @@ def build_schematic_plan() -> SchematicPlan:
     connections = (
         *_mcu_connections(),
         *_matrix_connections(),
-        *_test_point_connections(),
+        *_connector_connections(),
+        *_power_flag_connections(),
     )
     return SchematicPlan(
         components=tuple(components),
         connections=tuple(connections),
+        page_size=PAGE_SIZE,
+        portrait=PAGE_PORTRAIT,
+        field_visibility=_field_visibility(),
     )
 
 
@@ -268,6 +397,16 @@ def _edit_payload(component: SchematicComponent) -> dict[str, object]:
     return payload
 
 
+def _field_visibility_payload(
+    visibility: FieldVisibility,
+) -> dict[str, object]:
+    return {
+        "reference": visibility.reference,
+        "reference_visible": visibility.reference_visible,
+        "value_visible": visibility.value_visible,
+    }
+
+
 def _connections_by_net(
     connections: tuple[PinConnection, ...],
 ) -> dict[str, list[dict[str, str]]]:
@@ -287,6 +426,15 @@ def apply_schematic(
     schematic: Path = SCHEMATIC,
 ) -> None:
     plan = build_schematic_plan()
+    client.tool_schemas("sch_components")
+    client.call_tool(
+        "set_schematic_page",
+        {
+            "schematic": str(schematic),
+            "page_size": plan.page_size,
+            "portrait": plan.portrait,
+        },
+    )
     client.tool_schemas("sch_batch")
     client.call_tool(
         "batch_place_components",
@@ -317,7 +465,16 @@ def apply_schematic(
                 "pins": pins,
             },
         )
-    client.tool_schemas("sch_components")
+    client.call_tool(
+        "batch_set_schematic_field_visibility",
+        {
+            "schematic": str(schematic),
+            "edits": [
+                _field_visibility_payload(visibility)
+                for visibility in plan.field_visibility
+            ],
+        },
+    )
     client.call_tool(
         "update_symbols_from_library",
         {
