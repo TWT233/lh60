@@ -53,6 +53,10 @@ def old_production_references():
     )
 
 
+def tool_text_result(payload):
+    return {"content": [{"type": "text", "text": json.dumps(payload)}]}
+
+
 class SchematicAcceptanceContractTest(unittest.TestCase):
     def test_candidate_registers_every_footprint_library_needed_by_plan(self):
         from tools.check_schematic_acceptance import candidate_library_registrations
@@ -156,11 +160,11 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
-                return {}
+                return tool_text_result({"ok": True})
 
             def call_tool_json(self, name, arguments):
                 self.calls.append((name, arguments))
-                return {}
+                return {"ok": True}
 
             def tool_schemas(self, toolset):
                 return {}
@@ -464,7 +468,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         calls = []
         class FakeClient:
             def call_tool(self, name, arguments):
-                calls.append((name, arguments)); return {}
+                calls.append((name, arguments)); return tool_text_result({"ok": True})
             def tool_schemas(self, toolset):
                 calls.append(("schemas", toolset)); return {}
 
@@ -504,7 +508,35 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
-                return {}
+                if name == "update_symbols_from_library":
+                    if arguments.get("references") == ["U1"]:
+                        return tool_text_result(
+                            {
+                                "errors": [],
+                                "pins_moved": [],
+                                "updated": ["lh60-mcu:RP2040-Tiny"],
+                                "unchanged": [],
+                            }
+                        )
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                        }
+                    )
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(
+                        {
+                            "no_library_anchor": [],
+                            "no_property": [],
+                            "not_found": [],
+                            "moved": ["U1.Reference", "U1.Value"],
+                            "unchanged": [],
+                        }
+                    )
+                return tool_text_result({"ok": True})
 
             def call_tool_json(self, name, arguments):
                 self.calls.append((name, arguments))
@@ -617,7 +649,36 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                         schemas.setdefault(name, {}).update(values)
                     return schemas[toolset]
                 def call_tool(self, name, arguments):
-                    calls.append((name, arguments)); return {}
+                    calls.append((name, arguments))
+                    if name == "update_symbols_from_library":
+                        if arguments.get("references") == ["U1"]:
+                            return tool_text_result(
+                                {
+                                    "errors": [],
+                                    "pins_moved": [],
+                                    "updated": ["lh60-mcu:RP2040-Tiny"],
+                                    "unchanged": [],
+                                }
+                            )
+                        return tool_text_result(
+                            {
+                                "errors": [],
+                                "pins_moved": [],
+                                "updated": [],
+                                "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                            }
+                        )
+                    if name == "reset_schematic_field_positions":
+                        return tool_text_result(
+                            {
+                                "no_library_anchor": [],
+                                "no_property": [],
+                                "not_found": [],
+                                "moved": ["U1.Reference", "U1.Value"],
+                                "unchanged": [],
+                            }
+                        )
+                    return tool_text_result({"ok": True})
                 def call_tool_json(self, name, arguments):
                     calls.append((name, arguments))
                     if name == "get_schematic_layout":

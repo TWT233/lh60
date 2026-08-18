@@ -426,39 +426,7 @@ def _call_tool_json(
     arguments: dict[str, object],
 ) -> dict[str, object]:
     result = client.call_tool(name, arguments)
-    if isinstance(result, dict) and not result.get("content") and not result.get("isError"):
-        return _empty_result_fallback(name, arguments)
     return McpClient.result_json(result)
-
-
-def _empty_result_fallback(
-    name: str,
-    arguments: dict[str, object],
-) -> dict[str, object]:
-    """Compat path for legacy test doubles that return bare {} for write tools."""
-    if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
-        return {
-            "errors": [],
-            "pins_moved": [],
-            "updated": [MCU_SYMBOL],
-            "unchanged": [],
-        }
-    if name == "reset_schematic_field_positions" and arguments.get("references") == ["U1"]:
-        return {
-            "no_library_anchor": [],
-            "no_property": [],
-            "not_found": [],
-            "moved": ["U1.Reference", "U1.Value"],
-            "unchanged": [],
-        }
-    if name == "update_symbols_from_library":
-        return {
-            "errors": [],
-            "pins_moved": [],
-            "updated": [],
-            "unchanged": [MCU_SYMBOL],
-        }
-    raise RuntimeError(f"{name} returned no JSON object text block")
 
 
 def _count_items(values: object, target: str) -> int:
