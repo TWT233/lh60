@@ -215,8 +215,9 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 calls.append(("post-acceptance", str(schematic)))
                 return {"semantic": {"NET": [("U1", "1")]}, "svg_sha256": "prod-svg"}
 
-            def new_candidate(client, directory):
+            def new_candidate(client, directory, *, regenerate_libraries):
                 calls.append(("second-candidate", str(directory)))
+                self.assertFalse(regenerate_libraries)
                 return Path(directory) / "candidate.kicad_sch"
 
             def candidate_acceptance(client, schematic, output):
@@ -313,7 +314,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             _load_acceptance_toolsets(FakeClient())
 
     def test_acceptance_rejects_component_contract_or_layout_drift(self):
-        from tools.check_schematic_acceptance import assert_frozen_acceptance
+        from tools import check_schematic_acceptance as checker
 
         with TemporaryDirectory() as directory:
             svg_path = Path(directory) / "candidate.svg"
@@ -324,21 +325,30 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             ]
             data = {
                 "components": {"components": deepcopy(plan_components)},
+                "netlist": {"components": [
+                    {**plan_components[0], "pins": [{"number": "23", "net": "VSYS"}]},
+                    {**plan_components[1], "pins": [{"number": "1", "net": "VSYS"}]},
+                ]},
                 "layout": {"component_count": 2, "wire_count": 0, "label_count": 339},
                 "overlaps": {"overlap_count": 0},
                 "single_pin_nets": {"single_pin_net_count": 0, "nets": []},
-                "semantic": {"nets": [{"name": "VSYS", "pins": [{"reference": "U1", "pin_number": "23"}, {"reference": "J1", "pin_number": "1"}]}]},
                 "svg_path": str(svg_path),
             }
-            frozen = {
-                "components": sorted(plan_components, key=lambda component: component["reference"]),
-                "semantic": {"VSYS": (("J1", "1"), ("U1", "23"))},
-                "connector_map": {"J1": (("1", "VSYS"),)},
-            }
-            assert_frozen_acceptance(data, frozen)
-            data["components"]["components"][1]["footprint"] = "wrong"
-            with self.assertRaisesRegex(AssertionError, "component contract"):
-                assert_frozen_acceptance(data, frozen)
+            component_hash = checker.FROZEN_COMPONENT_SHA256
+            pin_hash = checker.FROZEN_PIN_SHA256
+            connector_map = checker.FROZEN_CONNECTOR_MAP
+            checker.FROZEN_COMPONENT_SHA256 = checker._stable_hash(checker.normalize_actual_components(plan_components))
+            checker.FROZEN_PIN_SHA256 = checker._stable_hash(checker.normalize_exported_pins(data["netlist"]))
+            checker.FROZEN_CONNECTOR_MAP = {"J1": (("1", "VSYS"),)}
+            try:
+                checker.assert_frozen_acceptance(data)
+                data["components"]["components"][1]["footprint"] = "wrong"
+                with self.assertRaisesRegex(AssertionError, "component contract"):
+                    checker.assert_frozen_acceptance(data)
+            finally:
+                checker.FROZEN_COMPONENT_SHA256 = component_hash
+                checker.FROZEN_PIN_SHA256 = pin_hash
+                checker.FROZEN_CONNECTOR_MAP = connector_map
 
     def test_complete_acceptance_invokes_frozen_plan_gate(self):
         from tools.check_schematic_acceptance import _assert_acceptance
@@ -367,9 +377,96 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 evidence_path, output_path, "reviewer",
                 {"u1": True, "matrix": True, "connectors": True, "title_block": True},
             )
-            self.assertEqual(approval["approved_by"], "reviewer")
-            self.assertTrue(approval["approved"])
+            self.assertEqual(approval["visual_approval"]["approved_by"], "reviewer")
+            self.assertTrue(approval["visual_approval"]["approved"])
             self.assertTrue(output_path.is_file())
+
+    def test_approval_output_preserves_complete_evidence_for_production(self):
+        from tools.check_schematic_acceptance import assert_candidate_evidence, record_visual_approval
+
+        with TemporaryDirectory() as directory:
+            evidence_path = Path(directory) / "candidate.json"
+            approved_path = Path(directory) / "approved.json"
+            evidence = {
+                "plan_hash": "plan", "git_sha": "head",
+                "acceptance": {"inventory": {"mcu": 1}},
+                "gates": {"wire_validation": True, "component_validation": True, "erc_errors": 0, "erc_warnings": 0},
+                "svg_sha256": "svg", "render_sha256": "render",
+            }
+            evidence_path.write_text(json.dumps(evidence))
+            approved = record_visual_approval(
+                evidence_path, approved_path, "reviewer",
+                {"u1": True, "matrix": True, "connectors": True, "title_block": True},
+            )
+            self.assertEqual(approved["acceptance"], evidence["acceptance"])
+            self.assertEqual(approved["visual_approval"]["approved_by"], "reviewer")
+            assert_candidate_evidence(approved, "plan", "head")
+
+    def test_writer_detection_fails_closed_when_lsof_is_unavailable(self):
+        from tools.check_schematic_acceptance import _writer_pids
+
+        with self.assertRaisesRegex(RuntimeError, "writer detection unavailable"):
+            _writer_pids(Path("/tmp/lh60.kicad_sch"), run_fn=lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError()))
+
+    def test_frozen_acceptance_hashes_actual_exported_components_and_pins_without_plan_builder(self):
+        from tools import check_schematic_acceptance as checker
+
+        components = [{"reference": "U1", "lib_id": "lib", "value": "value", "footprint": "fp"}]
+        netlist = {"components": [{**components[0], "pins": [{"number": "1", "net": "NET"}]}]}
+        original_component_hash = checker.FROZEN_COMPONENT_SHA256
+        original_pin_hash = checker.FROZEN_PIN_SHA256
+        original_map = checker.FROZEN_CONNECTOR_MAP
+        original_builder = checker.build_schematic_plan
+        checker.FROZEN_COMPONENT_SHA256 = checker._stable_hash(checker.normalize_actual_components(components))
+        checker.FROZEN_PIN_SHA256 = checker._stable_hash(checker.normalize_exported_pins(netlist))
+        checker.FROZEN_CONNECTOR_MAP = {}
+        checker.build_schematic_plan = lambda: (_ for _ in ()).throw(AssertionError("plan builder called"))
+        try:
+            with TemporaryDirectory() as directory:
+                svg_path = Path(directory) / "candidate.svg"
+                svg_path.write_text('<svg width="420mm" height="297mm"/>')
+                data = {
+                    "components": {"components": components}, "netlist": netlist, "svg_path": str(svg_path),
+                    "overlaps": {"overlap_count": 0}, "single_pin_nets": {"single_pin_net_count": 0, "nets": []},
+                }
+                checker.assert_frozen_acceptance(data)
+                data["netlist"]["components"][0]["pins"].append({"number": "2", "net": "NET"})
+                with self.assertRaisesRegex(AssertionError, "pin contract"):
+                    checker.assert_frozen_acceptance(data)
+        finally:
+            checker.FROZEN_COMPONENT_SHA256 = original_component_hash
+            checker.FROZEN_PIN_SHA256 = original_pin_hash
+            checker.FROZEN_CONNECTOR_MAP = original_map
+            checker.build_schematic_plan = original_builder
+
+    def test_candidate_prepares_libraries_once_then_second_candidate_only_registers_and_queries(self):
+        from tools.check_schematic_acceptance import candidate
+
+        calls = []
+        class FakeClient:
+            def call_tool(self, name, arguments):
+                calls.append((name, arguments)); return {}
+            def tool_schemas(self, toolset):
+                calls.append(("schemas", toolset)); return {}
+
+        client = FakeClient()
+        first = candidate(
+            client, Path("/tmp/first"), regenerate_libraries=True,
+            regenerate_fn=lambda factory, directory: calls.append(("regenerate", directory)),
+            verify_fn=lambda factory, project: calls.append(("verify", project)),
+            apply_fn=lambda client, schematic: calls.append(("apply", schematic)),
+        )
+        second = candidate(
+            client, Path("/tmp/second"), regenerate_libraries=False,
+            regenerate_fn=lambda factory, directory: calls.append(("regenerate", directory)),
+            verify_fn=lambda factory, project: calls.append(("verify", project)),
+            apply_fn=lambda client, schematic: calls.append(("apply", schematic)),
+        )
+        self.assertEqual([name for name, _ in calls].count("regenerate"), 1)
+        self.assertEqual([name for name, _ in calls].count("verify"), 2)
+        self.assertEqual([name for name, _ in calls].count("create_project"), 2)
+        self.assertEqual(first.name, "lh60-candidate.kicad_sch")
+        self.assertEqual(second.name, "lh60-candidate.kicad_sch")
 
     def test_real_preflight_and_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
         from tools.check_schematic_acceptance import converge, preflight
@@ -434,8 +531,8 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "writer"):
                 assert_predelete_safety(schematic, board, clean_tree_fn=lambda: True, writer_pids_fn=lambda path: [123])
 
-    def test_prepare_candidate_libraries_uses_fresh_clients_and_queries_live_assets(self):
-        from tools.check_schematic_acceptance import prepare_candidate_libraries
+    def test_prepare_and_verify_candidate_libraries_use_separate_fresh_clients(self):
+        from tools.check_schematic_acceptance import prepare_candidate_libraries, verify_candidate_libraries
 
         clients = []
         class FakeClient:
@@ -462,14 +559,20 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             return client
 
         applied = []
-        result = prepare_candidate_libraries(
+        prepare_candidate_libraries(
             factory, Path("/tmp/project"),
             apply_core_fn=lambda client: applied.append(("core", client.number)),
             apply_mcu_fn=lambda client: applied.append(("mcu", client.number)),
             capability_fn=lambda client: None,
         )
         self.assertEqual(applied, [("core", 0), ("mcu", 1)])
+        result = verify_candidate_libraries(
+            factory, Path("/tmp/project/lh60-candidate.kicad_pro"), capability_fn=lambda client: None,
+        )
         self.assertEqual(len(clients), 3)
+        for name, arguments in clients[2].calls:
+            if name == "get_symbol_info":
+                self.assertEqual(arguments["project_dir"], "/tmp/project/lh60-candidate.kicad_pro")
         self.assertEqual(set(result["symbols"]), {"Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny"})
         self.assertEqual(set(result["footprints"]), {"PinHeader_1x03_P2.54mm_Vertical", "PinHeader_1x04_P2.54mm_Vertical", "PinHeader_1x05_P2.54mm_Vertical", "MCU_RP2040-Tiny_SMD"})
 
@@ -510,7 +613,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 capabilities_fn=lambda client: calls.append(("capabilities", {})),
                 safety_fn=lambda schematic, board: calls.append(("safety", {})) or {"pcb_sha256": "pcb"},
                 acceptance_fn=lambda *unused: {"semantic": {"NET": [("U1", "1")]}, "svg_sha256": "production"},
-                candidate_fn=lambda *unused: Path(directory) / "candidate.kicad_sch",
+                candidate_fn=lambda *unused, **kwargs: Path(directory) / "candidate.kicad_sch",
                 candidate_acceptance_fn=lambda *unused: {"semantic": {"NET": [("U1", "1")]}, "svg_sha256": "candidate"},
             )
             write_names = [name for name, _ in calls if name.startswith("batch_delete")]

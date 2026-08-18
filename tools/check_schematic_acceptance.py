@@ -44,6 +44,14 @@ EXPECTED_PRODUCTION_REFERENCES = (
 )
 FROZEN_COMPONENT_SHA256 = "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18"
 FROZEN_PIN_SHA256 = "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58"
+FROZEN_CONNECTOR_MAP = {
+    "J1": (("1", "VSYS"), ("2", "3V3"), ("3", "GND")),
+    "J2": (("1", "COL0"), ("2", "COL1"), ("3", "COL2"), ("4", "COL3"), ("5", "COL4")),
+    "J3": (("1", "COL5"), ("2", "COL6"), ("3", "COL7"), ("4", "COL8"), ("5", "COL9")),
+    "J4": (("1", "ROW0"), ("2", "ROW1"), ("3", "ROW2"), ("4", "ROW3")),
+    "J5": (("1", "ROW4"), ("2", "ROW5"), ("3", "ROW6")),
+    "J6": (("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
+}
 VISUAL_CHECKLIST = {"u1", "matrix", "connectors", "title_block"}
 
 
@@ -169,28 +177,7 @@ def _query(client: McpClient, schematic: Path, svg_output: Path) -> dict[str, An
     if not exported.is_file():
         raise AssertionError(f"SVG export missing: {exported}")
     data["svg_path"] = str(exported)
-    semantic_nets: dict[str, list[dict[str, str]]] = {}
-    for connection in build_schematic_plan().connections:
-        result = client.call_tool_json(
-            "get_pin_net_name",
-            {
-                "schematic": str(schematic),
-                "reference": connection.reference,
-                "pin_number": connection.pin_number,
-            },
-        )
-        net_name = result.get("net_name")
-        if not net_name:
-            raise AssertionError(
-                f"missing net for {connection.reference}.{connection.pin_number}"
-            )
-        semantic_nets.setdefault(str(net_name), []).append(
-            {"reference": connection.reference, "pin_number": connection.pin_number}
-        )
-    data["semantic"] = {"nets": [
-        {"name": net_name, "pins": pins}
-        for net_name, pins in sorted(semantic_nets.items())
-    ]}
+    data["semantic"] = exported_net_semantics(data["netlist"])
     return data
 
 
@@ -211,46 +198,33 @@ def _inventory(components: list[dict[str, Any]]) -> dict[str, int]:
     return dict(counts)
 
 
-def frozen_plan_expectations() -> dict[str, Any]:
-    """Independent, serializable acceptance baseline frozen at review time."""
-    plan = build_schematic_plan()
-    components = sorted(
+def normalize_actual_components(components: list[dict[str, Any]]) -> list[dict[str, str]]:
+    return sorted(
         [
-            {
-                "reference": component.reference,
-                "lib_id": component.lib_id,
-                "value": component.value,
-                "footprint": component.footprint,
-            }
-            for component in plan.components
+            {key: str(component.get(key, "")) for key in ("reference", "lib_id", "value", "footprint")}
+            for component in components
         ],
         key=lambda item: item["reference"],
     )
+
+
+def normalize_exported_pins(netlist: dict[str, Any]) -> list[dict[str, str]]:
+    assignments = [
+        {"reference": str(component["reference"]), "pin_number": str(pin["number"]), "net_name": str(pin["net"])}
+        for component in netlist.get("components", [])
+        for pin in component.get("pins", [])
+        if pin.get("net")
+    ]
+    return sorted(assignments, key=lambda item: (item["net_name"], item["reference"], int(item["pin_number"])))
+
+
+def exported_net_semantics(netlist: dict[str, Any]) -> dict[str, Any]:
     pins_by_net: dict[str, list[dict[str, str]]] = {}
-    for connection in plan.connections:
-        pins_by_net.setdefault(connection.net_name, []).append(
-            {"reference": connection.reference, "pin_number": connection.pin_number}
-        )
-    semantic = normalize_net_semantics({
-        "nets": [
-            {"name": name, "pins": pins}
-            for name, pins in pins_by_net.items()
-        ]
-    })
-    connector_map = {
-        group.reference: tuple(group.pin_map)
-        for group in CONNECTOR_GROUPS
-    }
-    frozen_pins = sorted(
-        [
-            {"reference": connection.reference, "pin_number": connection.pin_number, "net_name": connection.net_name}
-            for connection in plan.connections
-        ],
-        key=lambda item: (item["net_name"], item["reference"], int(item["pin_number"])),
-    )
-    if _stable_hash(components) != FROZEN_COMPONENT_SHA256 or _stable_hash(frozen_pins) != FROZEN_PIN_SHA256:
-        raise AssertionError("frozen plan baseline drift")
-    return {"components": components, "semantic": semantic, "connector_map": connector_map}
+    for assignment in normalize_exported_pins(netlist):
+        pins_by_net.setdefault(assignment["net_name"], []).append({
+            "reference": assignment["reference"], "pin_number": assignment["pin_number"],
+        })
+    return {"nets": [{"name": name, "pins": pins} for name, pins in pins_by_net.items()]}
 
 
 def _stable_hash(payload: Any) -> str:
@@ -259,17 +233,10 @@ def _stable_hash(payload: Any) -> str:
     ).hexdigest()
 
 
-def assert_frozen_acceptance(data: dict[str, Any], frozen: dict[str, Any] | None = None) -> None:
+def assert_frozen_acceptance(data: dict[str, Any]) -> None:
     """Check live candidate/production facts against the reviewed plan."""
-    frozen = frozen or frozen_plan_expectations()
-    components = sorted(
-        [
-            {key: component.get(key, "") for key in ("reference", "lib_id", "value", "footprint")}
-            for component in data["components"]["components"]
-        ],
-        key=lambda item: item["reference"],
-    )
-    if components != frozen["components"]:
+    components = normalize_actual_components(data["components"]["components"])
+    if _stable_hash(components) != FROZEN_COMPONENT_SHA256:
         raise AssertionError("component contract mismatch")
     svg = Path(data["svg_path"]).read_text()
     page = re.search(r'width="([0-9.]+)mm" height="([0-9.]+)mm"', svg)
@@ -280,13 +247,11 @@ def assert_frozen_acceptance(data: dict[str, Any], frozen: dict[str, Any] | None
     single_pin = data["single_pin_nets"]
     if single_pin.get("single_pin_net_count") != 0 or single_pin.get("nets") != []:
         raise AssertionError(f"single-pin contract mismatch: {single_pin}")
-    actual_semantic = normalize_net_semantics(data["semantic"])
-    if actual_semantic != frozen["semantic"]:
-        raise AssertionError("pin semantic contract mismatch")
-    expected_assignments = sum(len(pins) for pins in frozen["semantic"].values())
-    if sum(len(pins) for pins in actual_semantic.values()) != expected_assignments:
-        raise AssertionError("pin assignment count mismatch")
-    for reference, pin_map in frozen["connector_map"].items():
+    assignments = normalize_exported_pins(data["netlist"])
+    if _stable_hash(assignments) != FROZEN_PIN_SHA256:
+        raise AssertionError("pin contract mismatch")
+    actual_semantic = normalize_net_semantics(exported_net_semantics(data["netlist"]))
+    for reference, pin_map in FROZEN_CONNECTOR_MAP.items():
         for pin_number, net_name in pin_map:
             if (reference, str(pin_number)) not in actual_semantic.get(net_name, ()):
                 raise AssertionError(f"connector map mismatch: {reference}.{pin_number} -> {net_name}")
@@ -309,8 +274,9 @@ def record_visual_approval(
     }
     if not all(approval[field] for field in ("plan_hash", "git_sha", "svg_sha256", "render_sha256")):
         raise AssertionError("visual approval evidence hashes missing")
-    _write_json(output_path, approval)
-    return approval
+    evidence["visual_approval"] = approval
+    _write_json(output_path, evidence)
+    return evidence
 
 
 def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
@@ -446,11 +412,14 @@ def _working_tree_is_clean() -> bool:
     return not subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
 
 
-def _writer_pids(path: Path) -> list[str]:
-    result = subprocess.run(
-        ["lsof", "-t", "--", str(path)],
-        text=True, capture_output=True, check=False,
-    )
+def _writer_pids(path: Path, *, run_fn=subprocess.run) -> list[str]:
+    try:
+        result = run_fn(
+            ["lsof", "-t", "--", str(path)],
+            text=True, capture_output=True, check=False,
+        )
+    except (FileNotFoundError, OSError) as error:
+        raise RuntimeError("writer detection unavailable") from error
     return [line for line in result.stdout.splitlines() if line]
 
 
@@ -472,14 +441,20 @@ def assert_predelete_safety(
 def prepare_candidate_libraries(
     client_factory, project_dir: Path, *, apply_core_fn=apply_core_library, apply_mcu_fn=apply_mcu_library,
     capability_fn=require_schematic_capabilities,
-) -> dict[str, list[str]]:
-    """Regenerate with isolated clients, then query the actual candidate assets."""
+) -> None:
+    """Regenerate shared source libraries with isolated clients."""
     with client_factory(KONNECT, CONFIG) as client:
         capability_fn(client)
         apply_core_fn(client)
     with client_factory(KONNECT, CONFIG) as client:
         capability_fn(client)
         apply_mcu_fn(client)
+
+
+def verify_candidate_libraries(
+    client_factory, project: Path, *, capability_fn=require_schematic_capabilities,
+) -> dict[str, list[str]]:
+    """Query registered candidate libraries through a fresh client."""
     symbols = ("Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny")
     footprints = (
         "PinHeader_1x03_P2.54mm_Vertical",
@@ -492,7 +467,7 @@ def prepare_candidate_libraries(
         for name in symbols:
             library = "lh60-mcu" if name == "RP2040-Tiny" else "lh60-core"
             result = client.call_tool_json(
-                "get_symbol_info", {"lib_id": f"{library}:{name}", "project_dir": str(project_dir)}
+                "get_symbol_info", {"lib_id": f"{library}:{name}", "project_dir": str(project)}
             )
             if result.get("name") != name:
                 raise AssertionError(f"library symbol verification failed: {name}")
@@ -500,7 +475,7 @@ def prepare_candidate_libraries(
             root = MCU_FOOTPRINT_LIBRARY if name == "MCU_RP2040-Tiny_SMD" else CORE_FOOTPRINT_LIBRARY
             result = client.call_tool_json(
                 "get_footprint_info",
-                {"footprint_path": str(root / f"{name}.kicad_mod"), "include_graphics": True, "project": str(project_dir)},
+                {"footprint_path": str(root / f"{name}.kicad_mod"), "include_graphics": True, "project": str(project)},
             )
             if result.get("name") != name:
                 raise AssertionError(f"library footprint verification failed: {name}")
@@ -586,7 +561,9 @@ def run_production_transaction(
     with tempfile.TemporaryDirectory(prefix="lh60-production-acceptance.") as directory:
         output_directory = Path(directory)
         production = acceptance_fn(client, schematic, output_directory / "production.svg")
-        candidate_schematic = candidate_fn(client, output_directory / "candidate")
+        candidate_schematic = candidate_fn(
+            client, output_directory / "candidate", regenerate_libraries=False,
+        )
         candidate_record = candidate_acceptance_fn(
             client, candidate_schematic, output_directory / "candidate.svg"
         )
@@ -621,9 +598,16 @@ def candidate_library_registrations(project: str) -> dict[str, list[dict[str, st
     }
 
 
-def candidate(client: McpClient, directory: Path, *, prepare_libraries_fn=prepare_candidate_libraries) -> Path:
-    if prepare_libraries_fn is not None:
-        prepare_libraries_fn(McpClient, directory)
+def candidate(
+    client: McpClient,
+    directory: Path,
+    *,
+    regenerate_libraries: bool = True,
+    regenerate_fn=prepare_candidate_libraries,
+    verify_fn=verify_candidate_libraries,
+    client_factory=McpClient,
+    apply_fn=apply_schematic,
+) -> Path:
     client.call_tool("create_project", {"path": str(directory), "name": "lh60-candidate"})
     project = directory / "lh60-candidate.kicad_pro"
     client.tool_schemas("library")
@@ -632,8 +616,11 @@ def candidate(client: McpClient, directory: Path, *, prepare_libraries_fn=prepar
         client.call_tool("register_symbol_library", {**registration, "scope": "project", "replace_existing": True})
     for registration in registrations["footprints"]:
         client.call_tool("register_footprint_library", {**registration, "scope": "project", "replace_existing": True})
+    if regenerate_libraries:
+        regenerate_fn(client_factory, directory)
+    verify_fn(client_factory, project)
     schematic = directory / "lh60-candidate.kicad_sch"
-    apply_schematic(client, schematic)
+    apply_fn(client, schematic)
     return schematic
 
 
