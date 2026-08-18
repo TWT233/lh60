@@ -422,6 +422,23 @@ class Rp2040TinyContractTest(unittest.TestCase):
         self.assertEqual(pin_types["GND"], "power_in")
         self.assertEqual(pin_types["VSYS"], "power_in")
 
+    def test_bottom_gpio_pins_have_readable_seven_millimetre_spacing(self):
+        pins, _ = self.specs()
+        bottom = [pin for pin in pins if 10 <= int(pin.number) <= 14]
+
+        self.assertEqual(
+            [(pin.number, pin.name, pin.pin_type) for pin in bottom],
+            [
+                ("10", "GP9", "bidirectional"),
+                ("11", "GP10", "bidirectional"),
+                ("12", "GP11", "bidirectional"),
+                ("13", "GP12", "bidirectional"),
+                ("14", "GP13", "bidirectional"),
+            ],
+        )
+        self.assertEqual([pin.x for pin in bottom], [15.24, 7.62, 0.0, -7.62, -15.24])
+        self.assertTrue(all(pin.y == -15.24 and pin.angle == 90.0 for pin in bottom))
+
     def test_footprint_contract_matches_lambdakb_smd_coordinates(self):
         _, spec = self.specs()
         expected_positions = {

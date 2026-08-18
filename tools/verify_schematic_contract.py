@@ -22,8 +22,8 @@ class SchematicPlanContractTest(unittest.TestCase):
         },
         "POWER_FLAG_POSITIONS_MM": {
             "#FLG01": (381.00, 86.36),
-            "#FLG02": (381.00, 96.52),
-            "#FLG03": (381.00, 106.68),
+            "#FLG02": (381.00, 106.68),
+            "#FLG03": (381.00, 127.00),
         },
     }
     EXPECTED_CONNECTORS = {

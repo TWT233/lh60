@@ -66,7 +66,7 @@ def rp2040_tiny_symbol_pins() -> tuple[SymbolPinSpec, ...]:
                 number=str(index + 10),
                 name=f"GP{index + 9}",
                 pin_type="bidirectional",
-                x=5.08 - index * 2.54,
+                x=(15.24, 7.62, 0.0, -7.62, -15.24)[index],
                 y=-15.24,
                 angle=90.0,
             )
