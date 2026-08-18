@@ -95,31 +95,31 @@ def _load_acceptance_toolsets(client: McpClient) -> None:
         for toolset in ("sch_components", "sch_batch", "sch_wiring", "sch_analysis", "sch_export")
     }
     contracts = {
-        "list_schematic_components": ("sch_components", ("schematic",)),
-        "get_schematic_layout": ("sch_batch", ("schematic",)),
-        "validate_wire_connections": ("sch_batch", ("schematic",)),
-        "validate_component_connections": ("sch_batch", ("schematic",)),
-        "batch_delete_schematic_wire": ("sch_wiring", ("schematic", "uuids")),
-        "export_netlist_summary": ("sch_export", ("schematic",)),
-        "run_erc": ("sch_export", ("schematic", "severity")),
-        "export_schematic_svg": ("sch_export", ("schematic", "output")),
-        "list_schematic_wires": ("sch_analysis", ("schematic",)),
-        "list_schematic_labels": ("sch_analysis", ("schematic",)),
-        "check_schematic_overlaps": ("sch_analysis", ("schematic",)),
-        "find_orphan_items": ("sch_analysis", ("schematic",)),
-        "find_shorted_nets": ("sch_analysis", ("schematic",)),
-        "find_single_pin_nets": ("sch_analysis", ("schematic",)),
-        "get_pin_net_name": ("sch_analysis", ("schematic", "reference", "pin_number")),
+        "list_schematic_components": ("sch_components", ("schematic",), ("schematic",)),
+        "get_schematic_layout": ("sch_batch", ("schematic",), ("schematic",)),
+        "validate_wire_connections": ("sch_batch", ("schematic",), ("schematic",)),
+        "validate_component_connections": ("sch_batch", ("schematic",), ("schematic",)),
+        "batch_delete_schematic_wire": ("sch_wiring", ("schematic", "uuids"), ("schematic", "uuids")),
+        "export_netlist_summary": ("sch_export", ("schematic",), ("schematic",)),
+        "run_erc": ("sch_export", ("schematic",), ("schematic", "severity")),
+        "export_schematic_svg": ("sch_export", ("schematic", "output"), ("schematic", "output")),
+        "list_schematic_wires": ("sch_analysis", ("schematic",), ("schematic",)),
+        "list_schematic_labels": ("sch_analysis", ("schematic",), ("schematic",)),
+        "check_schematic_overlaps": ("sch_analysis", ("schematic",), ("schematic",)),
+        "find_orphan_items": ("sch_analysis", ("schematic",), ("schematic",)),
+        "find_shorted_nets": ("sch_analysis", ("schematic",), ("schematic",)),
+        "find_single_pin_nets": ("sch_analysis", ("schematic",), ("schematic",)),
+        "get_pin_net_name": ("sch_analysis", ("schematic", "reference", "pin_number"), ("schematic", "reference", "pin_number")),
     }
     missing = {}
-    for tool, (toolset, inputs) in contracts.items():
+    for tool, (toolset, required_inputs, property_inputs) in contracts.items():
         schema = schemas[toolset].get(tool)
         if schema is None:
             missing[tool] = ["tool"]
             continue
-        absent = sorted(
-            set(inputs) - set(schema.get("required", []))
-        )
+        absent_required = set(required_inputs) - set(schema.get("required", []))
+        absent_properties = set(property_inputs) - set(schema.get("properties", {}))
+        absent = sorted(absent_required | absent_properties)
         if absent:
             missing[tool] = absent
     if missing:
