@@ -142,6 +142,8 @@ def symbol_payload() -> dict[str, object]:
         "value": "RP2040-Tiny",
         "show_pin_names": True,
         "show_pin_numbers": True,
+        "reference_at": {"x": 0.0, "y": 17.78, "rotation": 0.0},
+        "value_at": {"x": 0.0, "y": -25.40, "rotation": 0.0},
         "pins": [
             {
                 "number": pin.number,

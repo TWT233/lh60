@@ -451,6 +451,24 @@ class Rp2040TinyContractTest(unittest.TestCase):
         self.assertTrue(all((pad.width, pad.height) == (2.4, 1.6) for pad in spec.pads))
         self.assertEqual(spec.fpc_edge, "rear")
 
+    def test_symbol_payload_has_reference_at_anchor(self):
+        from tools.lh60_design.mcu_library import symbol_payload
+
+        payload = symbol_payload()
+        self.assertEqual(
+            payload["reference_at"],
+            {"x": 0.0, "y": 17.78, "rotation": 0.0},
+        )
+
+    def test_symbol_payload_has_value_at_anchor(self):
+        from tools.lh60_design.mcu_library import symbol_payload
+
+        payload = symbol_payload()
+        self.assertEqual(
+            payload["value_at"],
+            {"x": 0.0, "y": -25.40, "rotation": 0.0},
+        )
+
     def test_generated_library_contains_symbol_footprint_model_and_provenance(self):
         symbol_text = self.SYMBOL_LIBRARY.read_text()
         footprint_text = self.FOOTPRINT.read_text()
