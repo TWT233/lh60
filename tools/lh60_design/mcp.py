@@ -62,6 +62,26 @@ class McpClient:
             raise RuntimeError(f"{name} failed: {text}")
         return result
 
+    @staticmethod
+    def result_json(result: dict[str, object]) -> dict[str, object]:
+        if result.get("isError"):
+            raise RuntimeError(result)
+
+        for block in result.get("content", []):
+            if not isinstance(block, dict) or block.get("type") != "text":
+                continue
+            try:
+                value = json.loads(block["text"])
+            except (KeyError, TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(value, dict):
+                return value
+
+        raise RuntimeError("tool result has no JSON object text block")
+
+    def call_tool_json(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        return self.result_json(self.call_tool(name, arguments))
+
     def tool_schemas(self, toolset: str) -> dict[str, dict[str, Any]]:
         self.call_tool("load_toolset", {"name": toolset})
         tools = self.request("tools/list", {})["tools"]
