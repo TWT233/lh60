@@ -72,10 +72,11 @@ class McpClient:
                 continue
             try:
                 value = json.loads(block["text"])
-            except (KeyError, TypeError, json.JSONDecodeError):
-                continue
+            except (KeyError, TypeError, json.JSONDecodeError) as error:
+                raise RuntimeError("tool result text block is not valid JSON") from error
             if isinstance(value, dict):
                 return value
+            raise RuntimeError("tool result text block is not a JSON object")
 
         raise RuntimeError("tool result has no JSON object text block")
 
