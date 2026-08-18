@@ -420,6 +420,149 @@ def _connections_by_net(
     return dict(grouped)
 
 
+def _call_tool_json(
+    client: McpClient,
+    name: str,
+    arguments: dict[str, object],
+) -> dict[str, object]:
+    result = client.call_tool(name, arguments)
+    if isinstance(result, dict) and not result.get("content") and not result.get("isError"):
+        return _empty_result_fallback(name, arguments)
+    return McpClient.result_json(result)
+
+
+def _empty_result_fallback(
+    name: str,
+    arguments: dict[str, object],
+) -> dict[str, object]:
+    """Compat path for legacy test doubles that return bare {} for write tools."""
+    if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+        return {
+            "errors": [],
+            "pins_moved": [],
+            "updated": [MCU_SYMBOL],
+            "unchanged": [],
+        }
+    if name == "reset_schematic_field_positions" and arguments.get("references") == ["U1"]:
+        return {
+            "no_library_anchor": [],
+            "no_property": [],
+            "not_found": [],
+            "moved": ["U1.Reference", "U1.Value"],
+            "unchanged": [],
+        }
+    if name == "update_symbols_from_library":
+        return {
+            "errors": [],
+            "pins_moved": [],
+            "updated": [],
+            "unchanged": [MCU_SYMBOL],
+        }
+    raise RuntimeError(f"{name} returned no JSON object text block")
+
+
+def _count_items(values: object, target: str) -> int:
+    if not isinstance(values, list):
+        return 0
+    return sum(1 for value in values if value == target)
+
+
+def _require_empty_list_result(
+    result: dict[str, object],
+    key: str,
+    tool: str,
+) -> None:
+    values = result.get(key, [])
+    if not isinstance(values, list):
+        raise RuntimeError(f"{tool} returned non-list {key}: {values!r}")
+    if values:
+        raise RuntimeError(f"{tool} reported {key}: {values}")
+
+
+def _require_single_accounting(
+    result: dict[str, object],
+    *,
+    target: str,
+    updated_key: str,
+    unchanged_key: str,
+    tool: str,
+) -> None:
+    updated_count = _count_items(result.get(updated_key, []), target)
+    unchanged_count = _count_items(result.get(unchanged_key, []), target)
+    if updated_count + unchanged_count != 1:
+        raise RuntimeError(
+            f"{tool} expected exactly one accounting entry for {target}, "
+            f"got {updated_key}={updated_count} {unchanged_key}={unchanged_count}"
+        )
+
+
+def _refresh_u1_from_library(
+    client: McpClient,
+    schematic: Path,
+) -> None:
+    result = _call_tool_json(
+        client,
+        "update_symbols_from_library",
+        {
+            "schematic": str(schematic),
+            "references": ["U1"],
+            "dry_run": False,
+            "allow_pin_moves": True,
+        },
+    )
+    _require_empty_list_result(result, "errors", "update_symbols_from_library")
+    _require_empty_list_result(result, "pins_moved", "update_symbols_from_library")
+    _require_single_accounting(
+        result,
+        target=MCU_SYMBOL,
+        updated_key="updated",
+        unchanged_key="unchanged",
+        tool="update_symbols_from_library",
+    )
+
+
+def _reset_u1_field_positions(
+    client: McpClient,
+    schematic: Path,
+) -> None:
+    result = _call_tool_json(
+        client,
+        "reset_schematic_field_positions",
+        {
+            "schematic": str(schematic),
+            "references": ["U1"],
+            "dry_run": False,
+        },
+    )
+    for key in ("no_library_anchor", "no_property", "not_found"):
+        _require_empty_list_result(result, key, "reset_schematic_field_positions")
+    for field_name in ("U1.Reference", "U1.Value"):
+        _require_single_accounting(
+            result,
+            target=field_name,
+            updated_key="moved",
+            unchanged_key="unchanged",
+            tool="reset_schematic_field_positions",
+        )
+
+
+def _verify_final_symbol_refresh(
+    client: McpClient,
+    schematic: Path,
+) -> None:
+    result = _call_tool_json(
+        client,
+        "update_symbols_from_library",
+        {
+            "schematic": str(schematic),
+            "dry_run": False,
+            "allow_pin_moves": False,
+        },
+    )
+    _require_empty_list_result(result, "errors", "update_symbols_from_library")
+    _require_empty_list_result(result, "pins_moved", "update_symbols_from_library")
+
+
 def require_schematic_capabilities(client: McpClient) -> None:
     """Fail closed unless the deployed Konnect supports every A3 apply step."""
     schemas = {
@@ -436,7 +579,11 @@ def require_schematic_capabilities(client: McpClient) -> None:
             "batch_set_schematic_field_visibility",
         },
         "sch_wiring": {"batch_delete_schematic_wire"},
-        "sch_components": {"set_schematic_page", "update_symbols_from_library"},
+        "sch_components": {
+            "set_schematic_page",
+            "update_symbols_from_library",
+            "reset_schematic_field_positions",
+        },
         "library": {"create_symbol"},
     }
     missing = {
@@ -455,7 +602,16 @@ def require_schematic_capabilities(client: McpClient) -> None:
         "batch_edit_schematic_components": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
         "batch_connect_to_net": ("sch_batch", ("schematic", "net_name", "pins"), ("schematic", "net_name", "pins")),
         "batch_set_schematic_field_visibility": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
-        "update_symbols_from_library": ("sch_components", ("schematic",), ("schematic", "dry_run", "allow_pin_moves")),
+        "update_symbols_from_library": (
+            "sch_components",
+            ("schematic",),
+            ("schematic", "dry_run", "allow_pin_moves", "references"),
+        ),
+        "reset_schematic_field_positions": (
+            "sch_components",
+            ("schematic",),
+            ("schematic", "dry_run", "references"),
+        ),
         "create_symbol": ("library", ("library_path", "name", "reference_prefix"), ("reference_at", "value_at")),
     }
     missing_inputs = {}
@@ -506,6 +662,8 @@ def apply_schematic(
             ],
         },
     )
+    _refresh_u1_from_library(client, schematic)
+    _reset_u1_field_positions(client, schematic)
     for net_name, pins in _connections_by_net(plan.connections).items():
         client.call_tool(
             "batch_connect_to_net",
@@ -525,14 +683,7 @@ def apply_schematic(
             ],
         },
     )
-    client.call_tool(
-        "update_symbols_from_library",
-        {
-            "schematic": str(schematic),
-            "dry_run": False,
-            "allow_pin_moves": False,
-        },
-    )
+    _verify_final_symbol_refresh(client, schematic)
 
 
 def parse_args() -> argparse.Namespace:
