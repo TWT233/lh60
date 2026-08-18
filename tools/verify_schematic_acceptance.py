@@ -572,7 +572,9 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         self.assertEqual(len(clients), 3)
         for name, arguments in clients[2].calls:
             if name == "get_symbol_info":
-                self.assertEqual(arguments["project_dir"], "/tmp/project/lh60-candidate.kicad_pro")
+                self.assertEqual(arguments["project_dir"], "/tmp/project")
+            if name == "get_footprint_info":
+                self.assertEqual(arguments["project"], "/tmp/project/lh60-candidate.kicad_pro")
         self.assertEqual(set(result["symbols"]), {"Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny"})
         self.assertEqual(set(result["footprints"]), {"PinHeader_1x03_P2.54mm_Vertical", "PinHeader_1x04_P2.54mm_Vertical", "PinHeader_1x05_P2.54mm_Vertical", "MCU_RP2040-Tiny_SMD"})
 
