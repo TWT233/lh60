@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 
 class ConnectorSymbolContractTest(unittest.TestCase):
@@ -218,6 +219,203 @@ class ConnectorPayloadContractTest(unittest.TestCase):
         self.assertEqual(payload["pads"][1]["type"], "smd")
         self.assertEqual(payload["pads"][1]["roundrect_rratio"], 0.2)
         self.assertNotIn("drill", payload["pads"][1])
+
+
+class RecordingClient:
+    def __init__(self):
+        self.schemas = []
+        self.calls = []
+
+    def tool_schemas(self, toolset):
+        self.schemas.append(toolset)
+        return {}
+
+    def call_tool(self, name, arguments):
+        self.calls.append((name, arguments))
+        return {}
+
+
+class ConnectorApplyPlanTest(unittest.TestCase):
+    def _run_apply(self):
+        from tools.lh60_design import core_library
+
+        client = RecordingClient()
+        with mock.patch.object(core_library, "_symbol_definition_count", return_value=0):
+            core_library.apply_core_library(client)
+        return client
+
+    def test_apply_core_library_sends_exact_connector_create_payloads(self):
+        from tools.lh60_design.core_library import FOOTPRINT_LIBRARY
+
+        client = self._run_apply()
+        create_calls = {
+            call["name"]: call
+            for tool, call in client.calls
+            if tool == "create_footprint" and call["name"].startswith("PinHeader_1x")
+        }
+
+        self.assertEqual(
+            set(create_calls),
+            {
+                "PinHeader_1x03_P2.54mm_Vertical",
+                "PinHeader_1x04_P2.54mm_Vertical",
+                "PinHeader_1x05_P2.54mm_Vertical",
+            },
+        )
+        for count, name in (
+            (3, "PinHeader_1x03_P2.54mm_Vertical"),
+            (4, "PinHeader_1x04_P2.54mm_Vertical"),
+            (5, "PinHeader_1x05_P2.54mm_Vertical"),
+        ):
+            with self.subTest(footprint=name):
+                self.assertEqual(
+                    create_calls[name],
+                    {
+                        "output": str(FOOTPRINT_LIBRARY / f"{name}.kicad_mod"),
+                        "name": name,
+                        "description": (
+                            f"{count}-pin 2.54 mm vertical THT pin header; canonical "
+                            "front-side library definition for hand soldering, "
+                            "excluded from pick-and-place, retained in the BOM"
+                        ),
+                        "body_width": 2.54,
+                        "body_height": count * 2.54,
+                        "courtyard_clearance": 0.5,
+                        "pads": [
+                            {
+                                "number": str(index),
+                                "type": "thru_hole",
+                                "shape": "rect" if index == 1 else "circle",
+                                "x": 0.0,
+                                "y": (index - 1) * 2.54,
+                                "width": 1.7,
+                                "height": 1.7,
+                                "layers": ["*.Cu", "*.Mask"],
+                                "drill": 1.0,
+                            }
+                            for index in range(1, count + 1)
+                        ],
+                    },
+                )
+
+    def test_apply_core_library_sends_only_front_side_connector_graphics(self):
+        from tools.lh60_design.core_library import FOOTPRINT_LIBRARY, _connector_graphics
+
+        client = self._run_apply()
+        graphics_calls = [
+            call
+            for tool, call in client.calls
+            if tool == "set_footprint_graphics"
+            and "PinHeader_1x" in call["footprint_path"]
+        ]
+
+        self.assertEqual(len(graphics_calls), 9)
+        seen = set()
+        for count, name in (
+            (3, "PinHeader_1x03_P2.54mm_Vertical"),
+            (4, "PinHeader_1x04_P2.54mm_Vertical"),
+            (5, "PinHeader_1x05_P2.54mm_Vertical"),
+        ):
+            footprint_path = str(FOOTPRINT_LIBRARY / f"{name}.kicad_mod")
+            expected = _connector_graphics(count)
+            for layer, graphics in expected.items():
+                matches = [
+                    call
+                    for call in graphics_calls
+                    if call["footprint_path"] == footprint_path
+                    and call["selector"] == {"layer": layer}
+                ]
+                with self.subTest(footprint=name, layer=layer):
+                    self.assertEqual(
+                        matches,
+                        [
+                            {
+                                "footprint_path": footprint_path,
+                                "selector": {"layer": layer},
+                                "mode": "replace",
+                                "graphics": graphics,
+                            }
+                        ],
+                    )
+                    seen.add((footprint_path, layer))
+
+        self.assertEqual(len(seen), 9)
+        self.assertFalse(
+            any(
+                call["selector"]["layer"].startswith("B.")
+                for call in graphics_calls
+            )
+        )
+
+    def test_apply_core_library_sends_exact_connector_metadata_and_project_registration(self):
+        from tools.lh60_design.core_library import FOOTPRINT_LIBRARY, PROJECT, SYMBOL_LIBRARY
+
+        client = self._run_apply()
+        metadata_calls = {
+            call["footprint_path"]: call
+            for tool, call in client.calls
+            if tool == "set_footprint_metadata"
+            and "PinHeader_1x" in call["footprint_path"]
+        }
+
+        self.assertEqual(
+            set(metadata_calls),
+            {
+                str(FOOTPRINT_LIBRARY / "PinHeader_1x03_P2.54mm_Vertical.kicad_mod"),
+                str(FOOTPRINT_LIBRARY / "PinHeader_1x04_P2.54mm_Vertical.kicad_mod"),
+                str(FOOTPRINT_LIBRARY / "PinHeader_1x05_P2.54mm_Vertical.kicad_mod"),
+            },
+        )
+        for count, name in (
+            (3, "PinHeader_1x03_P2.54mm_Vertical"),
+            (4, "PinHeader_1x04_P2.54mm_Vertical"),
+            (5, "PinHeader_1x05_P2.54mm_Vertical"),
+        ):
+            with self.subTest(footprint=name):
+                self.assertEqual(
+                    metadata_calls[str(FOOTPRINT_LIBRARY / f"{name}.kicad_mod")],
+                    {
+                        "footprint_path": str(FOOTPRINT_LIBRARY / f"{name}.kicad_mod"),
+                        "description": (
+                            f"{count}-pin 2.54 mm vertical THT pin header; canonical "
+                            "front-side library definition for hand soldering, "
+                            "excluded from pick-and-place, retained in the BOM"
+                        ),
+                        "tags": ["lh60", "pin_header", "through_hole"],
+                        "attributes": ["exclude_from_pos_files"],
+                    },
+                )
+
+        register_calls = [
+            (tool, call)
+            for tool, call in client.calls
+            if tool in {"register_symbol_library", "register_footprint_library"}
+        ]
+        self.assertEqual(
+            register_calls,
+            [
+                (
+                    "register_symbol_library",
+                    {
+                        "library_path": str(SYMBOL_LIBRARY),
+                        "nickname": "lh60-core",
+                        "project": str(PROJECT),
+                        "scope": "project",
+                    },
+                ),
+                (
+                    "register_footprint_library",
+                    {
+                        "library_path": str(FOOTPRINT_LIBRARY),
+                        "nickname": "lh60-core",
+                        "project": str(PROJECT),
+                        "scope": "project",
+                        "replace_existing": True,
+                    },
+                ),
+            ],
+        )
+        self.assertEqual(client.schemas, ["library"])
 
 
 if __name__ == "__main__":
