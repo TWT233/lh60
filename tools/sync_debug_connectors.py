@@ -144,6 +144,15 @@ def _require_exact_int(value: Any, expected: int, label: str) -> int:
     return value
 
 
+def _logical_net_name(board_net: Any, label: str) -> str:
+    if not isinstance(board_net, str) or not board_net:
+        raise RuntimeError(f"{label} board net must be a nonempty string")
+    logical = board_net[1:] if board_net.startswith("/") else board_net
+    if not logical or "/" in logical:
+        raise RuntimeError(f"{label} board net has an unexpected hierarchical name: {board_net}")
+    return logical
+
+
 def _validate_hashes(schematic: Path, board: Path) -> tuple[str, str]:
     schematic_hash = _sha256(schematic)
     board_hash = _sha256(board)
@@ -345,11 +354,14 @@ def _require_tp_pads(client: McpClient, board: Path) -> dict[str, dict[str, Any]
             raise RuntimeError(f"{reference} pad payload is invalid")
         if pad.get("number") != "1":
             raise RuntimeError(f"{reference} must expose pad 1")
-        if pad.get("net") != TP_NETS[reference]:
+        board_net = pad.get("net")
+        logical_net = _logical_net_name(board_net, f"{reference} pad")
+        if logical_net != TP_NETS[reference]:
             raise RuntimeError(f"{reference} net mismatch: expected {TP_NETS[reference]}")
         pads_by_reference[reference] = {
             "number": "1",
-            "net": pad["net"],
+            "net": logical_net,
+            "board_net": board_net,
             "x": _finite_number(pad.get("x"), f"{reference} pad x"),
             "y": _finite_number(pad.get("y"), f"{reference} pad y"),
         }
@@ -361,16 +373,20 @@ def _require_empty_traces(
     board: Path,
     expected_references: frozenset[str] | set[str],
     label: str,
+    board_nets: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     # query_traces currently ignores its board argument and uses the active IPC
     # board.  Bind the following batch to the intended live board immediately
     # before querying any net.
     _require_exact_references(client, board, expected_references, label)
     traces = {}
+    if set(board_nets) != set(TP_NETS.values()):
+        raise RuntimeError("board-net trace map does not cover the frozen debug nets")
     for net_name in TP_NETS.values():
+        board_net = board_nets[net_name]
         result = client.call_tool_json(
             "query_traces",
-            {"board": str(board.resolve()), "net_name": net_name},
+            {"board": str(board.resolve()), "net_name": board_net},
         )
         try:
             _require_exact_int(result.get("count"), 0, f"{net_name} trace count")
@@ -378,7 +394,7 @@ def _require_empty_traces(
             raise RuntimeError(f"{net_name} must have zero board traces") from error
         if result.get("traces") != []:
             raise RuntimeError(f"{net_name} must have zero board traces")
-        traces[net_name] = result
+        traces[net_name] = {"board_net": board_net, **result}
     return traces
 
 
@@ -448,6 +464,17 @@ def _expected_centroids(pads: dict[str, dict[str, Any]]) -> dict[str, dict[str, 
     }
 
 
+def _board_nets_from_pads(pads: dict[str, dict[str, Any]]) -> dict[str, str]:
+    board_nets: dict[str, str] = {}
+    for pad in pads.values():
+        logical_net = pad["net"]
+        board_net = pad["board_net"]
+        if logical_net in board_nets and board_nets[logical_net] != board_net:
+            raise RuntimeError(f"debug net {logical_net} has inconsistent board net names")
+        board_nets[logical_net] = board_net
+    return board_nets
+
+
 def capture_baseline(client: McpClient, schematic: Path, board: Path) -> dict[str, Any]:
     require_pcb_sync_capabilities(client)
     schematic_hash, board_hash = _validate_hashes(schematic, board)
@@ -455,7 +482,13 @@ def capture_baseline(client: McpClient, schematic: Path, board: Path) -> dict[st
     board_info = _require_zone_count(client, board, 0)
     manufacturing = _require_manufacturing_track_count(client, board, 0)
     tp_pads = _require_tp_pads(client, board)
-    traces = _require_empty_traces(client, board, OLD_BOARD_REFS, "baseline trace binding 169")
+    traces = _require_empty_traces(
+        client,
+        board,
+        OLD_BOARD_REFS,
+        "baseline trace binding 169",
+        _board_nets_from_pads(tp_pads),
+    )
     drc = _require_complete_drc(
         client.call_tool_json(
             "run_drc",
@@ -523,6 +556,8 @@ def _require_baseline_shape(baseline: dict[str, Any], schematic: Path, board: Pa
         pad = tp_pads.get(reference)
         if not isinstance(pad, dict) or pad.get("number") != "1" or pad.get("net") != expected_net:
             raise RuntimeError(f"baseline tp_pads mismatch for {reference}")
+        if _logical_net_name(pad.get("board_net"), f"baseline tp_pads {reference}") != expected_net:
+            raise RuntimeError(f"baseline tp_pads mismatch for {reference}")
         _finite_number(pad.get("x"), f"baseline tp_pads {reference} x")
         _finite_number(pad.get("y"), f"baseline tp_pads {reference} y")
     if baseline.get("centroids") != _expected_centroids(tp_pads):
@@ -546,6 +581,8 @@ def _require_baseline_shape(baseline: dict[str, Any], schematic: Path, board: Pa
         if not isinstance(trace, dict) or trace.get("traces") != []:
             raise RuntimeError(f"baseline traces mismatch for {net_name}")
         _require_exact_int(trace.get("count"), 0, f"baseline traces {net_name} count")
+        if trace.get("board_net") != _board_nets_from_pads(tp_pads)[net_name]:
+            raise RuntimeError(f"baseline traces mismatch for {net_name}")
     try:
         _require_complete_drc(baseline.get("drc"))
     except RuntimeError as error:
@@ -659,15 +696,30 @@ def _require_connector_pads(client: McpClient, board: Path) -> dict[str, Any]:
             f"{reference} pad_count",
         )
         actual = {}
+        normalized_pads = []
         for pad in pads:
             if not isinstance(pad, dict):
                 raise RuntimeError(f"{reference} pad payload is invalid")
-            actual[str(pad.get("number"))] = pad.get("net")
-            _finite_number(pad.get("x"), f"{reference} pad x")
-            _finite_number(pad.get("y"), f"{reference} pad y")
+            number = str(pad.get("number"))
+            board_net = pad.get("net")
+            logical_net = _logical_net_name(board_net, f"{reference} pad {number}")
+            actual[number] = logical_net
+            normalized_pads.append(
+                {
+                    "number": number,
+                    "net": logical_net,
+                    "board_net": board_net,
+                    "x": _finite_number(pad.get("x"), f"{reference} pad x"),
+                    "y": _finite_number(pad.get("y"), f"{reference} pad y"),
+                }
+            )
         if actual != CONNECTOR_PAD_NETS[reference]:
             raise RuntimeError(f"{reference} post-save pad-net mismatch")
-        connector_pads[reference] = result
+        connector_pads[reference] = {
+            "reference": reference,
+            "pad_count": len(normalized_pads),
+            "pads": sorted(normalized_pads, key=lambda pad: pad["number"]),
+        }
     return connector_pads
 
 
@@ -715,7 +767,11 @@ def sync_debug_connectors(
     if before_tp_pads != baseline["tp_pads"]:
         raise RuntimeError("live TP pad state differs from captured baseline")
     before_traces = _require_empty_traces(
-        client, board, OLD_BOARD_REFS, "pre-delete trace binding 169"
+        client,
+        board,
+        OLD_BOARD_REFS,
+        "pre-delete trace binding 169",
+        _board_nets_from_pads(before_tp_pads),
     )
 
     first_dry = _validate_sync_plan(
@@ -794,7 +850,15 @@ def sync_debug_connectors(
     post_save_board_info = _require_zone_count(client, board, 0)
     post_save_manufacturing = _require_manufacturing_track_count(client, board, 0)
     post_save_traces = _require_empty_traces(
-        client, board, FINAL_BOARD_REFS, "post-save trace binding 152"
+        client,
+        board,
+        FINAL_BOARD_REFS,
+        "post-save trace binding 152",
+        {
+            pad["net"]: pad["board_net"]
+            for connector in connector_pads.values()
+            for pad in connector["pads"]
+        },
     )
     post_save_drc = _require_complete_drc(
         client.call_tool_json(

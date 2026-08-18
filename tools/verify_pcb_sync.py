@@ -193,15 +193,16 @@ CONNECTOR_FOOTPRINTS = {
 }
 
 
-def pad_payload(reference):
+def pad_payload(reference, *, hierarchical=True):
     index = int(reference.removeprefix("TP"))
+    logical_net = TP_NETS[reference]
     return {
         "reference": reference,
         "pad_count": 1,
         "pads": [
             {
                 "number": "1",
-                "net": TP_NETS[reference],
+                "net": f"/{logical_net}" if hierarchical else logical_net,
                 "x": 10.0 + index,
                 "y": 20.0 + index,
             }
@@ -209,11 +210,11 @@ def pad_payload(reference):
     }
 
 
-def connector_pad_payload(reference):
+def connector_pad_payload(reference, *, hierarchical=True):
     pads = [
             {
                 "number": number,
-                "net": net_name,
+                "net": f"/{net_name}" if hierarchical else net_name,
                 "x": 100.0 + int(number),
                 "y": 200.0 + int(number),
             }
@@ -320,7 +321,7 @@ def queue_capture_baseline_flow(client, *, drc=None):
         client.queue_json("get_component_pads", pad_payload(reference))
     client.queue_json("get_component_list", component_list_payload(old_board_refs()))
     for net_name in TP_NETS.values():
-        client.queue_json("query_traces", empty_trace_payload(net_name))
+        client.queue_json("query_traces", empty_trace_payload(f"/{net_name}"))
     client.queue_json("run_drc", drc_payload() if drc is None else drc)
 
 
@@ -361,7 +362,11 @@ def queue_pre_delete_live_state(
     )
     overrides = trace_overrides or {}
     for net_name in TP_NETS.values():
-        client.queue_json("query_traces", overrides.get(net_name, empty_trace_payload(net_name)))
+        board_net = f"/{net_name}"
+        client.queue_json(
+            "query_traces",
+            overrides.get(net_name, overrides.get(board_net, empty_trace_payload(board_net))),
+        )
 
 
 def default_sync_changes():
@@ -620,6 +625,8 @@ class PcbSyncContractTest(unittest.TestCase):
         self.assertEqual(baseline["tp_nets"], TP_NETS)
         self.assertEqual(baseline["connector_pad_nets"], CONNECTOR_PAD_NETS)
         self.assertEqual(set(baseline["tp_pads"]), tp_refs())
+        self.assertEqual(baseline["tp_pads"]["TP1"]["net"], "VSYS")
+        self.assertEqual(baseline["tp_pads"]["TP1"]["board_net"], "/VSYS")
         self.assertEqual(set(baseline["traces"]), set(TP_NETS.values()))
         self.assertEqual(
             baseline["centroids"]["J1"],
@@ -635,6 +642,15 @@ class PcbSyncContractTest(unittest.TestCase):
         )
         self.assertFalse(baseline["drc"]["truncated"])
         self.assertEqual(baseline["drc"]["categories_not_reported"], [])
+        trace_calls = [
+            arguments
+            for name, arguments in client.calls
+            if name == "query_traces"
+        ]
+        self.assertEqual(
+            [arguments["net_name"] for arguments in trace_calls],
+            [f"/{net_name}" for net_name in TP_NETS.values()],
+        )
         forbidden = {
             "save_project",
             "delete_component",
@@ -674,7 +690,9 @@ class PcbSyncContractTest(unittest.TestCase):
             trace_client.queue_json("get_component_pads", pad_payload(reference))
         trace_client.queue_json("get_component_list", component_list_payload(old_board_refs()))
         first_net = next(iter(TP_NETS.values()))
-        trace_client.queue_json("query_traces", {"net_name": first_net, "count": 1, "traces": [{}]})
+        trace_client.queue_json(
+            "query_traces", {"count": 1, "traces": [{"net": f"/{first_net}"}]}
+        )
         with self.assertRaisesRegex(RuntimeError, first_net):
             capture_baseline(trace_client, SCHEMATIC, BOARD)
 
@@ -724,7 +742,7 @@ class PcbSyncContractTest(unittest.TestCase):
                 "VSYS",
                 {
                     "trace_overrides": {
-                        "VSYS": {"count": False, "traces": []}
+                        "/VSYS": {"count": False, "traces": []}
                     }
                 },
             ),
@@ -1581,7 +1599,13 @@ class PcbSyncContractTest(unittest.TestCase):
 
             baseline_components = component_list_payload(old_board_refs())
             tp_pads = {
-                reference: pad_payload(reference)["pads"][0]
+                reference: {
+                    "number": "1",
+                    "net": TP_NETS[reference],
+                    "board_net": pad_payload(reference)["pads"][0]["net"],
+                    "x": pad_payload(reference)["pads"][0]["x"],
+                    "y": pad_payload(reference)["pads"][0]["y"],
+                }
                 for reference in sorted(tp_refs(), key=lambda item: int(item[2:]))
             }
             baseline = {
@@ -1615,7 +1639,10 @@ class PcbSyncContractTest(unittest.TestCase):
                 "board_info": board_info_payload(),
                 "manufacturing": manufacturing_payload(),
                 "traces": {
-                    net_name: empty_trace_payload(net_name)
+                    net_name: {
+                        "board_net": f"/{net_name}",
+                        **empty_trace_payload(f"/{net_name}"),
+                    }
                     for net_name in TP_NETS.values()
                 },
                 "drc": drc_payload(),
