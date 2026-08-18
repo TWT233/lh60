@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tools.lh60_design.mcp import McpClient
 
@@ -151,6 +152,54 @@ class McpClientResultTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             McpClient.result_json(result)
+
+    def test_result_json_raises_for_malformed_text_even_if_later_text_is_valid_object(self):
+        result = {
+            "content": [
+                {"type": "text", "text": "not-json"},
+                {"type": "text", "text": '{"count": 6}'},
+            ]
+        }
+
+        with self.assertRaises(RuntimeError):
+            McpClient.result_json(result)
+
+    def test_result_json_raises_for_non_object_text_even_if_later_text_is_valid_object(self):
+        result = {
+            "content": [
+                {"type": "text", "text": "true"},
+                {"type": "text", "text": '{"count": 6}'},
+            ]
+        }
+
+        with self.assertRaises(RuntimeError):
+            McpClient.result_json(result)
+
+    def test_call_tool_json_calls_call_tool_and_returns_parsed_object(self):
+        client = object.__new__(McpClient)
+        result = {"content": [{"type": "text", "text": '{"count": 6}'}]}
+
+        with mock.patch.object(client, "call_tool", return_value=result) as call_tool:
+            self.assertEqual(
+                client.call_tool_json("update_pcb_from_schematic", {"dry_run": True}),
+                {"count": 6},
+            )
+
+        call_tool.assert_called_once_with(
+            "update_pcb_from_schematic",
+            {"dry_run": True},
+        )
+
+    def test_call_tool_json_raises_for_tool_error_result(self):
+        client = object.__new__(McpClient)
+        result = {
+            "isError": True,
+            "content": [{"type": "text", "text": '{"message": "boom"}'}],
+        }
+
+        with mock.patch.object(client, "call_tool", return_value=result):
+            with self.assertRaises(RuntimeError):
+                client.call_tool_json("update_pcb_from_schematic", {"dry_run": True})
 
 
 if __name__ == "__main__":
