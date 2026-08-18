@@ -1,5 +1,6 @@
 import unittest
 from copy import deepcopy
+import json
 
 
 def complete_schematic_schemas():
@@ -30,7 +31,19 @@ def complete_schematic_schemas():
 
 
 def tool_text_result(payload):
-    return {"content": [{"type": "text", "text": __import__("json").dumps(payload)}]}
+    return {"content": [{"type": "text", "text": json.dumps(payload)}]}
+
+
+def empty_tool_result():
+    return {"content": []}
+
+
+def non_json_text_result(text="not-json"):
+    return {"content": [{"type": "text", "text": text}]}
+
+
+def json_scalar_result(value):
+    return {"content": [{"type": "text", "text": json.dumps(value)}]}
 
 
 class SchematicApplyContractTest(unittest.TestCase):
@@ -183,7 +196,7 @@ class SchematicApplyContractTest(unittest.TestCase):
                             "unchanged": [],
                         }
                     )
-                return {}
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         client = FakeClient()
         apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
@@ -368,7 +381,7 @@ class SchematicApplyContractTest(unittest.TestCase):
                             "unchanged": ["lh60-mcu:RP2040-Tiny"],
                         }
                     )
-                return {}
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         bad_payloads = (
             {"errors": ["stale"], "pins_moved": [], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": []},
@@ -417,7 +430,7 @@ class SchematicApplyContractTest(unittest.TestCase):
                             "unchanged": ["lh60-mcu:RP2040-Tiny"],
                         }
                     )
-                return {}
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         bad_payloads = (
             {"no_library_anchor": ["U1.Reference"], "no_property": [], "not_found": [], "moved": ["U1.Value"], "unchanged": []},
@@ -467,7 +480,7 @@ class SchematicApplyContractTest(unittest.TestCase):
                     )
                 if name == "update_symbols_from_library":
                     return tool_text_result(self.final_payload)
-                return {}
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         for payload in (
             {"errors": ["stale"], "pins_moved": [], "updated": [], "unchanged": ["lh60-mcu:RP2040-Tiny"]},
@@ -476,6 +489,148 @@ class SchematicApplyContractTest(unittest.TestCase):
             client = FakeClient(payload)
             with self.subTest(payload=payload):
                 with self.assertRaisesRegex(RuntimeError, "pins_moved|errors"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+
+    def test_apply_aborts_before_wiring_on_empty_or_malformed_early_refresh_results(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, refresh_result):
+                self.calls = []
+                self.refresh_result = refresh_result
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+                    return self.refresh_result
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(
+                        {
+                            "no_library_anchor": [],
+                            "no_property": [],
+                            "not_found": [],
+                            "moved": ["U1.Reference", "U1.Value"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "update_symbols_from_library":
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                        }
+                    )
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
+
+        for refresh_result in (
+            empty_tool_result(),
+            non_json_text_result(),
+            json_scalar_result(["not-an-object"]),
+        ):
+            client = FakeClient(refresh_result)
+            with self.subTest(refresh_result=refresh_result):
+                with self.assertRaisesRegex(RuntimeError, "no JSON object text block|not valid JSON|not a JSON object"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
+
+    def test_apply_aborts_before_wiring_on_empty_or_malformed_reset_results(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, reset_result):
+                self.calls = []
+                self.reset_result = reset_result
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": ["lh60-mcu:RP2040-Tiny"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "reset_schematic_field_positions":
+                    return self.reset_result
+                if name == "update_symbols_from_library":
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                        }
+                    )
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
+
+        for reset_result in (
+            empty_tool_result(),
+            non_json_text_result(),
+            json_scalar_result("not-an-object"),
+        ):
+            client = FakeClient(reset_result)
+            with self.subTest(reset_result=reset_result):
+                with self.assertRaisesRegex(RuntimeError, "no JSON object text block|not valid JSON|not a JSON object"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
+
+    def test_apply_aborts_on_empty_or_malformed_final_refresh_results(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, final_result):
+                self.calls = []
+                self.final_result = final_result
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": ["lh60-mcu:RP2040-Tiny"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "reset_schematic_field_positions":
+                    return tool_text_result(
+                        {
+                            "no_library_anchor": [],
+                            "no_property": [],
+                            "not_found": [],
+                            "moved": ["U1.Reference", "U1.Value"],
+                            "unchanged": [],
+                        }
+                    )
+                if name == "update_symbols_from_library":
+                    return self.final_result
+                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
+
+        for final_result in (
+            empty_tool_result(),
+            non_json_text_result(),
+            json_scalar_result(7),
+        ):
+            client = FakeClient(final_result)
+            with self.subTest(final_result=final_result):
+                with self.assertRaisesRegex(RuntimeError, "no JSON object text block|not valid JSON|not a JSON object"):
                     apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
 
 
