@@ -421,21 +421,54 @@ def _connections_by_net(
     return dict(grouped)
 
 
+def require_schematic_capabilities(client: McpClient) -> None:
+    """Fail closed unless the deployed Konnect supports every A3 apply step."""
+    schemas = {
+        toolset: client.tool_schemas(toolset)
+        for toolset in ("sch_batch", "sch_wiring", "sch_components", "library")
+    }
+    required = {
+        "sch_batch": {
+            "batch_delete_schematic_components",
+            "batch_delete",
+            "batch_place_components",
+            "batch_edit_schematic_components",
+            "batch_connect_to_net",
+            "batch_set_schematic_field_visibility",
+        },
+        "sch_wiring": {"batch_delete_schematic_wire"},
+        "sch_components": {"set_schematic_page", "update_symbols_from_library"},
+        "library": {"create_symbol"},
+    }
+    missing = {
+        toolset: sorted(names - schemas[toolset].keys())
+        for toolset, names in required.items()
+        if names - schemas[toolset].keys()
+    }
+    if missing:
+        raise RuntimeError(f"missing Konnect schematic tools: {missing}")
+    properties = schemas["library"]["create_symbol"].get("properties", {})
+    missing_anchors = [
+        anchor for anchor in ("reference_at", "value_at") if anchor not in properties
+    ]
+    if missing_anchors:
+        raise RuntimeError(f"create_symbol missing anchors: {missing_anchors}")
+
+
 def apply_schematic(
     client: McpClient,
     schematic: Path = SCHEMATIC,
 ) -> None:
     plan = build_schematic_plan()
-    client.tool_schemas("sch_components")
+    require_schematic_capabilities(client)
     client.call_tool(
         "set_schematic_page",
         {
             "schematic": str(schematic),
-            "page_size": plan.page_size,
+            "size": plan.page_size,
             "portrait": plan.portrait,
         },
     )
-    client.tool_schemas("sch_batch")
     client.call_tool(
         "batch_place_components",
         {

@@ -23,6 +23,11 @@
 
 
 
+
+
+
+
+
   (symbol "TestPoint"
     (pin_names
       (offset 1.016))
