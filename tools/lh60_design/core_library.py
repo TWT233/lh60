@@ -38,13 +38,15 @@ class CoreSymbolSpec:
 @dataclass(frozen=True)
 class CorePadSpec:
     number: str
+    pad_type: str
     shape: str
     x: float
     y: float
     width: float
     height: float
     layers: tuple[str, ...]
-    paste: bool
+    drill_mm: float | None = None
+    roundrect_rratio: float | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,52 @@ def _horizontal_pins(
     )
 
 
+def _vertical_connector_pins(count: int) -> tuple[CorePinSpec, ...]:
+    return tuple(
+        CorePinSpec(str(index), str(index), "passive", -5.08, (index - 1) * 2.54, 0.0)
+        for index in range(1, count + 1)
+    )
+
+
+def _connector_symbol_spec(count: int) -> CoreSymbolSpec:
+    name = f"Conn_01x0{count}"
+    return CoreSymbolSpec(
+        name=name,
+        reference_prefix="J",
+        value=name,
+        pins=_vertical_connector_pins(count),
+    )
+
+
+def _connector_footprint_spec(count: int) -> CoreFootprintSpec:
+    return CoreFootprintSpec(
+        name=f"PinHeader_1x0{count}_P2.54mm_Vertical",
+        description=(
+            f"{count}-pin 2.54 mm vertical THT pin header; canonical front-side "
+            "library definition for hand soldering, excluded from pick-and-place, "
+            "retained in the BOM"
+        ),
+        pads=tuple(
+            CorePadSpec(
+                number=str(index),
+                pad_type="thru_hole",
+                shape="rect" if index == 1 else "circle",
+                x=0.0,
+                y=(index - 1) * 2.54,
+                width=1.7,
+                height=1.7,
+                layers=("*.Cu", "*.Mask"),
+                drill_mm=1.0,
+            )
+            for index in range(1, count + 1)
+        ),
+        body_width_mm=2.54,
+        body_height_mm=count * 2.54,
+        courtyard_clearance_mm=0.5,
+        attributes=("exclude_from_pos_files",),
+    )
+
+
 def core_symbol_specs() -> tuple[CoreSymbolSpec, ...]:
     return (
         CoreSymbolSpec(
@@ -88,6 +136,9 @@ def core_symbol_specs() -> tuple[CoreSymbolSpec, ...]:
                 CorePinSpec("1", "PWR_FLAG", "power_out", 5.08, 0.0, 180.0),
             ),
         ),
+        _connector_symbol_spec(3),
+        _connector_symbol_spec(4),
+        _connector_symbol_spec(5),
     )
 
 
@@ -101,24 +152,24 @@ def core_footprint_specs() -> tuple[CoreFootprintSpec, ...]:
             ),
             pads=(
                 CorePadSpec(
-                    "1",
-                    "rect",
-                    -1.05,
-                    0.0,
-                    0.6,
-                    0.45,
-                    ("F.Cu", "F.Paste", "F.Mask"),
-                    True,
+                    number="1",
+                    pad_type="smd",
+                    shape="rect",
+                    x=-1.05,
+                    y=0.0,
+                    width=0.6,
+                    height=0.45,
+                    layers=("F.Cu", "F.Paste", "F.Mask"),
                 ),
                 CorePadSpec(
-                    "2",
-                    "rect",
-                    1.05,
-                    0.0,
-                    0.6,
-                    0.45,
-                    ("F.Cu", "F.Paste", "F.Mask"),
-                    True,
+                    number="2",
+                    pad_type="smd",
+                    shape="rect",
+                    x=1.05,
+                    y=0.0,
+                    width=0.6,
+                    height=0.45,
+                    layers=("F.Cu", "F.Paste", "F.Mask"),
                 ),
             ),
             body_width_mm=1.8,
@@ -134,14 +185,14 @@ def core_footprint_specs() -> tuple[CoreFootprintSpec, ...]:
             ),
             pads=(
                 CorePadSpec(
-                    "1",
-                    "circle",
-                    0.0,
-                    0.0,
-                    1.5,
-                    1.5,
-                    ("F.Cu", "F.Mask"),
-                    False,
+                    number="1",
+                    pad_type="smd",
+                    shape="circle",
+                    x=0.0,
+                    y=0.0,
+                    width=1.5,
+                    height=1.5,
+                    layers=("F.Cu", "F.Mask"),
                 ),
             ),
             body_width_mm=1.5,
@@ -149,6 +200,9 @@ def core_footprint_specs() -> tuple[CoreFootprintSpec, ...]:
             courtyard_clearance_mm=0.5,
             attributes=("exclude_from_pos_files", "exclude_from_bom"),
         ),
+        _connector_footprint_spec(3),
+        _connector_footprint_spec(4),
+        _connector_footprint_spec(5),
     )
 
 
@@ -185,6 +239,23 @@ def _symbol_payload(spec: CoreSymbolSpec) -> dict[str, object]:
 
 
 def _footprint_payload(spec: CoreFootprintSpec) -> dict[str, object]:
+    pads: list[dict[str, object]] = []
+    for pad in spec.pads:
+        payload: dict[str, object] = {
+            "number": pad.number,
+            "type": pad.pad_type,
+            "shape": pad.shape,
+            "x": pad.x,
+            "y": pad.y,
+            "width": pad.width,
+            "height": pad.height,
+            "layers": list(pad.layers),
+        }
+        if pad.drill_mm is not None:
+            payload["drill"] = pad.drill_mm
+        if pad.roundrect_rratio is not None:
+            payload["roundrect_rratio"] = pad.roundrect_rratio
+        pads.append(payload)
     return {
         "output": str(FOOTPRINT_LIBRARY / f"{spec.name}.kicad_mod"),
         "name": spec.name,
@@ -192,19 +263,7 @@ def _footprint_payload(spec: CoreFootprintSpec) -> dict[str, object]:
         "body_width": spec.body_width_mm,
         "body_height": spec.body_height_mm,
         "courtyard_clearance": spec.courtyard_clearance_mm,
-        "pads": [
-            {
-                "number": pad.number,
-                "type": "smd",
-                "shape": pad.shape,
-                "x": pad.x,
-                "y": pad.y,
-                "width": pad.width,
-                "height": pad.height,
-                "layers": list(pad.layers),
-            }
-            for pad in spec.pads
-        ],
+        "pads": pads,
     }
 
 
@@ -343,6 +402,73 @@ def _apply_test_point_graphics(client: McpClient, footprint: Path) -> None:
     )
 
 
+def _connector_graphics(pin_count: int) -> dict[str, list[dict[str, object]]]:
+    bottom_y = (pin_count - 1) * 2.54 + 1.27
+    return {
+        "F.Fab": [
+            {
+                "type": "rect",
+                "start": {"x": -1.27, "y": -1.27},
+                "end": {"x": 1.27, "y": bottom_y},
+                "stroke_width_mm": 0.1,
+                "fill": "none",
+            },
+        ],
+        "F.CrtYd": [
+            {
+                "type": "rect",
+                "start": {"x": -1.77, "y": -1.77},
+                "end": {"x": 1.77, "y": bottom_y + 0.5},
+                "stroke_width_mm": 0.05,
+                "fill": "none",
+            },
+        ],
+        "F.SilkS": [
+            {
+                "type": "line",
+                "start": {"x": -1.42, "y": -1.42},
+                "end": {"x": 1.42, "y": -1.42},
+                "stroke_width_mm": 0.15,
+            },
+            {
+                "type": "line",
+                "start": {"x": -1.42, "y": bottom_y + 0.15},
+                "end": {"x": 1.42, "y": bottom_y + 0.15},
+                "stroke_width_mm": 0.15,
+            },
+            {
+                "type": "line",
+                "start": {"x": -1.42, "y": -1.42},
+                "end": {"x": -1.42, "y": bottom_y + 0.15},
+                "stroke_width_mm": 0.15,
+            },
+            {
+                "type": "line",
+                "start": {"x": 1.42, "y": -1.42},
+                "end": {"x": 1.42, "y": bottom_y + 0.15},
+                "stroke_width_mm": 0.15,
+            },
+            {
+                "type": "line",
+                "start": {"x": -2.2, "y": -1.42},
+                "end": {"x": -1.42, "y": -1.42},
+                "stroke_width_mm": 0.15,
+            },
+            {
+                "type": "line",
+                "start": {"x": -2.2, "y": -1.42},
+                "end": {"x": -2.2, "y": 0.8},
+                "stroke_width_mm": 0.15,
+            },
+        ],
+    }
+
+
+def _apply_connector_graphics(client: McpClient, footprint: Path, pin_count: int) -> None:
+    for layer, graphics in _connector_graphics(pin_count).items():
+        _replace_graphics(client, footprint, layer, graphics)
+
+
 def apply_core_library(client: McpClient) -> None:
     client.tool_schemas("library")
     LIBRARY_ROOT.mkdir(parents=True, exist_ok=True)
@@ -374,14 +500,21 @@ def apply_core_library(client: McpClient) -> None:
         client.call_tool("create_footprint", _footprint_payload(spec))
         if spec.name == "D_SOD-323_Bottom":
             _apply_diode_graphics(client, footprint)
+            tags = ["lh60", "bottom_side"]
         else:
-            _apply_test_point_graphics(client, footprint)
+            if spec.name == "TestPoint_Pad_D1.5mm_Bottom":
+                _apply_test_point_graphics(client, footprint)
+                tags = ["lh60", "bottom_side"]
+            else:
+                pin_count = int(spec.name.split("_")[1][2:])
+                _apply_connector_graphics(client, footprint, pin_count)
+                tags = ["lh60", "pin_header", "through_hole"]
         client.call_tool(
             "set_footprint_metadata",
             {
                 "footprint_path": str(footprint),
                 "description": spec.description,
-                "tags": ["lh60", "bottom_side"],
+                "tags": tags,
                 "attributes": list(spec.attributes),
             },
         )

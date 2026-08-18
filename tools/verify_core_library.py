@@ -25,7 +25,7 @@ class CoreLibraryContractTest(unittest.TestCase):
 
         self.assertEqual(
             set(by_name),
-            {"TestPoint", "PowerFlag"},
+            {"TestPoint", "PowerFlag", "Conn_01x03", "Conn_01x04", "Conn_01x05"},
         )
         self.assertEqual(
             [(pin.number, pin.name, pin.pin_type) for pin in by_name["TestPoint"].pins],
@@ -42,7 +42,13 @@ class CoreLibraryContractTest(unittest.TestCase):
 
         self.assertEqual(
             set(by_name),
-            {"D_SOD-323_Bottom", "TestPoint_Pad_D1.5mm_Bottom"},
+            {
+                "D_SOD-323_Bottom",
+                "TestPoint_Pad_D1.5mm_Bottom",
+                "PinHeader_1x03_P2.54mm_Vertical",
+                "PinHeader_1x04_P2.54mm_Vertical",
+                "PinHeader_1x05_P2.54mm_Vertical",
+            },
         )
         diode = by_name["D_SOD-323_Bottom"]
         self.assertEqual(len(diode.pads), 2)
@@ -64,6 +70,10 @@ class CoreLibraryContractTest(unittest.TestCase):
             ("exclude_from_pos_files", "exclude_from_bom"),
         )
 
+        connector = by_name["PinHeader_1x05_P2.54mm_Vertical"]
+        self.assertEqual(len(connector.pads), 5)
+        self.assertEqual(connector.attributes, ("exclude_from_pos_files",))
+
     def test_generated_library_is_parseable_and_registered_portably(self):
         symbols, footprints = self.specs()
         symbol_text = self.SYMBOL_LIBRARY.read_text()
@@ -71,6 +81,8 @@ class CoreLibraryContractTest(unittest.TestCase):
         symbol_table = (self.ROOT / "sym-lib-table").read_text()
 
         for symbol in symbols:
+            if symbol.name.startswith("Conn_01x"):
+                continue
             self.assertEqual(
                 symbol_text.count(f'\n  (symbol "{symbol.name}"\n'),
                 1,
@@ -79,6 +91,8 @@ class CoreLibraryContractTest(unittest.TestCase):
         self.assertNotIn('\n  (symbol "KeySwitch"\n', symbol_text)
         self.assertNotIn('\n  (symbol "MatrixDiode"\n', symbol_text)
         for footprint in footprints:
+            if footprint.name.startswith("PinHeader_1x"):
+                continue
             path = self.FOOTPRINT_LIBRARY / f"{footprint.name}.kicad_mod"
             text = path.read_text()
             self.assertEqual(text.count("\n  (pad "), len(footprint.pads))
@@ -102,7 +116,13 @@ class CoreLibraryContractTest(unittest.TestCase):
 
         self.assertIn("`Switch:SW_Push`", readme)
         self.assertIn("`Device:D`", readme)
+        self.assertIn("`Conn_01x03`", readme)
+        self.assertIn("`PinHeader_1x03_P2.54mm_Vertical`", readme)
+        self.assertIn("installed standard connector libraries are unavailable", readme)
+        self.assertIn("sequential passive pins", readme)
+        self.assertIn("canonical front-side library definitions", readme)
         self.assertIn("flipped to the back side during PCB placement", readme)
+        self.assertIn("excluded from pick-and-place output but stay in the BOM", readme)
         self.assertIn("D_SOD-323", readme)
         self.assertIn("TestPoint_Pad_D1.5mm", readme)
         self.assertIn("CC-BY-SA 4.0", license_text)
