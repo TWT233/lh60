@@ -454,7 +454,11 @@ def prepare_candidate_libraries(
 def verify_candidate_libraries(
     client_factory, project: Path, *, capability_fn=require_schematic_capabilities,
 ) -> dict[str, list[str]]:
-    """Query registered candidate libraries through a fresh client."""
+    """Query registered candidate libraries through a fresh client.
+
+    Symbols resolve against the candidate project directory; footprints use the
+    registered project file path.
+    """
     symbols = ("Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny")
     footprints = (
         "PinHeader_1x03_P2.54mm_Vertical",
@@ -462,12 +466,13 @@ def verify_candidate_libraries(
         "PinHeader_1x05_P2.54mm_Vertical",
         "MCU_RP2040-Tiny_SMD",
     )
+    project_dir = project.parent
     with client_factory(KONNECT, CONFIG) as client:
         client.tool_schemas("library")
         for name in symbols:
             library = "lh60-mcu" if name == "RP2040-Tiny" else "lh60-core"
             result = client.call_tool_json(
-                "get_symbol_info", {"lib_id": f"{library}:{name}", "project_dir": str(project)}
+                "get_symbol_info", {"lib_id": f"{library}:{name}", "project_dir": str(project_dir)}
             )
             if result.get("name") != name:
                 raise AssertionError(f"library symbol verification failed: {name}")
