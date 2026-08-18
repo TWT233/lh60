@@ -2,6 +2,38 @@ import unittest
 
 
 class SchematicApplyContractTest(unittest.TestCase):
+    def test_power_flags_use_pin_connections_without_visible_custom_net_fields(self):
+        from tools.lh60_design.schematic import (
+            POWER_FLAG_POSITIONS_MM,
+            build_schematic_plan,
+        )
+
+        plan = build_schematic_plan()
+        flags = [
+            component
+            for component in plan.components
+            if component.reference.startswith("#FLG")
+        ]
+        flag_connections = {
+            connection.reference: (connection.pin_number, connection.net_name)
+            for connection in plan.connections
+            if connection.reference.startswith("#FLG")
+        }
+
+        self.assertEqual([flag.fields for flag in flags], [(), (), ()])
+        self.assertEqual(
+            [POWER_FLAG_POSITIONS_MM[flag.reference][1] for flag in flags],
+            [86.36, 106.68, 127.0],
+        )
+        self.assertEqual(
+            flag_connections,
+            {
+                "#FLG01": ("1", "VSYS"),
+                "#FLG02": ("1", "3V3"),
+                "#FLG03": ("1", "GND"),
+            },
+        )
+
     def test_capability_gate_requires_deployed_tools_and_symbol_anchors(self):
         from tools.lh60_design.schematic import require_schematic_capabilities
 

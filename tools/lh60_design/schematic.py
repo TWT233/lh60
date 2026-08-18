@@ -37,8 +37,8 @@ CONNECTOR_POSITIONS_MM = {
 }
 POWER_FLAG_POSITIONS_MM = {
     "#FLG01": (381.00, 86.36),
-    "#FLG02": (381.00, 96.52),
-    "#FLG03": (381.00, 106.68),
+    "#FLG02": (381.00, 106.68),
+    "#FLG03": (381.00, 127.00),
 }
 RETIRED_SWITCH_REFERENCES = {
     "r3_rshift_2.75u": "SW59",
@@ -271,7 +271,6 @@ def _support_components() -> tuple[SchematicComponent, ...]:
                 footprint="",
                 x=POWER_FLAG_POSITIONS_MM[reference][0],
                 y=POWER_FLAG_POSITIONS_MM[reference][1],
-                fields=(("Net", net_name),),
             )
         )
     return tuple(components)
