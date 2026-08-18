@@ -1,6 +1,56 @@
 import unittest
+from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+
+def disjoint_acceptance_schemas():
+    def schema(required, *properties):
+        return {"required": list(required), "properties": {item: {} for item in properties}}
+
+    return {
+        "sch_components": {
+            "list_schematic_components": schema(("schematic",), "schematic"),
+        },
+        "sch_batch": {
+            "get_schematic_layout": schema(("schematic",), "schematic"),
+            "validate_wire_connections": schema(("schematic",), "schematic"),
+            "validate_component_connections": schema(("schematic",), "schematic"),
+        },
+        "sch_wiring": {
+            "batch_delete_schematic_wire": schema(("schematic", "uuids"), "schematic", "uuids"),
+        },
+        "sch_analysis": {
+            name: schema(("schematic",), "schematic")
+            for name in (
+                "list_schematic_wires", "list_schematic_labels",
+                "check_schematic_overlaps", "find_orphan_items",
+                "find_shorted_nets", "find_single_pin_nets",
+            )
+        } | {
+            "get_pin_net_name": schema(("schematic", "reference", "pin_number"), "schematic", "reference", "pin_number"),
+        },
+        "sch_export": {
+            "export_netlist_summary": schema(("schematic",), "schematic"),
+            "run_erc": schema(("schematic", "severity"), "schematic", "severity"),
+            "export_schematic_svg": schema(("schematic", "output"), "schematic", "output"),
+        },
+        "library": {
+            "get_symbol_info": schema(("lib_id",), "lib_id", "project_dir"),
+            "get_footprint_info": schema(("footprint_path",), "footprint_path", "include_graphics", "project"),
+        },
+    }
+
+
+def old_production_references():
+    return (
+        {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
+        | {f"D{index}" for index in range(1, 71)}
+        | {f"SW{index}" for index in range(1, 77) if index != 59}
+        | {f"TP{index}" for index in range(1, 24)}
+    )
 
 
 class SchematicAcceptanceContractTest(unittest.TestCase):
@@ -176,7 +226,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             result = run_production_transaction(
                 FakeClient(), Path("/tmp/lh60.kicad_sch"), evidence_path, output_path,
                 expected_plan_hash="plan", expected_git_sha="head", expected_references=expected_refs,
-                preflight_fn=preflight, converge_fn=converge, acceptance_fn=acceptance, candidate_fn=new_candidate, candidate_acceptance_fn=candidate_acceptance, capabilities_fn=lambda client: None,
+                preflight_fn=preflight, converge_fn=converge, acceptance_fn=acceptance, candidate_fn=new_candidate, candidate_acceptance_fn=candidate_acceptance, capabilities_fn=lambda client: None, safety_fn=lambda schematic, board: {"pcb_sha256": "pcb"},
             )
             self.assertEqual([name for name, _ in calls], ["preflight", "delete-wires", "delete-labels", "delete-components", "empty", "apply", "post-acceptance", "second-candidate", "candidate-acceptance"])
             self.assertTrue(output_path.is_file())
@@ -241,6 +291,233 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 {"nets": [{"name": "ROW0", "pins": [{"reference": "D1", "pin_number": "2"}]}]},
                 {"nets": [{"name": "ROW0", "pins": [{"reference": "D1", "pin_number": "1"}]}]},
             )
+
+    def test_frozen_production_reference_set_is_exactly_172_without_headers(self):
+        from tools.check_schematic_acceptance import EXPECTED_PRODUCTION_REFERENCES
+
+        self.assertEqual(EXPECTED_PRODUCTION_REFERENCES, old_production_references())
+        self.assertEqual(len(EXPECTED_PRODUCTION_REFERENCES), 172)
+        self.assertFalse(any(reference.startswith("J") for reference in EXPECTED_PRODUCTION_REFERENCES))
+
+    def test_acceptance_schema_gate_rejects_wrong_toolset_ownership(self):
+        from tools.check_schematic_acceptance import _load_acceptance_toolsets
+
+        class FakeClient:
+            def tool_schemas(self, toolset):
+                schemas = deepcopy(disjoint_acceptance_schemas()[toolset])
+                if toolset == "sch_analysis":
+                    schemas.pop("list_schematic_wires")
+                return schemas
+
+        with self.assertRaisesRegex(RuntimeError, "list_schematic_wires"):
+            _load_acceptance_toolsets(FakeClient())
+
+    def test_acceptance_rejects_component_contract_or_layout_drift(self):
+        from tools.check_schematic_acceptance import assert_frozen_acceptance
+
+        with TemporaryDirectory() as directory:
+            svg_path = Path(directory) / "candidate.svg"
+            svg_path.write_text('<svg width="420mm" height="297mm"/>')
+            plan_components = [
+                {"reference": "U1", "lib_id": "lh60-mcu:RP2040-Tiny", "value": "RP2040-Tiny", "footprint": "lh60-mcu:MCU_RP2040-Tiny_SMD"},
+                {"reference": "J1", "lib_id": "lh60-core:Conn_01x03", "value": "PWR", "footprint": "lh60-core:PinHeader_1x03_P2.54mm_Vertical"},
+            ]
+            data = {
+                "components": {"components": deepcopy(plan_components)},
+                "layout": {"component_count": 2, "wire_count": 0, "label_count": 339},
+                "overlaps": {"overlap_count": 0},
+                "single_pin_nets": {"single_pin_net_count": 0, "nets": []},
+                "semantic": {"nets": [{"name": "VSYS", "pins": [{"reference": "U1", "pin_number": "23"}, {"reference": "J1", "pin_number": "1"}]}]},
+                "svg_path": str(svg_path),
+            }
+            frozen = {
+                "components": sorted(plan_components, key=lambda component: component["reference"]),
+                "semantic": {"VSYS": (("J1", "1"), ("U1", "23"))},
+                "connector_map": {"J1": (("1", "VSYS"),)},
+            }
+            assert_frozen_acceptance(data, frozen)
+            data["components"]["components"][1]["footprint"] = "wrong"
+            with self.assertRaisesRegex(AssertionError, "component contract"):
+                assert_frozen_acceptance(data, frozen)
+
+    def test_complete_acceptance_invokes_frozen_plan_gate(self):
+        from tools.check_schematic_acceptance import _assert_acceptance
+
+        data = {
+            "components": {"components": []},
+            "layout": {"wire_count": 0, "label_count": 339},
+            "shorts": {"short_count": 0},
+            "wire_validation": {"valid": True}, "component_validation": {"valid": True},
+            "erc": {"errors": 0, "warnings": 0}, "orphans": {"orphan_count": 339},
+        }
+        with self.assertRaisesRegex(AssertionError, "inventory mismatch"):
+            _assert_acceptance(data)
+
+    def test_approval_recording_requires_human_identity_and_complete_checklist(self):
+        from tools.check_schematic_acceptance import record_visual_approval
+
+        with TemporaryDirectory() as directory:
+            evidence_path = Path(directory) / "candidate.json"
+            output_path = Path(directory) / "approved.json"
+            evidence = {"plan_hash": "plan", "git_sha": "head", "svg_sha256": "svg", "render_sha256": "render"}
+            evidence_path.write_text(json.dumps(evidence))
+            with self.assertRaisesRegex(AssertionError, "checklist"):
+                record_visual_approval(evidence_path, output_path, "reviewer", {"u1": True})
+            approval = record_visual_approval(
+                evidence_path, output_path, "reviewer",
+                {"u1": True, "matrix": True, "connectors": True, "title_block": True},
+            )
+            self.assertEqual(approval["approved_by"], "reviewer")
+            self.assertTrue(approval["approved"])
+            self.assertTrue(output_path.is_file())
+
+    def test_real_preflight_and_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
+        from tools.check_schematic_acceptance import converge, preflight
+        from tools.verify_schematic_apply import complete_schematic_schemas
+
+        class FakeClient:
+            def __init__(self, empty_after_delete=True):
+                self.calls = []
+                self.empty_after_delete = empty_after_delete
+
+            def tool_schemas(self, toolset):
+                schemas = deepcopy(disjoint_acceptance_schemas())
+                for name, values in complete_schematic_schemas().items():
+                    schemas.setdefault(name, {}).update(values)
+                return schemas[toolset]
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                return {}
+
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "get_schematic_layout":
+                    if len([call for call in self.calls if call[0] == name]) > 1:
+                        return {"component_count": 0 if self.empty_after_delete else 1, "wire_count": 0, "label_count": 0}
+                    return {"component_count": 172, "wire_count": 290, "label_count": 339}
+                if name == "list_schematic_wires":
+                    return {"wires": [{"uuid": f"w{index}"} for index in range(290)]}
+                if name == "list_schematic_labels":
+                    return {"labels": [{"uuid": f"l{index}"} for index in range(339)]}
+                if name == "list_schematic_components":
+                    return {"components": [{"reference": reference} for reference in sorted(old_production_references())]}
+                raise AssertionError(name)
+
+        client = FakeClient()
+        state = preflight(client, Path("/tmp/production.kicad_sch"))
+        converge(client, Path("/tmp/production.kicad_sch"), state)
+        deletes = [(name, arguments) for name, arguments in client.calls if name.startswith("batch_delete")]
+        self.assertEqual([name for name, _ in deletes], ["batch_delete_schematic_wire", "batch_delete", "batch_delete_schematic_components"])
+        self.assertEqual(deletes[0][1]["uuids"], [f"w{index}" for index in range(290)])
+        self.assertEqual(deletes[1][1]["uuids"], [f"l{index}" for index in range(339)])
+        self.assertEqual(set(deletes[2][1]["references"]), old_production_references())
+
+        with self.assertRaisesRegex(AssertionError, "did not empty"):
+            converge(FakeClient(empty_after_delete=False), Path("/tmp/production.kicad_sch"), state)
+
+    def test_predelete_safety_records_pcb_hash_and_refuses_dirty_or_writer_state(self):
+        from tools.check_schematic_acceptance import assert_predelete_safety
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            schematic = root / "lh60.kicad_sch"
+            board = root / "lh60.kicad_pcb"
+            schematic.write_text("schematic")
+            board.write_text("board")
+            result = assert_predelete_safety(
+                schematic, board, clean_tree_fn=lambda: True, writer_pids_fn=lambda path: []
+            )
+            self.assertEqual(result["pcb_sha256"], hashlib.sha256(b"board").hexdigest())
+            with self.assertRaisesRegex(AssertionError, "clean"):
+                assert_predelete_safety(schematic, board, clean_tree_fn=lambda: False, writer_pids_fn=lambda path: [])
+            with self.assertRaisesRegex(AssertionError, "writer"):
+                assert_predelete_safety(schematic, board, clean_tree_fn=lambda: True, writer_pids_fn=lambda path: [123])
+
+    def test_prepare_candidate_libraries_uses_fresh_clients_and_queries_live_assets(self):
+        from tools.check_schematic_acceptance import prepare_candidate_libraries
+
+        clients = []
+        class FakeClient:
+            def __init__(self, number):
+                self.number = number
+                self.calls = []
+            def __enter__(self):
+                return self
+            def __exit__(self, *unused):
+                return None
+            def tool_schemas(self, toolset):
+                return deepcopy(disjoint_acceptance_schemas()[toolset])
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "get_symbol_info":
+                    return {"name": arguments["lib_id"].split(":")[1]}
+                if name == "get_footprint_info":
+                    return {"name": Path(arguments["footprint_path"]).stem}
+                raise AssertionError(name)
+
+        def factory(*unused):
+            client = FakeClient(len(clients))
+            clients.append(client)
+            return client
+
+        applied = []
+        result = prepare_candidate_libraries(
+            factory, Path("/tmp/project"),
+            apply_core_fn=lambda client: applied.append(("core", client.number)),
+            apply_mcu_fn=lambda client: applied.append(("mcu", client.number)),
+            capability_fn=lambda client: None,
+        )
+        self.assertEqual(applied, [("core", 0), ("mcu", 1)])
+        self.assertEqual(len(clients), 3)
+        self.assertEqual(set(result["symbols"]), {"Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny"})
+        self.assertEqual(set(result["footprints"]), {"PinHeader_1x03_P2.54mm_Vertical", "PinHeader_1x04_P2.54mm_Vertical", "PinHeader_1x05_P2.54mm_Vertical", "MCU_RP2040-Tiny_SMD"})
+
+    def test_transaction_runs_real_preflight_and_converge_only_after_safety(self):
+        from tools.check_schematic_acceptance import run_production_transaction
+        from tools.verify_schematic_apply import complete_schematic_schemas
+
+        with TemporaryDirectory() as directory:
+            evidence_path = Path(directory) / "candidate.json"
+            evidence_path.write_text(json.dumps({
+                "plan_hash": "plan", "git_sha": "head", "acceptance": {"ok": True},
+                "gates": {"wire_validation": True, "component_validation": True, "erc_errors": 0, "erc_warnings": 0},
+                "svg_sha256": "svg", "render_sha256": "render",
+                "visual_approval": {"approved": True, "plan_hash": "plan", "git_sha": "head", "svg_sha256": "svg", "render_sha256": "render"},
+            }))
+            calls = []
+            class FakeClient:
+                def tool_schemas(self, toolset):
+                    schemas = deepcopy(disjoint_acceptance_schemas())
+                    for name, values in complete_schematic_schemas().items():
+                        schemas.setdefault(name, {}).update(values)
+                    return schemas[toolset]
+                def call_tool(self, name, arguments):
+                    calls.append((name, arguments)); return {}
+                def call_tool_json(self, name, arguments):
+                    calls.append((name, arguments))
+                    if name == "get_schematic_layout":
+                        deleted = any(call[0] == "batch_delete_schematic_components" for call in calls)
+                        return {"component_count": 0 if deleted else 172, "wire_count": 0 if deleted else 290, "label_count": 0 if deleted else 339}
+                    if name == "list_schematic_wires": return {"wires": [{"uuid": f"w{n}"} for n in range(290)]}
+                    if name == "list_schematic_labels": return {"labels": [{"uuid": f"l{n}"} for n in range(339)]}
+                    if name == "list_schematic_components": return {"components": [{"reference": ref} for ref in old_production_references()]}
+                    raise AssertionError(name)
+
+            result = run_production_transaction(
+                FakeClient(), Path("/tmp/production.kicad_sch"), evidence_path, Path(directory) / "out.json",
+                expected_plan_hash="plan", expected_git_sha="head",
+                capabilities_fn=lambda client: calls.append(("capabilities", {})),
+                safety_fn=lambda schematic, board: calls.append(("safety", {})) or {"pcb_sha256": "pcb"},
+                acceptance_fn=lambda *unused: {"semantic": {"NET": [("U1", "1")]}, "svg_sha256": "production"},
+                candidate_fn=lambda *unused: Path(directory) / "candidate.kicad_sch",
+                candidate_acceptance_fn=lambda *unused: {"semantic": {"NET": [("U1", "1")]}, "svg_sha256": "candidate"},
+            )
+            write_names = [name for name, _ in calls if name.startswith("batch_delete")]
+            self.assertEqual(calls[0][0], "capabilities")
+            self.assertEqual(calls[1][0], "safety")
+            self.assertEqual(write_names, ["batch_delete_schematic_wire", "batch_delete", "batch_delete_schematic_components"])
+            self.assertEqual(result["predelete_safety"]["pcb_sha256"], "pcb")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,9 @@ import argparse
 from collections import Counter
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 from typing import Any
@@ -17,20 +19,32 @@ from tools.lh60_design.schematic import (
     build_schematic_plan,
     require_schematic_capabilities,
 )
+from tools.lh60_design.core_library import (
+    FOOTPRINT_LIBRARY as CORE_FOOTPRINT_LIBRARY,
+    apply_core_library,
+)
+from tools.lh60_design.mcu_library import (
+    FOOTPRINT_LIBRARY as MCU_FOOTPRINT_LIBRARY,
+    apply_mcu_library,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 KONNECT = Path("/data00/home/wangqiyilang/.local/bin/konnect")
 CONFIG = Path.home() / ".config/konnect/config.toml"
+BOARD = ROOT / "lh60.kicad_pcb"
 EXPECTED_BASELINE = {"component_count": 172, "wire_count": 290, "label_count": 339}
 EXPECTED_INVENTORY = {"mcu": 1, "switch": 75, "diode": 70, "connector": 6, "flag": 3}
 EXPECTED_PRODUCTION_TESTPOINTS = {f"TP{index}" for index in range(1, 24)}
 EXPECTED_PRODUCTION_REFERENCES = (
-    {"U1", *{f"J{index}" for index in range(1, 7)}, *{f"#FLG{index:02d}" for index in range(1, 4)}}
+    {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
     | {f"D{index}" for index in range(1, 71)}
     | {f"SW{index}" for index in range(1, 77) if index != 59}
     | EXPECTED_PRODUCTION_TESTPOINTS
 )
+FROZEN_COMPONENT_SHA256 = "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18"
+FROZEN_PIN_SHA256 = "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58"
+VISUAL_CHECKLIST = {"u1", "matrix", "connectors", "title_block"}
 
 
 def _plan_hash() -> str:
@@ -70,23 +84,24 @@ def classify_known_diagnostics(layout: dict[str, Any], orphans: dict[str, Any]) 
 def _load_acceptance_toolsets(client: McpClient) -> None:
     schemas = {
         toolset: client.tool_schemas(toolset)
-        for toolset in ("sch_components", "sch_analysis", "sch_export", "sch_batch")
+        for toolset in ("sch_components", "sch_batch", "sch_wiring", "sch_analysis", "sch_export")
     }
     contracts = {
         "list_schematic_components": ("sch_components", ("schematic",)),
-        "get_schematic_layout": ("sch_components", ("schematic",)),
-        "list_schematic_wires": ("sch_components", ("schematic",)),
-        "list_schematic_labels": ("sch_components", ("schematic",)),
-        "export_netlist_summary": ("sch_analysis", ("schematic",)),
+        "get_schematic_layout": ("sch_batch", ("schematic",)),
+        "validate_wire_connections": ("sch_batch", ("schematic",)),
+        "validate_component_connections": ("sch_batch", ("schematic",)),
+        "batch_delete_schematic_wire": ("sch_wiring", ("schematic", "uuids")),
+        "export_netlist_summary": ("sch_export", ("schematic",)),
+        "run_erc": ("sch_export", ("schematic", "severity")),
+        "export_schematic_svg": ("sch_export", ("schematic", "output")),
+        "list_schematic_wires": ("sch_analysis", ("schematic",)),
+        "list_schematic_labels": ("sch_analysis", ("schematic",)),
         "check_schematic_overlaps": ("sch_analysis", ("schematic",)),
         "find_orphan_items": ("sch_analysis", ("schematic",)),
         "find_shorted_nets": ("sch_analysis", ("schematic",)),
         "find_single_pin_nets": ("sch_analysis", ("schematic",)),
-        "validate_wire_connections": ("sch_analysis", ("schematic",)),
-        "validate_component_connections": ("sch_analysis", ("schematic",)),
         "get_pin_net_name": ("sch_analysis", ("schematic", "reference", "pin_number")),
-        "run_erc": ("sch_analysis", ("schematic", "severity")),
-        "export_schematic_svg": ("sch_export", ("schematic", "output")),
     }
     missing = {}
     for tool, (toolset, inputs) in contracts.items():
@@ -196,6 +211,108 @@ def _inventory(components: list[dict[str, Any]]) -> dict[str, int]:
     return dict(counts)
 
 
+def frozen_plan_expectations() -> dict[str, Any]:
+    """Independent, serializable acceptance baseline frozen at review time."""
+    plan = build_schematic_plan()
+    components = sorted(
+        [
+            {
+                "reference": component.reference,
+                "lib_id": component.lib_id,
+                "value": component.value,
+                "footprint": component.footprint,
+            }
+            for component in plan.components
+        ],
+        key=lambda item: item["reference"],
+    )
+    pins_by_net: dict[str, list[dict[str, str]]] = {}
+    for connection in plan.connections:
+        pins_by_net.setdefault(connection.net_name, []).append(
+            {"reference": connection.reference, "pin_number": connection.pin_number}
+        )
+    semantic = normalize_net_semantics({
+        "nets": [
+            {"name": name, "pins": pins}
+            for name, pins in pins_by_net.items()
+        ]
+    })
+    connector_map = {
+        group.reference: tuple(group.pin_map)
+        for group in CONNECTOR_GROUPS
+    }
+    frozen_pins = sorted(
+        [
+            {"reference": connection.reference, "pin_number": connection.pin_number, "net_name": connection.net_name}
+            for connection in plan.connections
+        ],
+        key=lambda item: (item["net_name"], item["reference"], int(item["pin_number"])),
+    )
+    if _stable_hash(components) != FROZEN_COMPONENT_SHA256 or _stable_hash(frozen_pins) != FROZEN_PIN_SHA256:
+        raise AssertionError("frozen plan baseline drift")
+    return {"components": components, "semantic": semantic, "connector_map": connector_map}
+
+
+def _stable_hash(payload: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=list).encode()
+    ).hexdigest()
+
+
+def assert_frozen_acceptance(data: dict[str, Any], frozen: dict[str, Any] | None = None) -> None:
+    """Check live candidate/production facts against the reviewed plan."""
+    frozen = frozen or frozen_plan_expectations()
+    components = sorted(
+        [
+            {key: component.get(key, "") for key in ("reference", "lib_id", "value", "footprint")}
+            for component in data["components"]["components"]
+        ],
+        key=lambda item: item["reference"],
+    )
+    if components != frozen["components"]:
+        raise AssertionError("component contract mismatch")
+    svg = Path(data["svg_path"]).read_text()
+    page = re.search(r'width="([0-9.]+)mm" height="([0-9.]+)mm"', svg)
+    if page is None or not (419.0 <= float(page.group(1)) <= 421.0 and 296.0 <= float(page.group(2)) <= 298.0):
+        raise AssertionError("page contract mismatch: expected A3 landscape SVG")
+    if data["overlaps"].get("overlap_count") != 0:
+        raise AssertionError(f"overlap contract mismatch: {data['overlaps']}")
+    single_pin = data["single_pin_nets"]
+    if single_pin.get("single_pin_net_count") != 0 or single_pin.get("nets") != []:
+        raise AssertionError(f"single-pin contract mismatch: {single_pin}")
+    actual_semantic = normalize_net_semantics(data["semantic"])
+    if actual_semantic != frozen["semantic"]:
+        raise AssertionError("pin semantic contract mismatch")
+    expected_assignments = sum(len(pins) for pins in frozen["semantic"].values())
+    if sum(len(pins) for pins in actual_semantic.values()) != expected_assignments:
+        raise AssertionError("pin assignment count mismatch")
+    for reference, pin_map in frozen["connector_map"].items():
+        for pin_number, net_name in pin_map:
+            if (reference, str(pin_number)) not in actual_semantic.get(net_name, ()):
+                raise AssertionError(f"connector map mismatch: {reference}.{pin_number} -> {net_name}")
+
+
+def record_visual_approval(
+    evidence_path: Path, output_path: Path, approved_by: str, checklist: dict[str, bool],
+) -> dict[str, Any]:
+    """Record, but never infer, a human visual approval for candidate evidence."""
+    evidence = json.loads(evidence_path.read_text())
+    if not approved_by.strip():
+        raise AssertionError("visual approval requires reviewer identity")
+    if set(checklist) != VISUAL_CHECKLIST or not all(checklist.values()):
+        raise AssertionError("visual approval checklist incomplete")
+    approval = {
+        "approved": True,
+        "approved_by": approved_by,
+        "checklist": checklist,
+        **{field: evidence.get(field) for field in ("plan_hash", "git_sha", "svg_sha256", "render_sha256")},
+    }
+    if not all(approval[field] for field in ("plan_hash", "git_sha", "svg_sha256", "render_sha256")):
+        raise AssertionError("visual approval evidence hashes missing")
+    _write_json(output_path, approval)
+    return approval
+
+
 def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
     components = data["components"]["components"]
     layout = data["layout"]
@@ -216,6 +333,7 @@ def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
     if data["erc"].get("errors") != 0 or data["erc"].get("warnings") != 0:
         raise AssertionError(f"ERC failures: {data['erc']}")
     diagnostics = classify_known_diagnostics(layout, data["orphans"])
+    assert_frozen_acceptance(data)
     return {"inventory": inventory, "known_diagnostics": diagnostics}
 
 
@@ -324,6 +442,71 @@ def assert_production_preflight(
         raise AssertionError("production TestPoint inventory mismatch")
 
 
+def _working_tree_is_clean() -> bool:
+    return not subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
+
+
+def _writer_pids(path: Path) -> list[str]:
+    result = subprocess.run(
+        ["lsof", "-t", "--", str(path)],
+        text=True, capture_output=True, check=False,
+    )
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def assert_predelete_safety(
+    schematic: Path, board: Path, *, clean_tree_fn=_working_tree_is_clean, writer_pids_fn=_writer_pids,
+) -> dict[str, str]:
+    """Record immutable PCB evidence and refuse concurrent or dirty mutation."""
+    if not clean_tree_fn():
+        raise AssertionError("production working tree must be clean before delete")
+    writers = writer_pids_fn(schematic)
+    if writers:
+        raise AssertionError(f"production schematic has active writer(s): {writers}")
+    return {
+        "schematic_sha256": hashlib.sha256(schematic.read_bytes()).hexdigest(),
+        "pcb_sha256": hashlib.sha256(board.read_bytes()).hexdigest(),
+    }
+
+
+def prepare_candidate_libraries(
+    client_factory, project_dir: Path, *, apply_core_fn=apply_core_library, apply_mcu_fn=apply_mcu_library,
+    capability_fn=require_schematic_capabilities,
+) -> dict[str, list[str]]:
+    """Regenerate with isolated clients, then query the actual candidate assets."""
+    with client_factory(KONNECT, CONFIG) as client:
+        capability_fn(client)
+        apply_core_fn(client)
+    with client_factory(KONNECT, CONFIG) as client:
+        capability_fn(client)
+        apply_mcu_fn(client)
+    symbols = ("Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny")
+    footprints = (
+        "PinHeader_1x03_P2.54mm_Vertical",
+        "PinHeader_1x04_P2.54mm_Vertical",
+        "PinHeader_1x05_P2.54mm_Vertical",
+        "MCU_RP2040-Tiny_SMD",
+    )
+    with client_factory(KONNECT, CONFIG) as client:
+        client.tool_schemas("library")
+        for name in symbols:
+            library = "lh60-mcu" if name == "RP2040-Tiny" else "lh60-core"
+            result = client.call_tool_json(
+                "get_symbol_info", {"lib_id": f"{library}:{name}", "project_dir": str(project_dir)}
+            )
+            if result.get("name") != name:
+                raise AssertionError(f"library symbol verification failed: {name}")
+        for name in footprints:
+            root = MCU_FOOTPRINT_LIBRARY if name == "MCU_RP2040-Tiny_SMD" else CORE_FOOTPRINT_LIBRARY
+            result = client.call_tool_json(
+                "get_footprint_info",
+                {"footprint_path": str(root / f"{name}.kicad_mod"), "include_graphics": True, "project": str(project_dir)},
+            )
+            if result.get("name") != name:
+                raise AssertionError(f"library footprint verification failed: {name}")
+    return {"symbols": list(symbols), "footprints": list(footprints)}
+
+
 def preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
     _load_acceptance_toolsets(client)
     layout = client.call_tool_json("get_schematic_layout", {"schematic": str(schematic)})
@@ -333,7 +516,7 @@ def preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
     label_uuids = assert_unique_nonempty_uuids(labels, "label")
     refs = [item["reference"] for item in client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]]
     state = {"layout": layout, "wire_uuids": wire_uuids, "label_uuids": label_uuids, "references": refs}
-    assert_production_preflight(state, set(refs))
+    assert_production_preflight(state)
     return state
 
 
@@ -382,6 +565,7 @@ def run_production_transaction(
     candidate_fn=None,
     candidate_acceptance_fn=_query_acceptance_record,
     capabilities_fn=require_production_capabilities,
+    safety_fn=assert_predelete_safety,
 ) -> dict[str, Any]:
     """Execute the one-way production transaction only after bound review evidence."""
     evidence_file = _evidence_path(candidate_evidence_path)
@@ -391,6 +575,7 @@ def run_production_transaction(
     candidate_fn = candidate_fn or candidate
     assert_candidate_evidence(candidate_evidence, expected_plan_hash, expected_git_sha)
     capabilities_fn(client)
+    safety = safety_fn(schematic, BOARD)
 
     state = preflight_fn(client, schematic)
     assert_production_preflight(
@@ -413,6 +598,7 @@ def run_production_transaction(
         "git_sha": expected_git_sha,
         "candidate_evidence_path": str(evidence_file),
         "candidate_evidence": candidate_evidence,
+        "predelete_safety": safety,
         "preflight": state,
         "production": production,
         "second_candidate": candidate_record,
@@ -435,7 +621,9 @@ def candidate_library_registrations(project: str) -> dict[str, list[dict[str, st
     }
 
 
-def candidate(client: McpClient, directory: Path) -> Path:
+def candidate(client: McpClient, directory: Path, *, prepare_libraries_fn=prepare_candidate_libraries) -> Path:
+    if prepare_libraries_fn is not None:
+        prepare_libraries_fn(McpClient, directory)
     client.call_tool("create_project", {"path": str(directory), "name": "lh60-candidate"})
     project = directory / "lh60-candidate.kicad_pro"
     client.tool_schemas("library")
@@ -456,6 +644,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--candidate-dir", type=Path)
     parser.add_argument("--candidate-evidence", type=Path)
+    parser.add_argument("--render", type=Path)
+    parser.add_argument("--record-visual-approval", action="store_true")
+    parser.add_argument("--approved-by")
+    parser.add_argument("--visual-checklist", type=Path)
     args = parser.parse_args()
     if args.production and args.preflight:
         parser.error("--production and --preflight are mutually exclusive")
@@ -463,6 +655,13 @@ def main() -> int:
         parser.error("--production requires --candidate-evidence")
     if args.production and args.output is None:
         parser.error("--production requires --output to persist transaction evidence")
+    if args.record_visual_approval:
+        if not args.candidate_evidence or not args.output or not args.approved_by or not args.visual_checklist:
+            parser.error("--record-visual-approval requires --candidate-evidence, --output, --approved-by, and --visual-checklist")
+        checklist = json.loads(args.visual_checklist.read_text())
+        result = record_visual_approval(args.candidate_evidence, args.output, args.approved_by, checklist)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     schematic = SCHEMATIC if args.production or args.preflight else None
     with McpClient(KONNECT, CONFIG) as client:
         if args.production:
@@ -486,6 +685,8 @@ def main() -> int:
                 **acceptance_record(data),
                 "queries": data,
             }
+            if args.render:
+                result["render_sha256"] = hashlib.sha256(args.render.read_bytes()).hexdigest()
     rendered = json.dumps(result, indent=2, sort_keys=True)
     if args.output:
         args.output.write_text(rendered + "\n")
