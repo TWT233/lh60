@@ -2,6 +2,55 @@ import unittest
 
 
 class SchematicApplyContractTest(unittest.TestCase):
+    def test_capability_gate_requires_deployed_tools_and_symbol_anchors(self):
+        from tools.lh60_design.schematic import require_schematic_capabilities
+
+        class FakeClient:
+            def tool_schemas(self, toolset):
+                schemas = {
+                    "sch_batch": {
+                        "batch_delete_schematic_components": {},
+                        "batch_delete": {},
+                        "batch_place_components": {},
+                        "batch_edit_schematic_components": {},
+                        "batch_connect_to_net": {},
+                        "batch_set_schematic_field_visibility": {},
+                    },
+                    "sch_wiring": {"batch_delete_schematic_wire": {}},
+                    "sch_components": {
+                        "set_schematic_page": {},
+                        "update_symbols_from_library": {},
+                    },
+                    "library": {
+                        "create_symbol": {
+                            "properties": {"reference_at": {}, "value_at": {}}
+                        }
+                    },
+                }
+                return schemas[toolset]
+
+        require_schematic_capabilities(FakeClient())
+
+        class MissingAnchor(FakeClient):
+            def tool_schemas(self, toolset):
+                schema = super().tool_schemas(toolset)
+                if toolset == "library":
+                    schema["create_symbol"]["properties"].pop("value_at")
+                return schema
+
+        with self.assertRaisesRegex(RuntimeError, "value_at"):
+            require_schematic_capabilities(MissingAnchor())
+
+        class MissingDelete(FakeClient):
+            def tool_schemas(self, toolset):
+                schema = super().tool_schemas(toolset)
+                if toolset == "sch_batch":
+                    schema.pop("batch_delete")
+                return schema
+
+        with self.assertRaisesRegex(RuntimeError, "batch_delete"):
+            require_schematic_capabilities(MissingDelete())
+
     def test_apply_uses_frozen_call_order_and_payloads(self):
         from tools.lh60_design.schematic import apply_schematic, build_schematic_plan
 
@@ -13,13 +62,23 @@ class SchematicApplyContractTest(unittest.TestCase):
                 self.calls.append(("load", toolset))
                 if toolset == "sch_batch":
                     return {
+                        "batch_delete_schematic_components": {},
+                        "batch_delete": {},
                         "batch_place_components": {},
                         "batch_edit_schematic_components": {},
                         "batch_connect_to_net": {},
                         "batch_set_schematic_field_visibility": {},
                     }
+                if toolset == "sch_wiring":
+                    return {"batch_delete_schematic_wire": {}}
                 if toolset == "sch_components":
                     return {"set_schematic_page": {}, "update_symbols_from_library": {}}
+                if toolset == "library":
+                    return {
+                        "create_symbol": {
+                            "properties": {"reference_at": {}, "value_at": {}}
+                        }
+                    }
                 return {}
 
             def call_tool(self, name, arguments):
@@ -31,9 +90,8 @@ class SchematicApplyContractTest(unittest.TestCase):
         plan = build_schematic_plan()
 
         expected_tool_names = [
-            "load",
+            *("load" for _ in range(4)),
             "set_schematic_page",
-            "load",
             "batch_place_components",
             "batch_edit_schematic_components",
             *(["batch_connect_to_net"] * len({connection.net_name for connection in plan.connections})),
@@ -44,32 +102,38 @@ class SchematicApplyContractTest(unittest.TestCase):
             [name for name, _ in client.calls],
             expected_tool_names,
         )
-        self.assertEqual(client.calls[0], ("load", "sch_components"))
         self.assertEqual(
-            client.calls[1],
+            client.calls[:4],
+            [
+                ("load", "sch_batch"),
+                ("load", "sch_wiring"),
+                ("load", "sch_components"),
+                ("load", "library"),
+            ],
+        )
+        self.assertEqual(
+            client.calls[4],
             (
                 "set_schematic_page",
                 {
                     "schematic": "/tmp/lh60-debug.kicad_sch",
-                    "page_size": "A3",
+                    "size": "A3",
                     "portrait": False,
                 },
             ),
         )
-        self.assertEqual(client.calls[2], ("load", "sch_batch"))
-
-        place_name, place_arguments = client.calls[3]
+        place_name, place_arguments = client.calls[5]
         self.assertEqual(place_name, "batch_place_components")
         self.assertEqual(place_arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
         self.assertEqual(len(place_arguments["components"]), 155)
 
-        edit_name, edit_arguments = client.calls[4]
+        edit_name, edit_arguments = client.calls[6]
         self.assertEqual(edit_name, "batch_edit_schematic_components")
         self.assertEqual(edit_arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
         self.assertEqual(len(edit_arguments["edits"]), 155)
 
         grouped_connections = {}
-        for name, arguments in client.calls[5:-2]:
+        for name, arguments in client.calls[7:-2]:
             self.assertEqual(name, "batch_connect_to_net")
             self.assertEqual(arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
             grouped_connections[arguments["net_name"]] = arguments["pins"]

@@ -4,6 +4,7 @@
   (generator_version "10.0")
 
 
+
   (symbol "RP2040-Tiny"
     (pin_names
       (offset 1.016))
@@ -12,8 +13,8 @@
     (on_board yes)
     (in_pos_files yes)
     (duplicate_pin_numbers_are_jumpers no)
-    (property "Reference" "U" (at 0 15.2400 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
-    (property "Value" "RP2040-Tiny" (at 0 -15.2400 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+    (property "Reference" "U" (at 0 17.78 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+    (property "Value" "RP2040-Tiny" (at 0 -25.4 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
     (property "Footprint" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
     (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
     (property "Description" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
