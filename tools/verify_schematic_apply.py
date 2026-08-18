@@ -1,4 +1,31 @@
 import unittest
+from copy import deepcopy
+
+
+def complete_schematic_schemas():
+    def schema(required, *properties):
+        return {"required": list(required), "properties": {name: {} for name in properties}}
+
+    return {
+        "sch_batch": {
+            "batch_delete_schematic_components": schema(("schematic", "references"), "schematic", "references"),
+            "batch_delete": schema(("schematic",), "schematic", "references", "uuids"),
+            "batch_place_components": schema(("schematic", "components"), "schematic", "components"),
+            "batch_edit_schematic_components": schema(("schematic", "edits"), "schematic", "edits"),
+            "batch_connect_to_net": schema(("schematic", "net_name", "pins"), "schematic", "net_name", "pins"),
+            "batch_set_schematic_field_visibility": schema(("schematic", "edits"), "schematic", "edits"),
+        },
+        "sch_wiring": {
+            "batch_delete_schematic_wire": schema(("schematic", "uuids"), "schematic", "uuids"),
+        },
+        "sch_components": {
+            "set_schematic_page": schema(("schematic", "size"), "schematic", "size", "portrait"),
+            "update_symbols_from_library": schema(("schematic",), "schematic", "dry_run", "allow_pin_moves", "references"),
+        },
+        "library": {
+            "create_symbol": schema(("library_path", "name", "reference_prefix"), "library_path", "name", "reference_prefix", "reference_at", "value_at"),
+        },
+    }
 
 
 class SchematicApplyContractTest(unittest.TestCase):
@@ -39,27 +66,7 @@ class SchematicApplyContractTest(unittest.TestCase):
 
         class FakeClient:
             def tool_schemas(self, toolset):
-                schemas = {
-                    "sch_batch": {
-                        "batch_delete_schematic_components": {},
-                        "batch_delete": {},
-                        "batch_place_components": {},
-                        "batch_edit_schematic_components": {},
-                        "batch_connect_to_net": {},
-                        "batch_set_schematic_field_visibility": {},
-                    },
-                    "sch_wiring": {"batch_delete_schematic_wire": {}},
-                    "sch_components": {
-                        "set_schematic_page": {},
-                        "update_symbols_from_library": {},
-                    },
-                    "library": {
-                        "create_symbol": {
-                            "properties": {"reference_at": {}, "value_at": {}}
-                        }
-                    },
-                }
-                return schemas[toolset]
+                return deepcopy(complete_schematic_schemas()[toolset])
 
         require_schematic_capabilities(FakeClient())
 
@@ -83,6 +90,40 @@ class SchematicApplyContractTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "batch_delete"):
             require_schematic_capabilities(MissingDelete())
 
+    def test_capability_gate_requires_all_invoked_input_contracts(self):
+        from tools.lh60_design.schematic import require_schematic_capabilities
+
+        class FakeClient:
+            def __init__(self, toolset, tool, field, container):
+                self.toolset = toolset
+                self.tool = tool
+                self.field = field
+                self.container = container
+
+            def tool_schemas(self, toolset):
+                schemas = deepcopy(complete_schematic_schemas()[toolset])
+                if toolset == self.toolset:
+                    if self.container == "properties":
+                        schemas[self.tool][self.container].pop(self.field)
+                    else:
+                        schemas[self.tool][self.container].remove(self.field)
+                return schemas
+
+        cases = (
+            ("sch_components", "set_schematic_page", "size", "required"),
+            ("sch_wiring", "batch_delete_schematic_wire", "uuids", "properties"),
+            ("sch_batch", "batch_delete", "uuids", "properties"),
+            ("sch_batch", "batch_place_components", "components", "required"),
+            ("sch_batch", "batch_edit_schematic_components", "edits", "properties"),
+            ("sch_batch", "batch_connect_to_net", "pins", "required"),
+            ("sch_batch", "batch_set_schematic_field_visibility", "edits", "properties"),
+            ("sch_components", "update_symbols_from_library", "allow_pin_moves", "properties"),
+        )
+        for toolset, tool, field, container in cases:
+            with self.subTest(tool=tool, field=field, container=container):
+                with self.assertRaisesRegex(RuntimeError, f"{tool}.*{field}"):
+                    require_schematic_capabilities(FakeClient(toolset, tool, field, container))
+
     def test_apply_uses_frozen_call_order_and_payloads(self):
         from tools.lh60_design.schematic import apply_schematic, build_schematic_plan
 
@@ -92,26 +133,7 @@ class SchematicApplyContractTest(unittest.TestCase):
 
             def tool_schemas(self, toolset):
                 self.calls.append(("load", toolset))
-                if toolset == "sch_batch":
-                    return {
-                        "batch_delete_schematic_components": {},
-                        "batch_delete": {},
-                        "batch_place_components": {},
-                        "batch_edit_schematic_components": {},
-                        "batch_connect_to_net": {},
-                        "batch_set_schematic_field_visibility": {},
-                    }
-                if toolset == "sch_wiring":
-                    return {"batch_delete_schematic_wire": {}}
-                if toolset == "sch_components":
-                    return {"set_schematic_page": {}, "update_symbols_from_library": {}}
-                if toolset == "library":
-                    return {
-                        "create_symbol": {
-                            "properties": {"reference_at": {}, "value_at": {}}
-                        }
-                    }
-                return {}
+                return deepcopy(complete_schematic_schemas()[toolset])
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))

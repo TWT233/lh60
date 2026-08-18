@@ -446,12 +446,30 @@ def require_schematic_capabilities(client: McpClient) -> None:
     }
     if missing:
         raise RuntimeError(f"missing Konnect schematic tools: {missing}")
-    properties = schemas["library"]["create_symbol"].get("properties", {})
-    missing_anchors = [
-        anchor for anchor in ("reference_at", "value_at") if anchor not in properties
-    ]
-    if missing_anchors:
-        raise RuntimeError(f"create_symbol missing anchors: {missing_anchors}")
+    contracts = {
+        "batch_delete_schematic_components": ("sch_batch", ("schematic", "references"), ("schematic", "references")),
+        "batch_delete": ("sch_batch", ("schematic",), ("schematic", "uuids")),
+        "batch_delete_schematic_wire": ("sch_wiring", ("schematic", "uuids"), ("schematic", "uuids")),
+        "set_schematic_page": ("sch_components", ("schematic", "size"), ("schematic", "size", "portrait")),
+        "batch_place_components": ("sch_batch", ("schematic", "components"), ("schematic", "components")),
+        "batch_edit_schematic_components": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
+        "batch_connect_to_net": ("sch_batch", ("schematic", "net_name", "pins"), ("schematic", "net_name", "pins")),
+        "batch_set_schematic_field_visibility": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
+        "update_symbols_from_library": ("sch_components", ("schematic",), ("schematic", "dry_run", "allow_pin_moves")),
+        "create_symbol": ("library", ("library_path", "name", "reference_prefix"), ("reference_at", "value_at")),
+    }
+    missing_inputs = {}
+    for tool, (toolset, required_inputs, property_inputs) in contracts.items():
+        schema = schemas[toolset][tool]
+        missing_required = sorted(set(required_inputs) - set(schema.get("required", [])))
+        missing_properties = sorted(set(property_inputs) - set(schema.get("properties", {})))
+        if missing_required or missing_properties:
+            missing_inputs[tool] = {
+                "required": missing_required,
+                "properties": missing_properties,
+            }
+    if missing_inputs:
+        raise RuntimeError(f"Konnect schematic input contract mismatch: {missing_inputs}")
 
 
 def apply_schematic(
