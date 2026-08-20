@@ -517,6 +517,188 @@ class ExactOwnershipClient:
 
 
 class PcbSyncContractTest(unittest.TestCase):
+    def test_sync_plan_normalizes_root_net_names_and_rejects_invalid_board_net_forms(self):
+        import tools.sync_debug_connectors as pcb_sync
+
+        slash_prefixed_changes = []
+        for index, reference in enumerate(sorted(CONNECTOR_PAD_NETS), start=1):
+            slash_prefixed_changes.append(
+                {
+                    **sync_change(reference, 300.0 + index, 90.0 + index),
+                    "pad_nets": {
+                        number: f"/{net_name}"
+                        for number, net_name in CONNECTOR_PAD_NETS[reference].items()
+                    },
+                }
+            )
+        slash_prefixed_plan = sync_plan_payload(
+            status="ready",
+            revision="rev-before",
+            board_only_planned=23,
+            board_only_applied=0,
+            skipped_applied=0,
+            added_applied=0,
+            changes=slash_prefixed_changes,
+        )
+        self.assertIs(
+            pcb_sync._validate_sync_plan(
+                slash_prefixed_plan,
+                expected_status="ready",
+                expected_board_only=23,
+                expected_board_only_applied=0,
+                expected_added_applied=0,
+                expected_skipped_applied=0,
+                require_undo=False,
+            ),
+            slash_prefixed_plan,
+        )
+
+        plain_plan = sync_plan_payload(
+            status="ready",
+            revision="rev-before",
+            board_only_planned=23,
+            board_only_applied=0,
+            skipped_applied=0,
+            added_applied=0,
+        )
+        self.assertIs(
+            pcb_sync._validate_sync_plan(
+                plain_plan,
+                expected_status="ready",
+                expected_board_only=23,
+                expected_board_only_applied=0,
+                expected_added_applied=0,
+                expected_skipped_applied=0,
+                require_undo=False,
+            ),
+            plain_plan,
+        )
+
+        wrong_pad_set = sync_plan_payload(
+            status="ready",
+            revision="rev-before",
+            board_only_planned=23,
+            board_only_applied=0,
+            skipped_applied=0,
+            added_applied=0,
+            changes=[
+                {**change, "pad_nets": {"1": "/VSYS"}}
+                if change["reference"] == "J1"
+                else change
+                for change in default_sync_changes()
+            ],
+        )
+        with self.assertRaisesRegex(RuntimeError, "J1 pad_nets mismatch"):
+            pcb_sync._validate_sync_plan(
+                wrong_pad_set,
+                expected_status="ready",
+                expected_board_only=23,
+                expected_board_only_applied=0,
+                expected_added_applied=0,
+                expected_skipped_applied=0,
+                require_undo=False,
+            )
+
+        nested_root = sync_plan_payload(
+            status="ready",
+            revision="rev-before",
+            board_only_planned=23,
+            board_only_applied=0,
+            skipped_applied=0,
+            added_applied=0,
+            changes=[
+                {
+                    **change,
+                    "pad_nets": {
+                        **CONNECTOR_PAD_NETS["J1"],
+                        "1": "/sheet/VSYS",
+                    },
+                }
+                if change["reference"] == "J1"
+                else change
+                for change in default_sync_changes()
+            ],
+        )
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "J1 pad 1 board net has an unexpected hierarchical name: /sheet/VSYS",
+        ):
+            pcb_sync._validate_sync_plan(
+                nested_root,
+                expected_status="ready",
+                expected_board_only=23,
+                expected_board_only_applied=0,
+                expected_added_applied=0,
+                expected_skipped_applied=0,
+                require_undo=False,
+            )
+
+        empty_net = sync_plan_payload(
+            status="ready",
+            revision="rev-before",
+            board_only_planned=23,
+            board_only_applied=0,
+            skipped_applied=0,
+            added_applied=0,
+            changes=[
+                {
+                    **change,
+                    "pad_nets": {
+                        **CONNECTOR_PAD_NETS["J1"],
+                        "1": "",
+                    },
+                }
+                if change["reference"] == "J1"
+                else change
+                for change in default_sync_changes()
+            ],
+        )
+        with self.assertRaisesRegex(
+            RuntimeError, "J1 pad 1 board net must be a nonempty string"
+        ):
+            pcb_sync._validate_sync_plan(
+                empty_net,
+                expected_status="ready",
+                expected_board_only=23,
+                expected_board_only_applied=0,
+                expected_added_applied=0,
+                expected_skipped_applied=0,
+                require_undo=False,
+            )
+
+        non_string_net = sync_plan_payload(
+            status="ready",
+            revision="rev-before",
+            board_only_planned=23,
+            board_only_applied=0,
+            skipped_applied=0,
+            added_applied=0,
+            changes=[
+                {
+                    **change,
+                    "pad_nets": {
+                        **CONNECTOR_PAD_NETS["J1"],
+                        "1": 123,
+                    },
+                }
+                if change["reference"] == "J1"
+                else change
+                for change in default_sync_changes()
+            ],
+        )
+        with self.assertRaisesRegex(
+            RuntimeError, "J1 pad 1 board net must be a nonempty string"
+        ):
+            pcb_sync._validate_sync_plan(
+                non_string_net,
+                expected_status="ready",
+                expected_board_only=23,
+                expected_board_only_applied=0,
+                expected_added_applied=0,
+                expected_skipped_applied=0,
+                require_undo=False,
+            )
+
     def test_hash_gate_accepts_migrated_schematic_and_rejects_pre_migration_hash(self):
         import tools.sync_debug_connectors as pcb_sync
 

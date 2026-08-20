@@ -602,7 +602,14 @@ def _validate_change(change: dict[str, Any], reference: str) -> None:
         raise RuntimeError(f"{reference} symbol_path must be nonempty")
     if change.get("dnp") is not False:
         raise RuntimeError(f"{reference} dnp must be false")
-    if change.get("pad_nets") != CONNECTOR_PAD_NETS[reference]:
+    pad_nets = change.get("pad_nets")
+    if not isinstance(pad_nets, dict) or set(pad_nets) != set(CONNECTOR_PAD_NETS[reference]):
+        raise RuntimeError(f"{reference} pad_nets mismatch")
+    normalized_pad_nets = {
+        number: _logical_net_name(pad_nets[number], f"{reference} pad {number}")
+        for number in sorted(CONNECTOR_PAD_NETS[reference])
+    }
+    if normalized_pad_nets != CONNECTOR_PAD_NETS[reference]:
         raise RuntimeError(f"{reference} pad_nets mismatch")
     position = change.get("position")
     if not isinstance(position, dict):
