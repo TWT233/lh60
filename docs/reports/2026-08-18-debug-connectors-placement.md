@@ -27,19 +27,38 @@ ready.
 ## Placement Summary
 
 All six debug connectors were placed on `B.Cu` with the intended access
-envelope and pin-1 readability preserved from the back assembly view. The
+envelope and frozen pin-1 direction preserved from the back assembly view. The
 placement evidence to preserve here is:
 
 - layer: `B.Cu`
-- pin 1 orientation: preserved and readable for every connector
+- pin 1 direction:
+  - `J1`: `south`
+  - `J2`: `south`
+  - `J3`: `south`
+  - `J4`: `south`
+  - `J5`: `north`
+  - `J6`: `north`
 - extraction target: `15 mm`
-- nearest `B.CrtYd` net clearance snapshots:
-  - `J1`: about `1.243 mm`
-  - `J2`: about `3.774 mm`
-  - `J3`: about `2.361 mm`
-  - `J4`: about `2.07 mm`
-  - `J5`: about `2.08 mm`
-  - `J6`: about `2.499 mm`
+- nearest existing `B.CrtYd` object and clearance snapshots:
+  - `J1`: `SW30` at `1.242501 mm`
+  - `J2`: `SW67` at `3.773750 mm`
+  - `J3`: `SW67` at `2.361250 mm`
+  - `J4`: `SW31` at `2.073750 mm`
+  - `J5`: `SW31` at `2.077821 mm`
+  - `J6`: `SW45` at `2.499404 mm`
+  - nearest connector-to-connector courtyard: `J6 -> J1` at `2.460000 mm`
+
+## Frozen Geometry
+
+The report preserves both the placed courtyard bounds and the model-derived
+access envelopes used to judge extraction/readability:
+
+- `J1` courtyard: `Rect(280.73, 29.15, 284.27, 37.77)`; access: `Rect(280.23, 28.65, 284.77, 38.27)`; pin 1 direction: `south`
+- `J2` courtyard: `Rect(75.73, 80.07, 79.27, 93.77)`; access: `Rect(75.23, 79.57, 79.77, 94.27)`; pin 1 direction: `south`
+- `J3` courtyard: `Rect(105.73, 80.07, 109.27, 93.77)`; access: `Rect(105.23, 79.57, 109.77, 94.27)`; pin 1 direction: `south`
+- `J4` courtyard: `Rect(1.23, 40.11, 4.77, 51.27)`; access: `Rect(0.73, 39.61, 5.27, 51.77)`; pin 1 direction: `south`
+- `J5` courtyard: `Rect(1.23, 53.73, 4.77, 62.35)`; access: `Rect(0.73, 53.23, 5.27, 62.85)`; pin 1 direction: `north`
+- `J6` courtyard: `Rect(280.73, 40.23, 284.27, 48.85)`; access: `Rect(280.23, 39.73, 284.77, 49.35)`; pin 1 direction: `north`
 
 ## Connector Table
 
@@ -62,29 +81,29 @@ surface stable and path-based.
 
 | Ref | Pin | Net | X (mm) | Y (mm) | Rot (deg) | Layer | Access Envelope | Pin 1 | 15 mm Extraction |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| J1 | 1 | VSYS | 282.50 | 36.00 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | readable | yes |
-| J1 | 2 | 3V3 | 282.50 | 33.46 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | readable | yes |
-| J1 | 3 | GND | 282.50 | 30.92 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | readable | yes |
-| J2 | 1 | COL0 | 77.50 | 92.00 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
-| J2 | 2 | COL1 | 77.50 | 89.46 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
-| J2 | 3 | COL2 | 77.50 | 86.92 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
-| J2 | 4 | COL3 | 77.50 | 84.38 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
-| J2 | 5 | COL4 | 77.50 | 81.84 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
-| J3 | 1 | COL5 | 107.50 | 92.00 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
-| J3 | 2 | COL6 | 107.50 | 89.46 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
-| J3 | 3 | COL7 | 107.50 | 86.92 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
-| J3 | 4 | COL8 | 107.50 | 84.38 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
-| J3 | 5 | COL9 | 107.50 | 81.84 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
-| J4 | 1 | ROW0 | 3.00 | 49.50 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
-| J4 | 2 | ROW1 | 3.00 | 46.96 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
-| J4 | 3 | ROW2 | 3.00 | 44.42 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
-| J4 | 4 | ROW3 | 3.00 | 41.88 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
-| J5 | 1 | ROW4 | 3.00 | 55.50 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | readable | yes |
-| J5 | 2 | ROW5 | 3.00 | 58.04 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | readable | yes |
-| J5 | 3 | ROW6 | 3.00 | 60.58 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | readable | yes |
-| J6 | 1 | GP27 | 282.50 | 42.00 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | readable | yes |
-| J6 | 2 | GP28 | 282.50 | 44.54 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | readable | yes |
-| J6 | 3 | GP29 | 282.50 | 47.08 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | readable | yes |
+| J1 | 1 | VSYS | 282.50 | 36.00 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | south | yes |
+| J1 | 2 | 3V3 | 282.50 | 33.46 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | south | yes |
+| J1 | 3 | GND | 282.50 | 30.92 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | south | yes |
+| J2 | 1 | COL0 | 77.50 | 92.00 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | south | yes |
+| J2 | 2 | COL1 | 77.50 | 89.46 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | south | yes |
+| J2 | 3 | COL2 | 77.50 | 86.92 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | south | yes |
+| J2 | 4 | COL3 | 77.50 | 84.38 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | south | yes |
+| J2 | 5 | COL4 | 77.50 | 81.84 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | south | yes |
+| J3 | 1 | COL5 | 107.50 | 92.00 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | south | yes |
+| J3 | 2 | COL6 | 107.50 | 89.46 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | south | yes |
+| J3 | 3 | COL7 | 107.50 | 86.92 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | south | yes |
+| J3 | 4 | COL8 | 107.50 | 84.38 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | south | yes |
+| J3 | 5 | COL9 | 107.50 | 81.84 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | south | yes |
+| J4 | 1 | ROW0 | 3.00 | 49.50 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | south | yes |
+| J4 | 2 | ROW1 | 3.00 | 46.96 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | south | yes |
+| J4 | 3 | ROW2 | 3.00 | 44.42 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | south | yes |
+| J4 | 4 | ROW3 | 3.00 | 41.88 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | south | yes |
+| J5 | 1 | ROW4 | 3.00 | 55.50 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | north | yes |
+| J5 | 2 | ROW5 | 3.00 | 58.04 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | north | yes |
+| J5 | 3 | ROW6 | 3.00 | 60.58 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | north | yes |
+| J6 | 1 | GP27 | 282.50 | 42.00 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | north | yes |
+| J6 | 2 | GP28 | 282.50 | 44.54 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | north | yes |
+| J6 | 3 | GP29 | 282.50 | 47.08 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | north | yes |
 
 ## Evidence Digests
 
@@ -115,7 +134,7 @@ entrypoint. The cache directory above is historical provenance from one
 production run, not the long-term delivery surface.
 
 Canonical rerun contract for this report family, once the acceptance checker
-unit merges into the repository:
+module is available on the report branch:
 
 ```bash
 # Preconditions:
@@ -123,11 +142,12 @@ unit merges into the repository:
 # 2. The Konnect IPC socket must be reachable from the deployed binary.
 # 3. The checker writes fresh evidence paths chosen by the operator; those
 #    outputs become the new run artifacts, not this historical cache path.
-PYTHONDONTWRITEBYTECODE=1 python tools/check_pcb_acceptance.py \
+PYTHONDONTWRITEBYTECODE=1 python -m tools.check_pcb_acceptance \
   --production \
-  --output docs/reports/2026-08-18-debug-connectors-placement.json \
-  --svg docs/reports/2026-08-18-debug-connectors-placement.svg \
-  --positions docs/reports/2026-08-18-debug-connectors-placement.csv
+  --output-dir docs/reports/debug-connectors-pcb-acceptance \
+  --board lh60.kicad_pcb \
+  --konnect ~/.local/bin/konnect \
+  --kicad-cli ~/.local/bin/kicad-cli
 python -m compileall -q tools
 git diff --check
 ```
@@ -152,7 +172,8 @@ against:
 - the recorded schematic and PCB hashes
 - the historical `save_count == 1` assertion
 - the post-run DRC tuple `163/367/0`
-- the nearest `B.CrtYd` clearance snapshots
+- the nearest existing `B.CrtYd` object and exact clearance snapshots
+- the frozen courtyard bounds and model-derived access envelopes
 - the connector pin table above
 
 ## Risks
