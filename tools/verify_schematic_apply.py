@@ -69,6 +69,54 @@ def json_scalar_result(value):
 
 
 class SchematicApplyContractTest(unittest.TestCase):
+    def test_edit_payload_omits_fields_only_for_standard_matrix_symbols(self):
+        from tools.lh60_design.schematic import (
+            CORE_DIODE,
+            CORE_SWITCH,
+            SchematicComponent,
+            _edit_payload,
+            build_schematic_plan,
+        )
+
+        def component(kind, lib_id, reference):
+            return SchematicComponent(
+                kind=kind,
+                lib_id=lib_id,
+                reference=reference,
+                value=reference,
+                footprint="Test:Footprint",
+                x=0.0,
+                y=0.0,
+                fields=(("LogicalNode", "KEY_1"),),
+            )
+
+        self.assertNotIn(
+            "fields",
+            _edit_payload(component("switch", CORE_SWITCH, "SW1")),
+        )
+        self.assertNotIn(
+            "fields",
+            _edit_payload(component("diode", CORE_DIODE, "D1")),
+        )
+        self.assertEqual(
+            _edit_payload(component("switch", "custom:Switch", "SW2"))["fields"],
+            {"LogicalNode": "KEY_1"},
+        )
+        self.assertEqual(
+            _edit_payload(component("diode", "custom:Diode", "D2"))["fields"],
+            {"LogicalNode": "KEY_1"},
+        )
+
+        plan_by_reference = {
+            component.reference: component
+            for component in build_schematic_plan().components
+        }
+        for reference in ("SW1", "D1"):
+            planned = plan_by_reference[reference]
+            self.assertTrue(planned.fields)
+            self.assertNotIn("fields", _edit_payload(planned))
+            self.assertEqual(_edit_payload(planned)["value"], planned.value)
+
     def test_power_flags_use_pin_connections_without_visible_custom_net_fields(self):
         from tools.lh60_design.schematic import (
             POWER_FLAG_POSITIONS_MM,
