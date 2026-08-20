@@ -63,7 +63,7 @@ def require_pcb_acceptance_capabilities(client: McpClient) -> None:
         "pcb_components": {
             "get_component_list": (("board",), ("board",)),
             "get_component_pads": (("board", "reference"), ("board", "reference")),
-            "list_board_footprint_graphics": (("board", "reference", "layer"), ("board", "reference", "layer")),
+            "list_board_footprint_graphics": (("board", "reference"), ("board", "reference", "layer")),
         },
         "verification": {
             "run_drc": (("board",), ("board", "limit", "severity")),
