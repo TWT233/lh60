@@ -19,8 +19,11 @@ KICAD_CLI = DEFAULT_KICAD_CLI
 EXPECTED_DRC_TOTAL = 530
 EXPECTED_DRC_UNCONNECTED = 367
 EXPECTED_DRC_FOOTPRINT = 163
+EXPECTED_DRC_ERRORS = 457
+EXPECTED_DRC_WARNINGS = 73
 EXPECTED_CONNECTOR_GRAPHICS = {"B.Fab": 1, "B.CrtYd": 1, "B.SilkS": 6}
 FORBIDDEN_FRONT_GRAPHICS = {"F.Fab": 0, "F.CrtYd": 0, "F.SilkS": 0}
+CONNECTOR_REFERENCES = tuple(CONNECTOR_PAD_NETS)
 
 
 def _git_sha() -> str:
@@ -199,19 +202,83 @@ def _require_connector_pad_nets(client: McpClient, board: Path) -> dict[str, Any
 
 
 def _normalize_drc_entry(entry: dict[str, Any]) -> dict[str, Any]:
-    references = entry.get("references", [])
-    if not isinstance(references, list):
-        references = []
+    pos = entry.get("pos")
+    if not isinstance(pos, dict):
+        pos = {}
     return {
-        "test_id": str(entry.get("test_id", "")),
+        "rule": str(entry.get("rule", "")),
+        "description": str(entry.get("description", "")),
         "severity": str(entry.get("severity", "")),
-        "layer": str(entry.get("layer", "")),
-        "message": str(entry.get("message", "")),
-        "references": tuple(sorted(str(reference) for reference in references)),
+        "pos": {
+            "x": pos.get("x"),
+            "y": pos.get("y"),
+        },
     }
 
 
-def _require_drc(client: McpClient, board: Path) -> dict[str, Any]:
+def _parse_drc_report(report_text: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current_rule: str | None = None
+    for raw_line in report_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]:"):
+            current_rule = line[1:-2]
+            sections.setdefault(current_rule, [])
+            continue
+        if current_rule is not None:
+            sections[current_rule].append(line)
+    return sections
+
+
+def _check_report_for_unexpected_connector_findings(report_text: str) -> list[dict[str, Any]]:
+    findings = []
+    for rule, lines in _parse_drc_report(report_text).items():
+        if rule == "unconnected_items":
+            continue
+        for line in lines:
+            for reference in CONNECTOR_REFERENCES:
+                if (
+                    f"of {reference}" in line
+                    or f"Reference field of {reference}" in line
+                    or f"Footprint text of {reference}" in line
+                ):
+                    findings.append({"rule": rule, "line": line})
+                    break
+    return findings
+
+
+def _write_drc_report(board: Path, output_dir: Path, *, kicad_cli: Path) -> dict[str, Any]:
+    report = output_dir / "drc.rpt"
+    command = [
+        str(kicad_cli),
+        "pcb",
+        "drc",
+        "--format",
+        "report",
+        "--units",
+        "mm",
+        "--severity-all",
+        "--output",
+        str(report),
+        str(board.resolve()),
+    ]
+    subprocess.run(command, check=True, capture_output=True, text=True)
+    if not report.is_file():
+        raise RuntimeError(f"DRC report missing: {report}")
+    report_text = report.read_text()
+    if not report_text.strip():
+        raise RuntimeError(f"DRC report empty: {report}")
+    return {
+        "path": str(report),
+        "sha256": hashlib.sha256(report_text.encode()).hexdigest(),
+        "text": report_text,
+        "command": command,
+    }
+
+
+def _require_drc(client: McpClient, board: Path, output_dir: Path, *, kicad_cli: Path) -> dict[str, Any]:
     result = client.call_tool_json(
         "run_drc",
         {"board": str(board.resolve()), "limit": 10000, "severity": "info"},
@@ -225,7 +292,7 @@ def _require_drc(client: McpClient, board: Path) -> dict[str, Any]:
             raise RuntimeError(f"DRC {field} mismatch: expected {expected}, got {result.get(field)}")
     if result.get("design_rule_violations") != EXPECTED_DRC_FOOTPRINT:
         raise RuntimeError("DRC design_rule_violations mismatch")
-    if result.get("errors") != EXPECTED_DRC_UNCONNECTED or result.get("warnings") != EXPECTED_DRC_FOOTPRINT:
+    if result.get("errors") != EXPECTED_DRC_ERRORS or result.get("warnings") != EXPECTED_DRC_WARNINGS:
         raise RuntimeError("DRC errors/warnings mismatch")
     if result.get("truncated") is not False or result.get("severity_filter") != "info":
         raise RuntimeError("DRC report is not a full info report")
@@ -233,15 +300,10 @@ def _require_drc(client: McpClient, board: Path) -> dict[str, Any]:
     if not isinstance(violations, list):
         raise RuntimeError("DRC violations payload malformed")
     normalized = [_normalize_drc_entry(entry) for entry in violations if isinstance(entry, dict)]
-    unexpected = []
-    for entry in normalized:
-        refs = [reference for reference in entry["references"] if reference.startswith("J")]
-        if not refs:
-            continue
-        if entry["test_id"] != "unconnected_items":
-            unexpected.append(entry)
+    report = _write_drc_report(board, output_dir, kicad_cli=kicad_cli)
+    unexpected = _check_report_for_unexpected_connector_findings(report["text"])
     if unexpected:
-        raise RuntimeError(f"unexpected J-related DRC finding: {unexpected}")
+        raise RuntimeError(f"unexpected J-related DRC report finding: {unexpected}")
     return {
         "total_violations": result["total_violations"],
         "unconnected_items": result["unconnected_items"],
@@ -250,6 +312,9 @@ def _require_drc(client: McpClient, board: Path) -> dict[str, Any]:
         "errors": result["errors"],
         "warnings": result["warnings"],
         "violations": normalized,
+        "report_path": report["path"],
+        "report_sha256": report["sha256"],
+        "report_command": report["command"],
     }
 
 
@@ -264,10 +329,14 @@ def _require_position_export_without_connectors(client: McpClient, board: Path, 
             "side": "both",
         },
     )
-    rows = list(csv.reader(output.read_text().splitlines()))
-    flat = ",".join(",".join(row) for row in rows)
-    for reference in CONNECTOR_PAD_NETS:
-        if reference in flat:
+    with output.open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None or "Ref" not in reader.fieldnames:
+            raise RuntimeError("position export must contain Ref column")
+        rows = list(reader)
+    for row in rows:
+        reference = row.get("Ref", "")
+        if reference in CONNECTOR_REFERENCES:
             raise RuntimeError(f"position export must exclude {reference}")
     return {
         "path": str(output),
@@ -317,7 +386,7 @@ def acceptance_record(
     resolved_kicad_cli = resolve_kicad_cli(kicad_cli)
     pose = _require_connector_pose_and_graphics(client, board)
     pads = _require_connector_pad_nets(client, board)
-    drc = _require_drc(client, board)
+    drc = _require_drc(client, board, output_dir, kicad_cli=resolved_kicad_cli)
     positions = _require_position_export_without_connectors(
         client, board, output_dir / "positions.csv"
     )
