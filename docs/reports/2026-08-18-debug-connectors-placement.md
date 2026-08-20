@@ -125,6 +125,7 @@ Konnect changes deployed for the production placement evidence:
   - `3e73a40`
   - `c3098c1`
   - `136b969`
+- Konnect integration commit: `136b969e93ca58b67c1110b1c8cd5645b45faa31`
 - deployed binary digest: `ff931a373e205402950a209596ab96958da837393dd84cfd9effcdc499daa0e3`
 
 ## Reproducible Gates
@@ -133,8 +134,11 @@ The delivery artifact is this repo-local report plus the repo-local checker
 entrypoint. The cache directory above is historical provenance from one
 production run, not the long-term delivery surface.
 
-Canonical rerun contract for this report family, once the acceptance checker
-module is available on the report branch:
+Canonical rerun contract for this report family depends on first cherry-picking
+`task/l6-pcb-acceptance` HEAD `5466398271ab4f01646ab1a0bb46561e779c1c61`
+into the integration branch. Only after that integration step is complete does
+the command below become executable on the integration branch; the final
+integrated flow is expected to follow that order.
 
 ```bash
 # Preconditions:
