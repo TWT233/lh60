@@ -4,7 +4,9 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,23 @@ EXPECTED_DRC_WARNINGS = 73
 EXPECTED_CONNECTOR_GRAPHICS = {"B.Fab": 1, "B.CrtYd": 1, "B.SilkS": 6}
 FORBIDDEN_FRONT_GRAPHICS = {"F.Fab": 0, "F.CrtYd": 0, "F.SilkS": 0}
 CONNECTOR_REFERENCES = tuple(CONNECTOR_PAD_NETS)
+EXPECTED_CONNECTOR_UNCONNECTED_ENDPOINTS = tuple(
+    (reference, pad_number, net)
+    for reference, pads in CONNECTOR_PAD_NETS.items()
+    for pad_number, net in pads.items()
+)
+DRC_SECTION_RE = re.compile(r"^\[([^]]+)\]:")
+CONNECTOR_ENDPOINT_RE = re.compile(
+    r"\bPTH pad (?P<pad_number>\S+) "
+    r"\[(?P<net>[^]]+)\] of (?P<reference>J\d+)\b"
+)
+CONNECTOR_ITEM_RE = re.compile(r"\bof J\d+\b")
+DRC_ITEM_LINE_RE = re.compile(r"^@\([^)]*\):\s+(?P<description>.+)$")
+DRC_ITEM_REFERENCE_RE = re.compile(
+    r"^(?:Footprint (?P<footprint_reference>\S+)|"
+    r".+\bof (?P<owned_reference>\S+?)(?: on \S+)?)$"
+)
+CONNECTOR_REFERENCE_RE = re.compile(r"^J\d+$")
 
 
 def _git_sha() -> str:
@@ -110,7 +129,19 @@ def _require_exact_inventory(client: McpClient, board: Path) -> dict[str, Any]:
         raise RuntimeError("get_component_list returned no components list")
     if result.get("count") != len(components):
         raise RuntimeError("get_component_list count mismatch")
-    actual_refs = {item.get("reference") for item in components if isinstance(item, dict)}
+    references = [
+        item.get("reference")
+        for item in components
+        if isinstance(item, dict) and isinstance(item.get("reference"), str)
+    ]
+    if len(references) != len(components):
+        raise RuntimeError("get_component_list contains malformed component reference")
+    duplicate_refs = sorted(
+        reference for reference, count in Counter(references).items() if count != 1
+    )
+    if duplicate_refs:
+        raise RuntimeError(f"duplicate component reference: {duplicate_refs}")
+    actual_refs = set(references)
     expected_refs = final_board_refs()
     if actual_refs != expected_refs:
         missing = sorted(expected_refs - actual_refs)
@@ -223,13 +254,75 @@ def _parse_drc_report(report_text: str) -> dict[str, list[str]]:
         line = raw_line.strip()
         if not line:
             continue
-        if line.startswith("[") and line.endswith("]:"):
-            current_rule = line[1:-2]
+        section = DRC_SECTION_RE.match(line)
+        if section is not None:
+            current_rule = section.group(1)
             sections.setdefault(current_rule, [])
             continue
         if current_rule is not None:
             sections[current_rule].append(line)
     return sections
+
+
+def _require_exact_connector_unconnected_endpoints(
+    report_text: str,
+) -> list[dict[str, str]]:
+    unconnected_lines = _parse_drc_report(report_text).get("unconnected_items", [])
+    endpoints = []
+    unparsed_connector_lines = []
+    for line in unconnected_lines:
+        match = CONNECTOR_ENDPOINT_RE.search(line)
+        if match is not None:
+            endpoints.append(
+                (
+                    match.group("reference"),
+                    match.group("pad_number"),
+                    match.group("net").removeprefix("/"),
+                )
+            )
+        elif CONNECTOR_ITEM_RE.search(line):
+            unparsed_connector_lines.append(line)
+
+    counts = Counter(endpoints)
+    expected = set(EXPECTED_CONNECTOR_UNCONNECTED_ENDPOINTS)
+    missing = [
+        endpoint
+        for endpoint in EXPECTED_CONNECTOR_UNCONNECTED_ENDPOINTS
+        if counts[endpoint] == 0
+    ]
+    duplicate = [
+        endpoint
+        for endpoint in EXPECTED_CONNECTOR_UNCONNECTED_ENDPOINTS
+        if counts[endpoint] > 1
+    ]
+    unexpected = sorted(endpoint for endpoint in counts if endpoint not in expected)
+    if missing or duplicate or unexpected or unparsed_connector_lines:
+        raise RuntimeError(
+            "connector unconnected endpoints mismatch: "
+            f"missing={missing}, duplicate={duplicate}, unexpected={unexpected}, "
+            f"unparsed={unparsed_connector_lines}"
+        )
+    endpoint_order = {
+        endpoint: index
+        for index, endpoint in enumerate(EXPECTED_CONNECTOR_UNCONNECTED_ENDPOINTS)
+    }
+    return [
+        {"reference": reference, "pad_number": pad_number, "net": net}
+        for reference, pad_number, net in sorted(
+            endpoints,
+            key=endpoint_order.__getitem__,
+        )
+    ]
+
+
+def _drc_item_reference(line: str) -> str | None:
+    item = DRC_ITEM_LINE_RE.match(line)
+    if item is None:
+        return None
+    reference = DRC_ITEM_REFERENCE_RE.match(item.group("description"))
+    if reference is None:
+        return None
+    return reference.group("footprint_reference") or reference.group("owned_reference")
 
 
 def _check_report_for_unexpected_connector_findings(report_text: str) -> list[dict[str, Any]]:
@@ -238,19 +331,16 @@ def _check_report_for_unexpected_connector_findings(report_text: str) -> list[di
         if rule == "unconnected_items":
             continue
         for line in lines:
-            for reference in CONNECTOR_REFERENCES:
-                if (
-                    f"of {reference}" in line
-                    or f"Reference field of {reference}" in line
-                    or f"Footprint text of {reference}" in line
-                ):
-                    findings.append({"rule": rule, "line": line})
-                    break
+            reference = _drc_item_reference(line)
+            if reference is not None and CONNECTOR_REFERENCE_RE.fullmatch(reference):
+                findings.append({"rule": rule, "line": line})
     return findings
 
 
 def _write_drc_report(board: Path, output_dir: Path, *, kicad_cli: Path) -> dict[str, Any]:
     report = output_dir / "drc.rpt"
+    if report.exists():
+        raise RuntimeError(f"DRC report output already exists: {report}")
     command = [
         str(kicad_cli),
         "pcb",
@@ -304,6 +394,7 @@ def _require_drc(client: McpClient, board: Path, output_dir: Path, *, kicad_cli:
     unexpected = _check_report_for_unexpected_connector_findings(report["text"])
     if unexpected:
         raise RuntimeError(f"unexpected J-related DRC report finding: {unexpected}")
+    connector_endpoints = _require_exact_connector_unconnected_endpoints(report["text"])
     return {
         "total_violations": result["total_violations"],
         "unconnected_items": result["unconnected_items"],
@@ -312,6 +403,7 @@ def _require_drc(client: McpClient, board: Path, output_dir: Path, *, kicad_cli:
         "errors": result["errors"],
         "warnings": result["warnings"],
         "violations": normalized,
+        "connector_unconnected_endpoints": connector_endpoints,
         "report_path": report["path"],
         "report_sha256": report["sha256"],
         "report_command": report["command"],
@@ -319,6 +411,8 @@ def _require_drc(client: McpClient, board: Path, output_dir: Path, *, kicad_cli:
 
 
 def _require_position_export_without_connectors(client: McpClient, board: Path, output: Path) -> dict[str, Any]:
+    if output.exists():
+        raise RuntimeError(f"position output already exists: {output}")
     client.call_tool(
         "export_position_file",
         {
@@ -346,6 +440,8 @@ def _require_position_export_without_connectors(client: McpClient, board: Path, 
 
 
 def _export_back_svg(board: Path, output: Path, *, kicad_cli: Path) -> dict[str, Any]:
+    if output.exists():
+        raise RuntimeError(f"back SVG output already exists: {output}")
     command = [
         str(kicad_cli),
         "pcb",
@@ -380,9 +476,12 @@ def acceptance_record(
     output_dir: Path,
     kicad_cli: Path | None = None,
 ) -> dict[str, Any]:
+    board_hash_before = hashlib.sha256(board.read_bytes()).hexdigest()
     require_pcb_acceptance_capabilities(client)
-    board_hash = hashlib.sha256(board.read_bytes()).hexdigest()
     output_dir.mkdir(parents=True, exist_ok=True)
+    for output in (output_dir / "drc.rpt", output_dir / "positions.csv", output_dir / "back.svg"):
+        if output.exists():
+            raise RuntimeError(f"acceptance output already exists: {output}")
     resolved_kicad_cli = resolve_kicad_cli(kicad_cli)
     pose = _require_connector_pose_and_graphics(client, board)
     pads = _require_connector_pad_nets(client, board)
@@ -391,10 +490,21 @@ def acceptance_record(
         client, board, output_dir / "positions.csv"
     )
     svg = _export_back_svg(board, output_dir / "back.svg", kicad_cli=resolved_kicad_cli)
+    board_hash_after = hashlib.sha256(board.read_bytes()).hexdigest()
+    if board_hash_after != board_hash_before:
+        raise RuntimeError(
+            "board changed during acceptance: "
+            f"before={board_hash_before}, after={board_hash_after}"
+        )
     return {
         "git_sha": _git_sha(),
         "board": str(board.resolve()),
-        "board_sha256": board_hash,
+        "board_sha256": board_hash_before,
+        "board_integrity": {
+            "sha256_before": board_hash_before,
+            "sha256_after": board_hash_after,
+            "equal": board_hash_before == board_hash_after,
+        },
         "coverage": {
             "expected_refs": 152,
             "connector_pad_nets": 23,
