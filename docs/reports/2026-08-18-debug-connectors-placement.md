@@ -48,6 +48,20 @@ placement evidence to preserve here is:
   - `J6`: `SW45` at `2.499404 mm`
   - nearest connector-to-connector courtyard: `J6 -> J1` at `2.460000 mm`
 
+## Placement selection provenance
+
+The planned bounded search around the committed L5 legacy-test-point centroids
+was exhausted. In the frozen order `J1..J6`, 17 offsets, then rotations
+`0/90/180/270`, all `408` candidate poses failed the initial board-access-bound
+gate with `board_max_y`: the source test points were outside the production
+board outline (`y max = 95.25 mm`), and even the largest negative Y offset was
+only `-10 mm`. There was no first passing candidate.
+
+The coordinates in `FROZEN_CONNECTOR_PLACEMENTS` therefore are not algorithm
+output. They are a documented design deviation: the user later approved the
+reviewed placement override, which was then validated by the access-envelope,
+courtyard-clearance, and DRC evidence recorded in this report.
+
 ## Frozen Geometry
 
 The report preserves both the placed courtyard bounds and the model-derived
