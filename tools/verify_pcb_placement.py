@@ -142,5 +142,189 @@ class SocketPlacementPlanTest(unittest.TestCase):
                 self.assertEqual(layer, placement.layer)
 
 
+class ConnectorPlacementPlanTest(unittest.TestCase):
+    def test_connector_placement_rejects_ambiguous_rotation_or_layer_at_construction(self):
+        from tools.lh60_design.pcb import ConnectorPlacement
+
+        with self.assertRaisesRegex(ValueError, "0 or 180"):
+            ConnectorPlacement("J1", 3, 10.0, 10.0, 90.0)
+        with self.assertRaisesRegex(ValueError, "B.Cu"):
+            ConnectorPlacement("J1", 3, 10.0, 10.0, 0.0, layer="F.Cu")
+
+    def test_frozen_plan_groups_six_headers_on_the_back_with_clear_access(self):
+        from tools.lh60_design.pcb import frozen_connector_placements
+
+        plan = frozen_connector_placements()
+        self.assertEqual(
+            [placement.reference for placement in plan],
+            ["J1", "J2", "J3", "J4", "J5", "J6"],
+        )
+        self.assertEqual(
+            [placement.pin_count for placement in plan],
+            [3, 5, 5, 4, 3, 3],
+        )
+        self.assertTrue(all(placement.layer == "B.Cu" for placement in plan))
+        self.assertTrue(all(placement.rotation_deg in (0.0, 180.0) for placement in plan))
+        self.assertTrue(
+            all(
+                coordinate * 2 == round(coordinate * 2)
+                for placement in plan
+                for coordinate in (placement.x_mm, placement.y_mm)
+            )
+        )
+        self.assertEqual(
+            [(p.reference, p.x_mm, p.y_mm, p.rotation_deg) for p in plan],
+            [
+                ("J1", 282.5, 36.0, 0.0),
+                ("J2", 77.5, 92.0, 0.0),
+                ("J3", 107.5, 92.0, 0.0),
+                ("J4", 3.0, 49.5, 0.0),
+                ("J5", 3.0, 55.5, 180.0),
+                ("J6", 282.5, 42.0, 180.0),
+            ],
+        )
+        self.assertEqual(
+            [placement.pin1_direction for placement in plan],
+            ["south", "south", "south", "south", "north", "north"],
+        )
+
+        for placement in plan:
+            with self.subTest(reference=placement.reference):
+                envelope = placement.access_envelope()
+                self.assertGreaterEqual(envelope.min_x, 0.5)
+                self.assertGreaterEqual(envelope.min_y, 0.5)
+                self.assertLessEqual(envelope.max_x, 285.25)
+                self.assertLessEqual(envelope.max_y, 94.75)
+                self.assertEqual(placement.extraction_clearance_mm, 15.0)
+
+        for index, first in enumerate(plan):
+            for second in plan[index + 1 :]:
+                with self.subTest(first=first.reference, second=second.reference):
+                    self.assertGreaterEqual(
+                        first.access_envelope().distance_to(second.access_envelope()),
+                        1.0,
+                    )
+
+    def test_apply_sets_each_header_pose_then_idempotent_back_side(self):
+        from tools.lh60_design.pcb import (
+            apply_connector_placements,
+            frozen_connector_placements,
+        )
+
+        class FakeClient:
+            def __init__(self, *, flip_changed=True):
+                self.calls = []
+                self.flip_changed = flip_changed
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return {
+                    "move_component": {},
+                    "rotate_component": {},
+                    "flip_component": {},
+                }
+
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                placement = next(
+                    item
+                    for item in frozen_connector_placements()
+                    if item.reference == arguments["reference"]
+                )
+                if name == "move_component":
+                    return {
+                        "moved": placement.reference,
+                        "x": placement.x_mm,
+                        "y": placement.y_mm,
+                        "source": "file",
+                    }
+                if name == "rotate_component":
+                    return {
+                        "rotated": placement.reference,
+                        "rotation": placement.rotation_deg,
+                        "source": "file",
+                    }
+                return {
+                    "flipped": placement.reference,
+                    "layer": "B.Cu",
+                    "changed": self.flip_changed,
+                    "source": "file",
+                }
+
+        client = FakeClient()
+        applied = apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
+        plan = frozen_connector_placements()
+
+        self.assertEqual(client.calls[0], ("load", "pcb_components"))
+        self.assertEqual(len(client.calls), 1 + 3 * len(plan))
+        self.assertEqual([item["reference"] for item in applied], [p.reference for p in plan])
+        for index, placement in enumerate(plan):
+            move, rotate, flip = client.calls[1 + index * 3 : 4 + index * 3]
+            self.assertEqual(
+                move,
+                (
+                    "move_component",
+                    {
+                        "board": "/tmp/lh60.kicad_pcb",
+                        "reference": placement.reference,
+                        "x": placement.x_mm,
+                        "y": placement.y_mm,
+                    },
+                ),
+            )
+            self.assertEqual(
+                rotate,
+                (
+                    "rotate_component",
+                    {
+                        "board": "/tmp/lh60.kicad_pcb",
+                        "reference": placement.reference,
+                        "rotation": placement.rotation_deg,
+                    },
+                ),
+            )
+            self.assertEqual(
+                flip,
+                (
+                    "flip_component",
+                    {
+                        "board": "/tmp/lh60.kicad_pcb",
+                        "reference": placement.reference,
+                        "layer": "B.Cu",
+                    },
+                ),
+            )
+
+        idempotent = FakeClient(flip_changed=False)
+        second = apply_connector_placements(idempotent, "/tmp/lh60.kicad_pcb")
+        self.assertTrue(all(item["flip_changed"] is False for item in second))
+
+    def test_apply_refuses_missing_schema_or_non_file_response(self):
+        from tools.lh60_design.pcb import apply_connector_placements
+
+        class MissingFlipClient:
+            def tool_schemas(self, _toolset):
+                return {"move_component": {}, "rotate_component": {}}
+
+        with self.assertRaisesRegex(RuntimeError, "flip_component"):
+            apply_connector_placements(MissingFlipClient(), "/tmp/lh60.kicad_pcb")
+
+        class LiveMoveClient:
+            def tool_schemas(self, _toolset):
+                return {
+                    "move_component": {},
+                    "rotate_component": {},
+                    "flip_component": {},
+                }
+
+            def call_tool_json(self, name, arguments):
+                if name == "move_component":
+                    return {"moved": arguments["reference"], "source": "ipc"}
+                raise AssertionError("must stop before rotate/flip")
+
+        with self.assertRaisesRegex(RuntimeError, "closed-board"):
+            apply_connector_placements(LiveMoveClient(), "/tmp/lh60.kicad_pcb")
+
+
 if __name__ == "__main__":
     unittest.main()
