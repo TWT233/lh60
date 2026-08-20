@@ -229,6 +229,13 @@ def queue_pre_save_gates(client, *, references=None, connector_positions=None):
     for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
         client.queue_json("get_component_pads", connector_pad_payload(reference))
     client.queue_json(
+        "update_pcb_from_schematic",
+        sync_plan_payload(
+            status="noop", revision="rev-pre-save-noop", board_only_planned=0,
+            board_only_applied=0, skipped_applied=0, added_applied=0,
+        ),
+    )
+    client.queue_json(
         "get_component_list",
         component_list_payload(
             final_board_refs(),
@@ -238,12 +245,36 @@ def queue_pre_save_gates(client, *, references=None, connector_positions=None):
     for net_name in TP_NETS.values():
         client.queue_json("query_traces", empty_trace_payload(net_name))
     client.queue_json(
-        "update_pcb_from_schematic",
-        sync_plan_payload(
-            status="noop", revision="rev-pre-save-noop", board_only_planned=0,
-            board_only_applied=0, skipped_applied=0, added_applied=0,
+        "get_component_list",
+        component_list_payload(
+            final_board_refs(),
+            connector_positions=connector_positions,
         ),
     )
+
+
+def pre_save_gate_failure_inventory(
+    *,
+    layer_by_reference=None,
+    x_by_reference=None,
+    y_by_reference=None,
+):
+    payload = component_list_payload(
+        final_board_refs(),
+        connector_positions=staged_connector_positions(),
+    )
+    layer_by_reference = {} if layer_by_reference is None else layer_by_reference
+    x_by_reference = {} if x_by_reference is None else x_by_reference
+    y_by_reference = {} if y_by_reference is None else y_by_reference
+    for component in payload["components"]:
+        reference = component["reference"]
+        if reference in layer_by_reference:
+            component["layer"] = layer_by_reference[reference]
+        if reference in x_by_reference:
+            component["x"] = x_by_reference[reference]
+        if reference in y_by_reference:
+            component["y"] = y_by_reference[reference]
+    return payload
 
 
 def tp_refs():
@@ -1412,6 +1443,17 @@ class PcbSyncContractTest(unittest.TestCase):
         for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
             client.queue_json("get_component_pads", connector_pad_payload(reference))
         client.queue_json(
+            "update_pcb_from_schematic",
+            sync_plan_payload(
+                status="noop",
+                revision="rev-pre-save-noop",
+                board_only_planned=0,
+                board_only_applied=0,
+                skipped_applied=0,
+                added_applied=0,
+            ),
+        )
+        client.queue_json(
             "get_component_list",
             component_list_payload(
                 final_board_refs(),
@@ -1421,14 +1463,10 @@ class PcbSyncContractTest(unittest.TestCase):
         for net_name in TP_NETS.values():
             client.queue_json("query_traces", empty_trace_payload(net_name))
         client.queue_json(
-            "update_pcb_from_schematic",
-            sync_plan_payload(
-                status="noop",
-                revision="rev-pre-save-noop",
-                board_only_planned=0,
-                board_only_applied=0,
-                skipped_applied=0,
-                added_applied=0,
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=pre_save_positions,
             ),
         )
         client.queue_raw("save_project", raw_text_result("Board saved successfully."))
@@ -2217,6 +2255,13 @@ class PcbSyncContractTest(unittest.TestCase):
             client,
             pre_save_connector_positions=pre_save_positions,
         )
+        client.queue_json(
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=pre_save_positions,
+            ),
+        )
 
         hash_values = iter(
             (
@@ -2231,6 +2276,202 @@ class PcbSyncContractTest(unittest.TestCase):
                 RuntimeError,
                 "J1 staged connector must remain outside board bounds",
             ):
+                sync_debug_connectors(client, SCHEMATIC, BOARD, baseline)
+        self.assertFalse(any(name == "save_project" for name, _ in client.calls))
+
+    def test_sync_rejects_pre_save_connector_gate_failures_before_save(self):
+        import tools.sync_debug_connectors as pcb_sync
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        baseline = baseline_fixture()
+        cases = (
+            (
+                "layer",
+                pre_save_gate_failure_inventory(layer_by_reference={"J1": "B.Cu"}),
+                "J1 layer mismatch: expected F.Cu",
+            ),
+            (
+                "non-finite x",
+                pre_save_gate_failure_inventory(x_by_reference={"J1": float("nan")}),
+                "J1 component x must be a finite number",
+            ),
+            (
+                "non-finite y",
+                pre_save_gate_failure_inventory(y_by_reference={"J1": float("inf")}),
+                "J1 component y must be a finite number",
+            ),
+        )
+        for label, final_inventory, expected_error in cases:
+            with self.subTest(label=label):
+                client = FakeClient()
+                queue_pre_delete_live_state(client)
+                queue_rebind_triplet(client)
+                queue_rebind_readback(client)
+                client.queue_json(
+                    "update_pcb_from_schematic",
+                    sync_plan_payload(
+                        status="ready",
+                        revision="rev-before",
+                        board_only_planned=23,
+                        board_only_applied=0,
+                        skipped_applied=0,
+                        added_applied=0,
+                    ),
+                )
+                for reference in sorted(tp_refs(), key=lambda item: int(item[2:])):
+                    client.queue_json("delete_component", {"deleted": reference})
+                client.queue_json("get_component_list", component_list_payload(shared_refs()))
+                client.queue_json(
+                    "update_pcb_from_schematic",
+                    sync_plan_payload(
+                        status="ready",
+                        revision="rev-after",
+                        board_only_planned=0,
+                        board_only_applied=0,
+                        skipped_applied=0,
+                        added_applied=0,
+                    ),
+                    sync_plan_payload(
+                        status="applied",
+                        revision="rev-after",
+                        board_only_planned=0,
+                        board_only_applied=0,
+                        skipped_applied=3,
+                        added_applied=6,
+                        undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
+                    ),
+                )
+                client.queue_json(
+                    "get_component_list",
+                    component_list_payload(
+                        final_board_refs(),
+                        connector_positions=staged_connector_positions(),
+                    ),
+                )
+                for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
+                    client.queue_json("get_component_pads", connector_pad_payload(reference))
+                client.queue_json(
+                    "get_component_list",
+                    component_list_payload(
+                        final_board_refs(),
+                        connector_positions=staged_connector_positions(),
+                    ),
+                )
+                client.queue_json(
+                    "update_pcb_from_schematic",
+                    sync_plan_payload(
+                        status="noop",
+                        revision="rev-pre-save-noop",
+                        board_only_planned=0,
+                        board_only_applied=0,
+                        skipped_applied=0,
+                        added_applied=0,
+                    ),
+                )
+                for net_name in TP_NETS.values():
+                    client.queue_json("query_traces", empty_trace_payload(net_name))
+                client.queue_json("get_component_list", final_inventory)
+
+                hash_values = iter(
+                    (
+                        pcb_sync.EXPECTED_SCHEMATIC_HASH,
+                        pcb_sync.EXPECTED_BOARD_HASH,
+                    )
+                )
+                with mock.patch(
+                    "tools.sync_debug_connectors._sha256", side_effect=lambda _path: next(hash_values)
+                ):
+                    with self.assertRaisesRegex(RuntimeError, expected_error):
+                        sync_debug_connectors(client, SCHEMATIC, BOARD, baseline)
+                self.assertFalse(any(name == "save_project" for name, _ in client.calls))
+
+    def test_sync_binds_pre_save_gate_to_final_inventory_snapshot(self):
+        import tools.sync_debug_connectors as pcb_sync
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        baseline = baseline_fixture()
+        client = FakeClient()
+        queue_pre_delete_live_state(client)
+        queue_rebind_triplet(client)
+        queue_rebind_readback(client)
+        client.queue_json(
+            "update_pcb_from_schematic",
+            sync_plan_payload(
+                status="ready",
+                revision="rev-before",
+                board_only_planned=23,
+                board_only_applied=0,
+                skipped_applied=0,
+                added_applied=0,
+            ),
+        )
+        for reference in sorted(tp_refs(), key=lambda item: int(item[2:])):
+            client.queue_json("delete_component", {"deleted": reference})
+        client.queue_json("get_component_list", component_list_payload(shared_refs()))
+        client.queue_json(
+            "update_pcb_from_schematic",
+            sync_plan_payload(
+                status="ready",
+                revision="rev-after",
+                board_only_planned=0,
+                board_only_applied=0,
+                skipped_applied=0,
+                added_applied=0,
+            ),
+            sync_plan_payload(
+                status="applied",
+                revision="rev-after",
+                board_only_planned=0,
+                board_only_applied=0,
+                skipped_applied=3,
+                added_applied=6,
+                undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
+            ),
+        )
+        client.queue_json(
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=staged_connector_positions(),
+            ),
+        )
+        for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
+            client.queue_json("get_component_pads", connector_pad_payload(reference))
+        client.queue_json(
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=staged_connector_positions(),
+            ),
+        )
+        client.queue_json(
+            "update_pcb_from_schematic",
+            sync_plan_payload(
+                status="noop",
+                revision="rev-pre-save-noop",
+                board_only_planned=0,
+                board_only_applied=0,
+                skipped_applied=0,
+                added_applied=0,
+            ),
+        )
+        for net_name in TP_NETS.values():
+            client.queue_json("query_traces", empty_trace_payload(net_name))
+        client.queue_json(
+            "get_component_list",
+            pre_save_gate_failure_inventory(layer_by_reference={"J1": "B.Cu"}),
+        )
+
+        hash_values = iter(
+            (
+                pcb_sync.EXPECTED_SCHEMATIC_HASH,
+                pcb_sync.EXPECTED_BOARD_HASH,
+            )
+        )
+        with mock.patch(
+            "tools.sync_debug_connectors._sha256", side_effect=lambda _path: next(hash_values)
+        ):
+            with self.assertRaisesRegex(RuntimeError, "J1 layer mismatch: expected F.Cu"):
                 sync_debug_connectors(client, SCHEMATIC, BOARD, baseline)
         self.assertFalse(any(name == "save_project" for name, _ in client.calls))
 

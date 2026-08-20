@@ -377,14 +377,15 @@ def _require_tp_pads(client: McpClient, board: Path) -> dict[str, dict[str, Any]
 def _require_empty_traces(
     client: McpClient,
     board: Path,
-    expected_references: frozenset[str] | set[str],
+    expected_references: frozenset[str] | set[str] | None,
     label: str,
     board_nets: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     # query_traces currently ignores its board argument and uses the active IPC
     # board.  Bind the following batch to the intended live board immediately
     # before querying any net.
-    _require_exact_references(client, board, expected_references, label)
+    if expected_references is not None:
+        _require_exact_references(client, board, expected_references, label)
     traces = {}
     if set(board_nets) != set(TP_NETS.values()):
         raise RuntimeError("board-net trace map does not cover the frozen debug nets")
@@ -1039,20 +1040,8 @@ def sync_debug_connectors(
     if apply_result["plan_revision"] != second_dry["plan_revision"]:
         raise RuntimeError("apply result plan_revision differs from second dry run")
 
-    pre_save_inventory = _require_exact_inventory(client, board, FINAL_BOARD_REFS, "final 152")
-    pre_save_refs = pre_save_inventory["references"]
+    _require_exact_inventory(client, board, FINAL_BOARD_REFS, "final 152")
     pre_save_connector_pads = _require_connector_pads(client, board)
-    pre_save_traces = _require_empty_traces(
-        client,
-        board,
-        FINAL_BOARD_REFS,
-        "pre-save trace binding 152",
-        {
-            pad["net"]: pad["board_net"]
-            for connector in pre_save_connector_pads.values()
-            for pad in connector["pads"]
-        },
-    )
     pre_save_noop = _validate_sync_plan(
         client.call_tool_json(
             "update_pcb_from_schematic",
@@ -1065,6 +1054,19 @@ def sync_debug_connectors(
         expected_skipped_applied=0,
         require_undo=False,
     )
+    pre_save_traces = _require_empty_traces(
+        client,
+        board,
+        FINAL_BOARD_REFS,
+        "pre-save trace binding 152",
+        {
+            pad["net"]: pad["board_net"]
+            for connector in pre_save_connector_pads.values()
+            for pad in connector["pads"]
+        },
+    )
+    pre_save_inventory = _require_exact_inventory(client, board, FINAL_BOARD_REFS, "final 152")
+    pre_save_refs = pre_save_inventory["references"]
     pre_save_connectors = _require_connector_instances(pre_save_inventory)
     client.call_tool("save_project", {})
     after_schematic_hash = _sha256(schematic)
