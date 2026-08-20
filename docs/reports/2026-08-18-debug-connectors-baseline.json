@@ -1,11 +1,11 @@
 {
-  "board": "/data00/home/wangqiyilang/playground/lh60/.worktree/debug-connectors-pcb-sync/lh60/lh60.kicad_pcb",
+  "board": "/data00/home/wangqiyilang/playground/lh60/.worktree/debug-connectors-r5-production/lh60/lh60.kicad_pcb",
   "board_hash": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
   "board_info": {
     "company": "",
     "copper_layer_count": 2,
     "date": "",
-    "file": "/data00/home/wangqiyilang/playground/lh60/.worktree/debug-connectors-pcb-sync/lh60/lh60.kicad_pcb",
+    "file": "/data00/home/wangqiyilang/playground/lh60/.worktree/debug-connectors-r5-production/lh60/lh60.kicad_pcb",
     "layer_count": 18,
     "net_count": 93,
     "paper": "A4",
@@ -1804,6 +1804,15 @@
       {
         "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
         "pos": {
+          "x": 199.22625,
+          "y": 83.015
+        },
+        "rule": "hole_clearance",
+        "severity": "error"
+      },
+      {
+        "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
+        "pos": {
           "x": 175.87625,
           "y": 85.965
         },
@@ -1822,24 +1831,6 @@
       {
         "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
         "pos": {
-          "x": 199.22625,
-          "y": 83.015
-        },
-        "rule": "hole_clearance",
-        "severity": "error"
-      },
-      {
-        "description": "Items shorting two nets (nets /KEY_63 and /KEY_65)",
-        "pos": {
-          "x": 197.12625,
-          "y": 91.865
-        },
-        "rule": "shorting_items",
-        "severity": "error"
-      },
-      {
-        "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
-        "pos": {
           "x": 197.12625,
           "y": 85.965
         },
@@ -1853,24 +1844,6 @@
           "y": 85.965
         },
         "rule": "hole_clearance",
-        "severity": "error"
-      },
-      {
-        "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
-        "pos": {
-          "x": 186.47625,
-          "y": 85.965
-        },
-        "rule": "hole_clearance",
-        "severity": "error"
-      },
-      {
-        "description": "Items shorting two nets (nets /ROW6 and /COL3)",
-        "pos": {
-          "x": 221.674999,
-          "y": 91.475
-        },
-        "rule": "shorting_items",
         "severity": "error"
       },
       {
@@ -1883,12 +1856,12 @@
         "severity": "error"
       },
       {
-        "description": "Items shorting two nets (nets /KEY_12 and /KEY_64)",
+        "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
         "pos": {
-          "x": 175.87625,
-          "y": 88.915
+          "x": 186.47625,
+          "y": 85.965
         },
-        "rule": "shorting_items",
+        "rule": "hole_clearance",
         "severity": "error"
       },
       {
@@ -1898,33 +1871,6 @@
           "y": 85.965
         },
         "rule": "hole_clearance",
-        "severity": "error"
-      },
-      {
-        "description": "Items shorting two nets (nets /COL2 and /KEY_64)",
-        "pos": {
-          "x": 177.97625,
-          "y": 88.915
-        },
-        "rule": "shorting_items",
-        "severity": "error"
-      },
-      {
-        "description": "Items shorting two nets (nets /KEY_13 and /KEY_64)",
-        "pos": {
-          "x": 175.87625,
-          "y": 91.865
-        },
-        "rule": "shorting_items",
-        "severity": "error"
-      },
-      {
-        "description": "Items shorting two nets (nets /COL3 and /KEY_64)",
-        "pos": {
-          "x": 177.97625,
-          "y": 91.865
-        },
-        "rule": "shorting_items",
         "severity": "error"
       },
       {
@@ -1950,6 +1896,15 @@
         "pos": {
           "x": 195.625,
           "y": 90.425
+        },
+        "rule": "shorting_items",
+        "severity": "error"
+      },
+      {
+        "description": "Items shorting two nets (nets /KEY_63 and /KEY_65)",
+        "pos": {
+          "x": 197.12625,
+          "y": 91.865
         },
         "rule": "shorting_items",
         "severity": "error"
@@ -1982,19 +1937,28 @@
         "severity": "error"
       },
       {
-        "description": "Items shorting two nets (nets /KEY_30 and /ROW6)",
+        "description": "Items shorting two nets (nets /ROW6 and /COL3)",
         "pos": {
-          "x": 184.37625,
-          "y": 83.015
+          "x": 221.674999,
+          "y": 91.475
         },
         "rule": "shorting_items",
         "severity": "error"
       },
       {
-        "description": "Items shorting two nets (nets /COL0 and /ROW6)",
+        "description": "Items shorting two nets (nets /KEY_12 and /KEY_64)",
         "pos": {
-          "x": 186.47625,
-          "y": 83.015
+          "x": 175.87625,
+          "y": 88.915
+        },
+        "rule": "shorting_items",
+        "severity": "error"
+      },
+      {
+        "description": "Items shorting two nets (nets /COL2 and /KEY_64)",
+        "pos": {
+          "x": 177.97625,
+          "y": 88.915
         },
         "rule": "shorting_items",
         "severity": "error"
@@ -2009,12 +1973,48 @@
         "severity": "error"
       },
       {
+        "description": "Items shorting two nets (nets /KEY_30 and /ROW6)",
+        "pos": {
+          "x": 184.37625,
+          "y": 83.015
+        },
+        "rule": "shorting_items",
+        "severity": "error"
+      },
+      {
         "description": "Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0358 mm)",
         "pos": {
           "x": 182.22625,
           "y": 83.015
         },
         "rule": "hole_clearance",
+        "severity": "error"
+      },
+      {
+        "description": "Items shorting two nets (nets /COL0 and /ROW6)",
+        "pos": {
+          "x": 186.47625,
+          "y": 83.015
+        },
+        "rule": "shorting_items",
+        "severity": "error"
+      },
+      {
+        "description": "Items shorting two nets (nets /KEY_13 and /KEY_64)",
+        "pos": {
+          "x": 175.87625,
+          "y": 91.865
+        },
+        "rule": "shorting_items",
+        "severity": "error"
+      },
+      {
+        "description": "Items shorting two nets (nets /COL3 and /KEY_64)",
+        "pos": {
+          "x": 177.97625,
+          "y": 91.865
+        },
+        "rule": "shorting_items",
         "severity": "error"
       },
       {
@@ -2488,8 +2488,8 @@
       {
         "description": "Front solder mask aperture bridges items with different nets",
         "pos": {
-          "x": 175.475,
-          "y": 85.725
+          "x": 195.625,
+          "y": 90.425
         },
         "rule": "solder_mask_bridge",
         "severity": "error"
@@ -2497,8 +2497,8 @@
       {
         "description": "Front solder mask aperture bridges items with different nets",
         "pos": {
-          "x": 195.625,
-          "y": 90.425
+          "x": 175.475,
+          "y": 85.725
         },
         "rule": "solder_mask_bridge",
         "severity": "error"
@@ -6574,7 +6574,7 @@
     ],
     "warnings": 73
   },
-  "git_sha": "4e1de2396970fa35c3e4fea743f22da636ce7037",
+  "git_sha": "904d6cfdf9d350d545dcce0d611667a51b1a5d25",
   "manufacturing": {
     "board_info": {
       "copper_layers": 2,
@@ -6617,6 +6617,31 @@
       },
       {
         "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_63 and /KEY_65)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_33 and /ROW6)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
         "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_65 and /COL2)",
         "severity": "error"
       },
@@ -6647,32 +6672,7 @@
       },
       {
         "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_63 and /KEY_65)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
         "issue": "DRC [shorting_items]: Items shorting two nets (nets /ROW6 and /COL3)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_33 and /ROW6)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
         "severity": "error"
       },
       {
@@ -6697,22 +6697,22 @@
       },
       {
         "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_30 and /ROW6)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
-        "issue": "DRC [shorting_items]: Items shorting two nets (nets /COL0 and /ROW6)",
-        "severity": "error"
-      },
-      {
-        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
         "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)",
         "severity": "error"
       },
       {
         "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [shorting_items]: Items shorting two nets (nets /KEY_30 and /ROW6)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
         "issue": "DRC [hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0358 mm)",
+        "severity": "error"
+      },
+      {
+        "fix": "Fix in the PCB editor, or waive the rule deliberately; run_drc lists every violation with its location",
+        "issue": "DRC [shorting_items]: Items shorting two nets (nets /COL0 and /ROW6)",
         "severity": "error"
       },
       {
@@ -8885,8 +8885,8 @@
     "verdict": "NOT READY"
   },
   "schema_version": 1,
-  "schematic": "/data00/home/wangqiyilang/playground/lh60/.worktree/debug-connectors-pcb-sync/lh60/lh60.kicad_sch",
-  "schematic_hash": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+  "schematic": "/data00/home/wangqiyilang/playground/lh60/.worktree/debug-connectors-r5-production/lh60/lh60.kicad_sch",
+  "schematic_hash": "5322b7f21c10854aef14f7ca92ac35353f9fb9b7abd215451b4b4678a41aa1ac",
   "tp_nets": {
     "TP1": "VSYS",
     "TP10": "COL6",
