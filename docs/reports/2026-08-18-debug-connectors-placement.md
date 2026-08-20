@@ -134,24 +134,33 @@ The delivery artifact is this repo-local report plus the repo-local checker
 entrypoint. The cache directory above is historical provenance from one
 production run, not the long-term delivery surface.
 
-Canonical rerun contract for this report family depends on first cherry-picking
-`task/l6-pcb-acceptance` HEAD `5466398271ab4f01646ab1a0bb46561e779c1c61`
-into the integration branch. Only after that integration step is complete does
-the command below become executable on the integration branch; the final
-integrated flow is expected to follow that order.
+The checker and its live rerun path are already integrated as of integration
+HEAD `3fcf2bba3fe953f8cc2b619acff5c967c005bca5`. The final integration HEAD may
+advance beyond that commit; run the exact command below from that final HEAD.
+No branch-local cherry-pick or other stale prerequisite is required.
+
+A rerun validates the current connector placement and acceptance contracts,
+then emits fresh board/DRC/CSV/SVG hashes and digests. It does not compare those
+values with the historical digests recorded above and does not reproduce the
+historical `save_count`. The `--output-dir` receives `drc.rpt`, `positions.csv`,
+and `back.svg`; the aggregate JSON is printed to stdout and must be redirected
+to `acceptance.json` in the same fresh evidence root. Use a distinct root for
+every future run, never one of the historical evidence roots in this report.
 
 ```bash
 # Preconditions:
 # 1. KiCad must be running with the target production board open.
 # 2. The Konnect IPC socket must be reachable from the deployed binary.
-# 3. The checker writes fresh evidence paths chosen by the operator; those
-#    outputs become the new run artifacts, not this historical cache path.
+# 3. Choose a new, untracked evidence root for this run. Do not reuse a
+#    historical root or commit the generated outputs.
+evidence_root=$(mktemp -d /tmp/lh60-pcb-acceptance.XXXXXX)
 PYTHONDONTWRITEBYTECODE=1 python -m tools.check_pcb_acceptance \
   --production \
-  --output-dir docs/reports/debug-connectors-pcb-acceptance \
+  --output-dir "$evidence_root" \
   --board lh60.kicad_pcb \
   --konnect ~/.local/bin/konnect \
-  --kicad-cli ~/.local/bin/kicad-cli
+  --kicad-cli ~/.local/bin/kicad-cli \
+  > "$evidence_root/acceptance.json"
 python -m compileall -q tools
 git diff --check
 ```
@@ -159,9 +168,9 @@ git diff --check
 This report preserves `save_count == 1` as immutable historical production
 evidence from the run rooted at
 `/data00/home/wangqiyilang/.cache/r3-identity-rebind/l6-production.PN3Aga`.
-A read-only checker rerun is expected to validate placement, hashes, digests,
-and exported tables, but it does not retroactively reproduce that original
-write count.
+A read-only checker rerun validates the current placement and exported tables
+and emits their current hashes and digests, but it neither compares historical
+digests nor retroactively reproduces that original write count.
 
 Historical provenance for the recorded production run should still be verified
 against:
@@ -186,5 +195,6 @@ against:
   `163` DRC violations and `367` unconnected items.
 - Connector placement evidence is valid for access and orientation, but not for
   a released manufacturing package.
-- Any future rerun must preserve the same evidence roots and update this report
-  additively instead of substituting a transient path.
+- Every future rerun must create and preserve its own distinct fresh evidence
+  root. The historical root remains immutable provenance and must never be
+  reused or overwritten.

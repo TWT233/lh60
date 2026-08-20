@@ -212,9 +212,12 @@ class ConnectorPlacementPlanTest(unittest.TestCase):
         )
 
         class FakeClient:
-            def __init__(self, *, flip_changed=True):
+            def __init__(self):
                 self.calls = []
-                self.flip_changed = flip_changed
+                self.layers = {
+                    placement.reference: "F.Cu"
+                    for placement in frozen_connector_placements()
+                }
 
             def tool_schemas(self, toolset):
                 self.calls.append(("load", toolset))
@@ -244,60 +247,129 @@ class ConnectorPlacementPlanTest(unittest.TestCase):
                         "rotation": placement.rotation_deg,
                         "source": "file",
                     }
+                changed = self.layers[placement.reference] != arguments["layer"]
+                self.layers[placement.reference] = arguments["layer"]
                 return {
                     "flipped": placement.reference,
-                    "layer": "B.Cu",
-                    "changed": self.flip_changed,
+                    "layer": self.layers[placement.reference],
+                    "changed": changed,
                     "source": "file",
                 }
 
         client = FakeClient()
-        applied = apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
+        first = apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
+        second = apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
         plan = frozen_connector_placements()
 
-        self.assertEqual(client.calls[0], ("load", "pcb_components"))
-        self.assertEqual(len(client.calls), 1 + 3 * len(plan))
-        self.assertEqual([item["reference"] for item in applied], [p.reference for p in plan])
-        for index, placement in enumerate(plan):
-            move, rotate, flip = client.calls[1 + index * 3 : 4 + index * 3]
+        self.assertEqual(len(client.calls), 2 * (1 + 3 * len(plan)))
+        for pass_index, (applied, expected_changed) in enumerate(
+            ((first, True), (second, False))
+        ):
+            offset = pass_index * (1 + 3 * len(plan))
+            self.assertEqual(client.calls[offset], ("load", "pcb_components"))
             self.assertEqual(
-                move,
-                (
-                    "move_component",
-                    {
-                        "board": "/tmp/lh60.kicad_pcb",
-                        "reference": placement.reference,
-                        "x": placement.x_mm,
-                        "y": placement.y_mm,
-                    },
-                ),
+                [item["reference"] for item in applied],
+                [placement.reference for placement in plan],
             )
-            self.assertEqual(
-                rotate,
-                (
-                    "rotate_component",
-                    {
-                        "board": "/tmp/lh60.kicad_pcb",
-                        "reference": placement.reference,
-                        "rotation": placement.rotation_deg,
-                    },
-                ),
+            self.assertTrue(all(item["layer"] == "B.Cu" for item in applied))
+            self.assertTrue(
+                all(item["flip_changed"] is expected_changed for item in applied)
             )
-            self.assertEqual(
-                flip,
-                (
-                    "flip_component",
-                    {
-                        "board": "/tmp/lh60.kicad_pcb",
-                        "reference": placement.reference,
-                        "layer": "B.Cu",
-                    },
-                ),
-            )
+            for index, placement in enumerate(plan):
+                move, rotate, flip = client.calls[
+                    offset + 1 + index * 3 : offset + 4 + index * 3
+                ]
+                self.assertEqual(
+                    move,
+                    (
+                        "move_component",
+                        {
+                            "board": "/tmp/lh60.kicad_pcb",
+                            "reference": placement.reference,
+                            "x": placement.x_mm,
+                            "y": placement.y_mm,
+                        },
+                    ),
+                )
+                self.assertEqual(
+                    rotate,
+                    (
+                        "rotate_component",
+                        {
+                            "board": "/tmp/lh60.kicad_pcb",
+                            "reference": placement.reference,
+                            "rotation": placement.rotation_deg,
+                        },
+                    ),
+                )
+                self.assertEqual(
+                    flip,
+                    (
+                        "flip_component",
+                        {
+                            "board": "/tmp/lh60.kicad_pcb",
+                            "reference": placement.reference,
+                            "layer": "B.Cu",
+                        },
+                    ),
+                )
 
-        idempotent = FakeClient(flip_changed=False)
-        second = apply_connector_placements(idempotent, "/tmp/lh60.kicad_pcb")
-        self.assertTrue(all(item["flip_changed"] is False for item in second))
+        self.assertEqual(
+            client.layers,
+            {placement.reference: "B.Cu" for placement in plan},
+        )
+
+    def test_apply_rejects_flip_results_that_do_not_prove_the_target_final_state(self):
+        from tools.lh60_design.pcb import apply_connector_placements
+
+        class InvalidFlipClient:
+            def __init__(self, field, value):
+                self.field = field
+                self.value = value
+
+            def tool_schemas(self, _toolset):
+                return {
+                    "move_component": {},
+                    "rotate_component": {},
+                    "flip_component": {},
+                }
+
+            def call_tool_json(self, name, arguments):
+                reference = arguments["reference"]
+                if name == "move_component":
+                    return {
+                        "moved": reference,
+                        "x": arguments["x"],
+                        "y": arguments["y"],
+                        "source": "file",
+                    }
+                if name == "rotate_component":
+                    return {
+                        "rotated": reference,
+                        "rotation": arguments["rotation"],
+                        "source": "file",
+                    }
+                result = {
+                    "flipped": reference,
+                    "layer": "B.Cu",
+                    "changed": True,
+                    "source": "file",
+                }
+                result[self.field] = self.value
+                return result
+
+        cases = (
+            ("flipped", "J2", "flip readback mismatch"),
+            ("layer", "F.Cu", "flip readback mismatch"),
+            ("source", "ipc", "closed-board file path"),
+        )
+        for field, value, error in cases:
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(RuntimeError, error):
+                    apply_connector_placements(
+                        InvalidFlipClient(field, value),
+                        "/tmp/lh60.kicad_pcb",
+                    )
 
     def test_apply_refuses_missing_schema_or_non_file_response(self):
         from tools.lh60_design.pcb import apply_connector_placements
