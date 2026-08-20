@@ -30,7 +30,7 @@ def complete_pcb_acceptance_schemas():
         "pcb_components": {
             "get_component_list": schema(("board",), "board"),
             "get_component_pads": schema(("board", "reference"), "board", "reference"),
-            "list_board_footprint_graphics": schema(("board", "reference", "layer"), "board", "reference", "layer"),
+            "list_board_footprint_graphics": schema(("board", "reference"), "board", "reference", "layer"),
         },
         "verification": {
             "run_drc": schema(("board",), "board", "limit", "severity"),
@@ -224,6 +224,11 @@ def queue_happy_path(client):
 
 
 class PcbAcceptanceContractTest(unittest.TestCase):
+    def test_capability_gate_accepts_real_list_board_footprint_graphics_schema(self):
+        from tools.check_pcb_acceptance import require_pcb_acceptance_capabilities
+
+        require_pcb_acceptance_capabilities(FakeClient())
+
     def test_capability_gate_requires_run_drc_and_export_position_contracts(self):
         from tools.check_pcb_acceptance import require_pcb_acceptance_capabilities
 
@@ -238,6 +243,33 @@ class PcbAcceptanceContractTest(unittest.TestCase):
         schemas = complete_pcb_acceptance_schemas()
         schemas["pcb_export"] = {}
         with self.assertRaisesRegex(RuntimeError, "export_position_file"):
+            require_pcb_acceptance_capabilities(FakeClient(schemas=schemas))
+
+    def test_capability_gate_rejects_list_board_footprint_graphics_required_drift(self):
+        from tools.check_pcb_acceptance import require_pcb_acceptance_capabilities
+
+        schemas = complete_pcb_acceptance_schemas()
+        schemas["pcb_components"]["list_board_footprint_graphics"] = schema(
+            ("board",),
+            "board",
+            "reference",
+            "layer",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "list_board_footprint_graphics required inputs differ"):
+            require_pcb_acceptance_capabilities(FakeClient(schemas=schemas))
+
+    def test_capability_gate_rejects_list_board_footprint_graphics_missing_layer_property(self):
+        from tools.check_pcb_acceptance import require_pcb_acceptance_capabilities
+
+        schemas = complete_pcb_acceptance_schemas()
+        schemas["pcb_components"]["list_board_footprint_graphics"] = schema(
+            ("board", "reference"),
+            "board",
+            "reference",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "list_board_footprint_graphics missing \\['layer'\\]"):
             require_pcb_acceptance_capabilities(FakeClient(schemas=schemas))
 
     def test_acceptance_happy_path_returns_hashes_coverage_and_never_saves(self):
