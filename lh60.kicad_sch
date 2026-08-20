@@ -29716,7 +29716,7 @@
     (at 381 86.36 0)
     (unit 1)
     (in_bom yes)
-    (on_board yes)
+    (on_board no)
     (dnp no)
     (uuid "de41cb3f-8900-44b4-9281-cade5ab259a9")
     (property "Reference" "#FLG01"
@@ -29767,7 +29767,7 @@
     (at 381 106.68 0)
     (unit 1)
     (in_bom yes)
-    (on_board yes)
+    (on_board no)
     (dnp no)
     (uuid "4ffd1609-8397-4625-a0bf-6d9c9bedc884")
     (property "Reference" "#FLG02"
@@ -29818,7 +29818,7 @@
     (at 381 127 0)
     (unit 1)
     (in_bom yes)
-    (on_board yes)
+    (on_board no)
     (dnp no)
     (uuid "4a887c89-6b36-4944-9c38-50ad9191f0bd")
     (property "Reference" "#FLG03"
