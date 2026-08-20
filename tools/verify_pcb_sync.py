@@ -37,6 +37,14 @@ def complete_pcb_sync_schemas():
                 "dry_run",
                 "expected_plan_revision",
             ),
+            "rebind_pcb_schematic_identities": schema(
+                ("schematic", "board", "references"),
+                "schematic",
+                "board",
+                "references",
+                "dry_run",
+                "expected_plan_revision",
+            ),
         },
         "manufacturing": {
             "validate_for_manufacturing": schema(("board",), "board"),
@@ -68,6 +76,160 @@ def shared_refs():
     refs.update({f"SW{index}" for index in range(1, 59)})
     refs.update({f"SW{index}" for index in range(60, 77)})
     return refs
+
+
+REBIND_REFS = tuple(sorted(shared_refs()))
+
+
+def _rebind_component_contracts():
+    from tools.lh60_design.schematic import build_schematic_plan
+
+    plan = build_schematic_plan()
+    components = {component.reference: component for component in plan.components}
+    pad_nets = {reference: {} for reference in REBIND_REFS}
+    for connection in plan.connections:
+        if connection.reference in pad_nets:
+            pad_nets[connection.reference][connection.pin_number] = connection.net_name
+    return {
+        reference: {
+            "value": components[reference].value,
+            "footprint_id": components[reference].footprint,
+            "dnp": components[reference].dnp is True,
+            "pad_nets": dict(sorted(pad_nets[reference].items())),
+        }
+        for reference in REBIND_REFS
+    }
+
+
+def _rebind_uuid(index, namespace):
+    return f"{index:08x}-0000-4000-8000-{namespace:012x}"
+
+
+def rebind_change(reference):
+    index = REBIND_REFS.index(reference) + 1
+    contract = _rebind_component_contracts()[reference]
+    return {
+        "reference": reference,
+        "kiid": _rebind_uuid(index, 1),
+        "old_symbol_path": f"/{_rebind_uuid(index, 2)}",
+        "new_symbol_path": f"/{_rebind_uuid(index, 3)}",
+        **contract,
+        "preserve": {
+            "position": {"x": float(index), "y": float(index) / 2.0},
+            "rotation": 0.0,
+            "layer": "F.Cu",
+            "locked": False,
+        },
+    }
+
+
+def rebind_plan_payload(
+    *,
+    status,
+    revision,
+    requested,
+    eligible,
+    planned,
+    applied,
+    conflicts,
+    diagnostics=None,
+    changes=None,
+    undo=None,
+):
+    return {
+        "status": status,
+        "plan_revision": revision,
+        "coverage": {
+            "source": "saved_schematic_hierarchy",
+            "hierarchy_files": 1,
+            "transport": "live_kicad_ipc",
+            "atomicity": "single_kicad_undo_commit",
+            "requested": requested,
+            "eligible": eligible,
+            "planned": planned,
+            "applied": applied,
+            "conflicts": conflicts,
+        },
+        "changes": (
+            changes
+            if changes is not None
+            else [] if status == "noop" else [rebind_change(reference) for reference in REBIND_REFS]
+        ),
+        "diagnostics": [] if diagnostics is None else diagnostics,
+        "undo": undo,
+    }
+
+
+def queue_rebind_triplet(client, *, dry=None, apply=None, noop=None):
+    client.queue_json(
+        "rebind_pcb_schematic_identities",
+        dry
+        or rebind_plan_payload(
+            status="ready", revision="rebind-rev", requested=146, eligible=146,
+            planned=146, applied=0, conflicts=0,
+        ),
+        apply
+        or rebind_plan_payload(
+            status="applied", revision="rebind-rev", requested=146, eligible=146,
+            planned=146, applied=146, conflicts=0, undo="Ctrl-Z reverses the identity rebind.",
+        ),
+        noop
+        or rebind_plan_payload(
+            status="noop", revision="rebind-noop", requested=146, eligible=0,
+            planned=0, applied=0, conflicts=0,
+        ),
+    )
+
+
+def queue_rebind_readback(
+    client,
+    *,
+    references=None,
+    pad_overrides=None,
+    trace_overrides=None,
+):
+    client.queue_json(
+        "get_component_list",
+        component_list_payload(old_board_refs() if references is None else references),
+    )
+    pad_overrides = pad_overrides or {}
+    for reference in sorted(tp_refs(), key=lambda item: int(item[2:])):
+        client.queue_json(
+            "get_component_pads",
+            pad_overrides.get(reference, pad_payload(reference)),
+        )
+    client.queue_json("get_component_list", component_list_payload(old_board_refs()))
+    trace_overrides = trace_overrides or {}
+    for net_name in TP_NETS.values():
+        board_net = f"/{net_name}"
+        client.queue_json(
+            "query_traces",
+            trace_overrides.get(net_name, trace_overrides.get(board_net, empty_trace_payload(board_net))),
+        )
+
+
+def queue_rebind_stage(client):
+    queue_rebind_triplet(client)
+    queue_rebind_readback(client)
+
+
+def queue_pre_save_gates(client, *, references=None):
+    client.queue_json(
+        "get_component_list",
+        component_list_payload(final_board_refs() if references is None else references),
+    )
+    for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
+        client.queue_json("get_component_pads", connector_pad_payload(reference))
+    client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+    for net_name in TP_NETS.values():
+        client.queue_json("query_traces", empty_trace_payload(net_name))
+    client.queue_json(
+        "update_pcb_from_schematic",
+        sync_plan_payload(
+            status="noop", revision="rev-pre-save-noop", board_only_planned=0,
+            board_only_applied=0, skipped_applied=0, added_applied=0,
+        ),
+    )
 
 
 def tp_refs():
@@ -380,8 +542,11 @@ def default_sync_changes():
     ]
 
 
-def queue_sync_through_apply(client, *, delete_overrides=None, second_dry=None, apply=None):
+def queue_sync_through_apply(
+    client, *, delete_overrides=None, second_dry=None, apply=None, pre_save_references=None
+):
     queue_pre_delete_live_state(client)
+    queue_rebind_stage(client)
     client.queue_json(
         "update_pcb_from_schematic",
         sync_plan_payload(
@@ -422,6 +587,7 @@ def queue_sync_through_apply(client, *, delete_overrides=None, second_dry=None, 
             undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
         ),
     )
+    queue_pre_save_gates(client, references=pre_save_references)
 
 
 class FakeClient:
@@ -734,6 +900,7 @@ class PcbSyncContractTest(unittest.TestCase):
             CONNECTOR_VALUES as actual_values,
             FINAL_BOARD_REFS,
             OLD_BOARD_REFS,
+            REBIND_REFS as actual_rebind_refs,
             SHARED_REFS,
             TP_NETS as actual_tp_nets,
         )
@@ -743,9 +910,12 @@ class PcbSyncContractTest(unittest.TestCase):
         self.assertEqual(actual_values, CONNECTOR_VALUES)
         self.assertEqual(actual_footprints, CONNECTOR_FOOTPRINTS)
         self.assertEqual(SHARED_REFS, shared_refs())
+        self.assertEqual(actual_rebind_refs, REBIND_REFS)
+        self.assertEqual(actual_rebind_refs, tuple(sorted(SHARED_REFS)))
         self.assertEqual(OLD_BOARD_REFS, old_board_refs())
         self.assertEqual(FINAL_BOARD_REFS, final_board_refs())
         self.assertEqual(len(SHARED_REFS), 146)
+        self.assertEqual(len(actual_rebind_refs), 146)
         self.assertEqual(len(OLD_BOARD_REFS), 169)
         self.assertEqual(len(FINAL_BOARD_REFS), 152)
         self.assertFalse(any(reference.startswith("TP") for reference in SHARED_REFS))
@@ -766,6 +936,10 @@ class PcbSyncContractTest(unittest.TestCase):
             ("pcb_board", "get_board_info", "board", "required"),
             ("pcb_routing", "query_traces", "net_name", "properties"),
             ("sch_export", "update_pcb_from_schematic", "expected_plan_revision", "properties"),
+            ("sch_export", "rebind_pcb_schematic_identities", "tool", "tool"),
+            ("sch_export", "rebind_pcb_schematic_identities", "references", "required"),
+            ("sch_export", "rebind_pcb_schematic_identities", "dry_run", "properties"),
+            ("sch_export", "rebind_pcb_schematic_identities", "expected_plan_revision", "properties"),
             ("manufacturing", "validate_for_manufacturing", "board", "properties"),
             ("verification", "run_drc", "severity", "properties"),
             ("project", "save_project", "tool", "tool"),
@@ -791,6 +965,14 @@ class PcbSyncContractTest(unittest.TestCase):
         misplaced = schemas["pcb_routing"].pop("query_traces")
         schemas["pcb_components"]["query_traces"] = misplaced
         with self.assertRaisesRegex(RuntimeError, "pcb_routing.*query_traces"):
+            require_pcb_sync_capabilities(ExactOwnershipClient(schemas))
+
+        schemas = complete_pcb_sync_schemas()
+        misplaced = schemas["sch_export"].pop("rebind_pcb_schematic_identities")
+        schemas["pcb_components"]["rebind_pcb_schematic_identities"] = misplaced
+        with self.assertRaisesRegex(
+            RuntimeError, "sch_export.*rebind_pcb_schematic_identities"
+        ):
             require_pcb_sync_capabilities(ExactOwnershipClient(schemas))
 
     def test_capability_gate_rejects_every_unexpected_required_input(self):
@@ -968,6 +1150,7 @@ class PcbSyncContractTest(unittest.TestCase):
 
         coverage_client = FakeClient()
         queue_pre_delete_live_state(coverage_client)
+        queue_rebind_stage(coverage_client)
         preview = sync_plan_payload(
             status="ready", revision="rev-before", board_only_planned=23,
             board_only_applied=0, skipped_applied=0, added_applied=0,
@@ -1134,6 +1317,8 @@ class PcbSyncContractTest(unittest.TestCase):
 
         client = FakeClient()
         queue_pre_delete_live_state(client)
+        queue_rebind_triplet(client)
+        queue_rebind_readback(client)
         client.queue_json(
             "update_pcb_from_schematic",
             sync_plan_payload(
@@ -1169,6 +1354,22 @@ class PcbSyncContractTest(unittest.TestCase):
             ),
         )
         client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+        for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
+            client.queue_json("get_component_pads", connector_pad_payload(reference))
+        client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+        for net_name in TP_NETS.values():
+            client.queue_json("query_traces", empty_trace_payload(net_name))
+        client.queue_json(
+            "update_pcb_from_schematic",
+            sync_plan_payload(
+                status="noop",
+                revision="rev-pre-save-noop",
+                board_only_planned=0,
+                board_only_applied=0,
+                skipped_applied=0,
+                added_applied=0,
+            ),
+        )
         client.queue_raw("save_project", raw_text_result("Board saved successfully."))
         post_save_components = component_list_payload(final_board_refs())
         for component in post_save_components["components"]:
@@ -1232,7 +1433,45 @@ class PcbSyncContractTest(unittest.TestCase):
             for name, arguments in client.calls
             if name == "update_pcb_from_schematic"
         ]
-        self.assertEqual(len(update_calls), 4)
+        rebind_calls = [
+            (name, arguments)
+            for name, arguments in client.calls
+            if name == "rebind_pcb_schematic_identities"
+        ]
+        self.assertEqual(
+            rebind_calls,
+            [
+                (
+                    "rebind_pcb_schematic_identities",
+                    {
+                        "schematic": str(SCHEMATIC.resolve()),
+                        "board": str(BOARD.resolve()),
+                        "references": list(REBIND_REFS),
+                        "dry_run": True,
+                    },
+                ),
+                (
+                    "rebind_pcb_schematic_identities",
+                    {
+                        "schematic": str(SCHEMATIC.resolve()),
+                        "board": str(BOARD.resolve()),
+                        "references": list(REBIND_REFS),
+                        "dry_run": False,
+                        "expected_plan_revision": "rebind-rev",
+                    },
+                ),
+                (
+                    "rebind_pcb_schematic_identities",
+                    {
+                        "schematic": str(SCHEMATIC.resolve()),
+                        "board": str(BOARD.resolve()),
+                        "references": list(REBIND_REFS),
+                        "dry_run": True,
+                    },
+                ),
+            ],
+        )
+        self.assertEqual(len(update_calls), 5)
         self.assertEqual(update_calls[0][1]["dry_run"], True)
         self.assertNotIn("expected_plan_revision", update_calls[0][1])
         self.assertEqual(update_calls[1][1]["dry_run"], True)
@@ -1247,6 +1486,14 @@ class PcbSyncContractTest(unittest.TestCase):
         )
         self.assertEqual(
             update_calls[3][1],
+            {
+                "schematic": str(SCHEMATIC.resolve()),
+                "board": str(BOARD.resolve()),
+                "dry_run": True,
+            },
+        )
+        self.assertEqual(
+            update_calls[4][1],
             {
                 "schematic": str(SCHEMATIC.resolve()),
                 "board": str(BOARD.resolve()),
@@ -1272,6 +1519,22 @@ class PcbSyncContractTest(unittest.TestCase):
             max(index for index, (name, _) in enumerate(client.calls) if name == "update_pcb_from_schematic"),
         ]
         self.assertLess(save_index, min(post_save_validation_indices))
+        pre_save_noop_index = [
+            index
+            for index, (name, arguments) in enumerate(client.calls)
+            if name == "update_pcb_from_schematic"
+            and arguments == update_calls[3][1]
+        ][0]
+        self.assertLess(pre_save_noop_index, save_index)
+        connector_pad_indices = [
+            index
+            for index, (name, arguments) in enumerate(client.calls)
+            if name == "get_component_pads"
+            and arguments["reference"] in {f"J{index}" for index in range(1, 7)}
+        ]
+        self.assertEqual(len(connector_pad_indices), 12)
+        self.assertLess(max(connector_pad_indices[:6]), save_index)
+        self.assertGreater(min(connector_pad_indices[6:]), save_index)
         self.assertEqual(
             sum(1 for name, _ in client.calls if name == "save_project"), 1
         )
@@ -1283,6 +1546,9 @@ class PcbSyncContractTest(unittest.TestCase):
         ][-2:]
         self.assertGreater(min(after_hash_indices), save_event_index)
         self.assertEqual(evidence["apply"]["status"], "applied")
+        self.assertEqual(evidence["rebind_dry_run"]["status"], "ready")
+        self.assertEqual(evidence["rebind_apply"]["status"], "applied")
+        self.assertEqual(evidence["rebind_noop"]["status"], "noop")
         self.assertEqual(
             evidence["before_hashes"],
             {
@@ -1307,9 +1573,11 @@ class PcbSyncContractTest(unittest.TestCase):
         query_indices = [
             index for index, (name, _) in enumerate(client.calls) if name == "query_traces"
         ]
-        self.assertEqual(len(query_indices), 46)
+        self.assertEqual(len(query_indices), 92)
         self.assertEqual(client.calls[query_indices[0] - 1][0], "get_component_list")
         self.assertEqual(client.calls[query_indices[23] - 1][0], "get_component_list")
+        self.assertEqual(client.calls[query_indices[46] - 1][0], "get_component_list")
+        self.assertEqual(client.calls[query_indices[69] - 1][0], "get_component_list")
         forbidden = {
             "move_component",
             "rotate_component",
@@ -1319,6 +1587,180 @@ class PcbSyncContractTest(unittest.TestCase):
             "add_via",
         }
         self.assertTrue(forbidden.isdisjoint({name for name, _ in client.calls}))
+
+    def test_sync_rejects_bad_rebind_dry_run_before_delete_or_save(self):
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        client = FakeClient()
+        queue_pre_delete_live_state(client)
+        queue_rebind_triplet(
+            client,
+            dry=rebind_plan_payload(
+                status="applied",
+                revision="rebind-rev",
+                requested=146,
+                eligible=146,
+                planned=146,
+                applied=146,
+                conflicts=0,
+                undo="unexpected undo",
+            ),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "rebind status mismatch: expected ready"):
+            sync_debug_connectors(client, SCHEMATIC, BOARD, baseline_fixture())
+        self.assertFalse(any(name == "delete_component" for name, _ in client.calls))
+        self.assertFalse(any(name == "save_project" for name, _ in client.calls))
+
+    def test_rebind_validator_rejects_invalid_or_equal_symbol_paths(self):
+        from tools.sync_debug_connectors import _validate_rebind_plan
+
+        cases = (
+            ("invalid old path", "old_symbol_path", "/not-a-uuid", "old_symbol_path"),
+            ("invalid new path", "new_symbol_path", "//11111111-0000-4000-8000-000000000001", "new_symbol_path"),
+            ("equal paths", "new_symbol_path", None, "symbol paths must differ"),
+        )
+        for label, field, value, expected_error in cases:
+            with self.subTest(label=label):
+                payload = rebind_plan_payload(
+                    status="ready", revision="rebind-rev", requested=146, eligible=146,
+                    planned=146, applied=0, conflicts=0,
+                )
+                if value is None:
+                    payload["changes"][0][field] = payload["changes"][0]["old_symbol_path"]
+                else:
+                    payload["changes"][0][field] = value
+                with self.assertRaisesRegex(RuntimeError, expected_error):
+                    _validate_rebind_plan(
+                        payload, expected_status="ready", expected_planned=146,
+                        expected_applied=0, require_undo=False,
+                    )
+
+    def test_rebind_validator_refuses_full_plan_contract_drift(self):
+        from tools.sync_debug_connectors import _validate_rebind_plan
+
+        def ready_payload():
+            return rebind_plan_payload(
+                status="ready", revision="rebind-rev", requested=146, eligible=146,
+                planned=146, applied=0, conflicts=0,
+            )
+
+        cases = (
+            ("top fields", lambda payload: payload.__setitem__("extra", True), "plan fields"),
+            ("empty revision", lambda payload: payload.__setitem__("plan_revision", ""), "plan_revision"),
+            ("diagnostics", lambda payload: payload.__setitem__("diagnostics", [{}]), "diagnostic"),
+            ("coverage fields", lambda payload: payload["coverage"].pop("source"), "coverage fields"),
+            ("bool count", lambda payload: payload["coverage"].__setitem__("requested", True), "coverage requested"),
+            ("wrong count", lambda payload: payload["coverage"].__setitem__("eligible", 145), "coverage eligible"),
+            ("unknown reference", lambda payload: payload["changes"][0].__setitem__("reference", "R999"), "change references"),
+            ("permuted references", lambda payload: payload["changes"].reverse(), "change order"),
+            ("extra change field", lambda payload: payload["changes"][0].__setitem__("extra", True), "change fields"),
+            ("bad kiid", lambda payload: payload["changes"][0].__setitem__("kiid", "not-a-uuid"), "kiid"),
+            ("value drift", lambda payload: payload["changes"][0].__setitem__("value", "WRONG"), "value mismatch"),
+            ("footprint drift", lambda payload: payload["changes"][0].__setitem__("footprint_id", "wrong:fp"), "footprint_id mismatch"),
+            ("dnp drift", lambda payload: payload["changes"][0].__setitem__("dnp", True), "dnp mismatch"),
+            ("pad drift", lambda payload: payload["changes"][0].__setitem__("pad_nets", {}), "pad_nets mismatch"),
+            ("preserve shape", lambda payload: payload["changes"][0]["preserve"].pop("locked"), "preserve shape"),
+            ("preserve bool", lambda payload: payload["changes"][0]["preserve"].__setitem__("locked", 1), "preserve locked"),
+            ("dry undo", lambda payload: payload.__setitem__("undo", "unexpected"), "dry-run/noop"),
+        )
+        for label, mutate, expected_error in cases:
+            with self.subTest(label=label):
+                payload = ready_payload()
+                mutate(payload)
+                with self.assertRaisesRegex(RuntimeError, expected_error):
+                    _validate_rebind_plan(
+                        payload, expected_status="ready", expected_planned=146,
+                        expected_applied=0, require_undo=False,
+                    )
+
+        apply_payload = rebind_plan_payload(
+            status="applied", revision="rebind-rev", requested=146, eligible=146,
+            planned=146, applied=146, conflicts=0, undo="",
+        )
+        with self.assertRaisesRegex(RuntimeError, "undo guidance"):
+            _validate_rebind_plan(
+                apply_payload, expected_status="applied", expected_planned=146,
+                expected_applied=146, require_undo=True,
+            )
+
+    def test_sync_refuses_rebind_transaction_failures_before_normal_sync_delete_or_save(self):
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        cases = (
+            (
+                "apply revision mismatch",
+                lambda client: queue_rebind_triplet(
+                    client,
+                    apply=rebind_plan_payload(
+                        status="applied", revision="different-revision", requested=146,
+                        eligible=146, planned=146, applied=146, conflicts=0, undo="undo",
+                    ),
+                ),
+                "rebind apply result plan_revision differs",
+            ),
+            (
+                "final non-noop",
+                lambda client: queue_rebind_triplet(
+                    client,
+                    noop=rebind_plan_payload(
+                        status="ready", revision="rebind-noop", requested=146,
+                        eligible=146, planned=146, applied=0, conflicts=0,
+                    ),
+                ),
+                "rebind status mismatch: expected noop",
+            ),
+        )
+        for label, queue, expected_error in cases:
+            with self.subTest(label=label):
+                client = FakeClient()
+                queue_pre_delete_live_state(client)
+                queue(client)
+                with self.assertRaisesRegex(RuntimeError, expected_error):
+                    sync_debug_connectors(client, SCHEMATIC, BOARD, baseline_fixture())
+                self.assertFalse(any(name == "update_pcb_from_schematic" for name, _ in client.calls))
+                self.assertFalse(any(name == "delete_component" for name, _ in client.calls))
+                self.assertFalse(any(name == "save_project" for name, _ in client.calls))
+
+    def test_sync_refuses_malformed_or_structured_rebind_errors_before_mutation(self):
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        for response in (empty_result(), raw_text_result("not-json"), RuntimeError("invalid_argument")):
+            with self.subTest(response=response):
+                client = FakeClient()
+                queue_pre_delete_live_state(client)
+                client.queue_raw("rebind_pcb_schematic_identities", response)
+                with self.assertRaises(RuntimeError):
+                    sync_debug_connectors(client, SCHEMATIC, BOARD, baseline_fixture())
+                self.assertFalse(any(name == "update_pcb_from_schematic" for name, _ in client.calls))
+                self.assertFalse(any(name == "delete_component" for name, _ in client.calls))
+                self.assertFalse(any(name == "save_project" for name, _ in client.calls))
+
+    def test_sync_refuses_rebind_readback_evidence_drift_before_normal_sync_delete_or_save(self):
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        pad_drift = pad_payload("TP1")
+        pad_drift["pads"][0]["net"] = "/WRONG"
+        cases = (
+            ("inventory", {"references": old_board_refs() - {"TP23"}}, "post-rebind 169 references"),
+            ("pad", {"pad_overrides": {"TP1": pad_drift}}, "TP1 net mismatch"),
+            (
+                "trace",
+                {"trace_overrides": {"VSYS": {"count": 1, "traces": [{"net": "/VSYS"}]}}},
+                "VSYS must have zero board traces",
+            ),
+        )
+        for label, readback_kwargs, expected_error in cases:
+            with self.subTest(label=label):
+                client = FakeClient()
+                queue_pre_delete_live_state(client)
+                queue_rebind_triplet(client)
+                queue_rebind_readback(client, **readback_kwargs)
+                with self.assertRaisesRegex(RuntimeError, expected_error):
+                    sync_debug_connectors(client, SCHEMATIC, BOARD, baseline_fixture())
+                self.assertFalse(any(name == "update_pcb_from_schematic" for name, _ in client.calls))
+                self.assertFalse(any(name == "delete_component" for name, _ in client.calls))
+                self.assertFalse(any(name == "save_project" for name, _ in client.calls))
 
     def test_sync_rejects_bad_first_dry_run_contract_before_delete_and_never_saves(self):
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, capture_baseline, sync_debug_connectors
@@ -1475,6 +1917,7 @@ class PcbSyncContractTest(unittest.TestCase):
             with self.subTest(expected_error=expected_error):
                 client = FakeClient()
                 queue_pre_delete_live_state(client)
+                queue_rebind_stage(client)
                 client.queue_json("update_pcb_from_schematic", preview)
                 with self.assertRaisesRegex(RuntimeError, expected_error):
                     sync_debug_connectors(client, SCHEMATIC, BOARD, baseline)
@@ -1488,6 +1931,7 @@ class PcbSyncContractTest(unittest.TestCase):
             with self.subTest(response=response):
                 client = FakeClient()
                 queue_pre_delete_live_state(client)
+                queue_rebind_stage(client)
                 client.queue_raw("update_pcb_from_schematic", response)
                 with self.assertRaises(RuntimeError):
                     sync_debug_connectors(client, SCHEMATIC, BOARD, baseline_fixture())
@@ -1503,6 +1947,7 @@ class PcbSyncContractTest(unittest.TestCase):
 
         client = FakeClient()
         queue_pre_delete_live_state(client)
+        queue_rebind_stage(client)
         client.queue_json(
             "update_pcb_from_schematic",
             sync_plan_payload(
@@ -1589,11 +2034,9 @@ class PcbSyncContractTest(unittest.TestCase):
         for expected_error, flow_kwargs, final_refs in cases:
             with self.subTest(expected_error=expected_error):
                 client = FakeClient()
-                queue_sync_through_apply(client, **flow_kwargs)
-                if final_refs is not None:
-                    client.queue_json(
-                        "get_component_list", component_list_payload(final_refs)
-                    )
+                queue_sync_through_apply(
+                    client, **flow_kwargs, pre_save_references=final_refs
+                )
                 with self.assertRaisesRegex(RuntimeError, expected_error):
                     sync_debug_connectors(client, SCHEMATIC, BOARD, baseline_fixture())
                 self.assertFalse(any(name == "save_project" for name, _ in client.calls))
@@ -1607,9 +2050,6 @@ class PcbSyncContractTest(unittest.TestCase):
             with self.subTest(failure=failure):
                 client = FakeClient()
                 queue_sync_through_apply(client)
-                client.queue_json(
-                    "get_component_list", component_list_payload(final_board_refs())
-                )
                 client.queue_raw(
                     "save_project", raw_text_result("Board saved successfully.")
                 )
@@ -1683,6 +2123,7 @@ class PcbSyncContractTest(unittest.TestCase):
 
         apply_undo_client = FakeClient()
         queue_pre_delete_live_state(apply_undo_client)
+        queue_rebind_stage(apply_undo_client)
         apply_undo_client.queue_json(
             "update_pcb_from_schematic",
             sync_plan_payload(
@@ -1717,12 +2158,14 @@ class PcbSyncContractTest(unittest.TestCase):
                 undo="",
             ),
         )
+        # Apply validation occurs before the shared pre-save gates.
         with self.assertRaisesRegex(RuntimeError, "undo guidance"):
             sync_debug_connectors(apply_undo_client, SCHEMATIC, BOARD, baseline_fixture())
         self.assertFalse(any(name == "save_project" for name, _ in apply_undo_client.calls))
 
         noop_client = FakeClient()
         queue_pre_delete_live_state(noop_client)
+        queue_rebind_stage(noop_client)
         noop_client.queue_json(
             "update_pcb_from_schematic",
             sync_plan_payload(
@@ -1757,7 +2200,7 @@ class PcbSyncContractTest(unittest.TestCase):
                 undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
             ),
         )
-        noop_client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+        queue_pre_save_gates(noop_client)
         noop_client.queue_raw("save_project", raw_text_result("Board saved successfully."))
         noop_post_save = component_list_payload(final_board_refs())
         for component in noop_post_save["components"]:
@@ -1866,6 +2309,7 @@ class PcbSyncContractTest(unittest.TestCase):
 
             client = FakeClient()
             queue_pre_delete_live_state(client)
+            queue_rebind_stage(client)
             client.queue_json(
                 "update_pcb_from_schematic",
                 sync_plan_payload(
@@ -1900,7 +2344,7 @@ class PcbSyncContractTest(unittest.TestCase):
                     undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
                 ),
             )
-            client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+            queue_pre_save_gates(client)
             client.queue_raw("save_project", raw_text_result("Board saved successfully."))
             post_save_components = component_list_payload(final_board_refs())
             for component in post_save_components["components"]:

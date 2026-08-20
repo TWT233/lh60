@@ -7,6 +7,7 @@ import json
 import math
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +78,7 @@ SHARED_REFS = frozenset(
     | {f"SW{index}" for index in range(1, 59)}
     | {f"SW{index}" for index in range(60, 77)}
 )
+REBIND_REFS = tuple(sorted(SHARED_REFS))
 TP_REFS = tuple(f"TP{index}" for index in range(1, 24))
 OLD_BOARD_REFS = frozenset(SHARED_REFS | set(TP_REFS))
 FINAL_BOARD_REFS = frozenset(SHARED_REFS | {f"J{index}" for index in range(1, 7)})
@@ -197,6 +199,10 @@ def require_pcb_sync_capabilities(client: McpClient) -> None:
             "query_traces": (("board",), ("board", "net_name")),
         },
         "sch_export": {
+            "rebind_pcb_schematic_identities": (
+                ("schematic", "board", "references"),
+                ("schematic", "board", "references", "dry_run", "expected_plan_revision"),
+            ),
             "update_pcb_from_schematic": (
                 ("schematic", "board"),
                 ("schematic", "board", "dry_run", "expected_plan_revision"),
@@ -685,6 +691,143 @@ def _validate_sync_plan(
     return payload
 
 
+def _rebind_component_contracts() -> dict[str, dict[str, Any]]:
+    from tools.lh60_design.schematic import build_schematic_plan
+
+    plan = build_schematic_plan()
+    components = {component.reference: component for component in plan.components}
+    pad_nets = {reference: {} for reference in REBIND_REFS}
+    for connection in plan.connections:
+        if connection.reference in pad_nets:
+            pad_nets[connection.reference][connection.pin_number] = connection.net_name
+    return {
+        reference: {
+            "value": components[reference].value,
+            "footprint_id": components[reference].footprint,
+            "dnp": components[reference].dnp is True,
+            "pad_nets": dict(sorted(pad_nets[reference].items())),
+        }
+        for reference in REBIND_REFS
+    }
+
+
+def _require_symbol_path(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value or value == "/":
+        raise RuntimeError(f"{label} must be a nonempty symbol path")
+    segments = value.split("/")[1:] if value.startswith("/") else []
+    if not segments or any(not segment for segment in segments):
+        raise RuntimeError(f"{label} must be a valid symbol path")
+    try:
+        for segment in segments:
+            uuid.UUID(segment)
+    except (ValueError, AttributeError) as error:
+        raise RuntimeError(f"{label} must be a valid symbol path") from error
+    return value
+
+
+def _validate_rebind_change(
+    change: Any, reference: str, contracts: dict[str, dict[str, Any]]
+) -> None:
+    if not isinstance(change, dict):
+        raise RuntimeError(f"{reference} rebind change must be an object")
+    expected_fields = {
+        "reference", "kiid", "old_symbol_path", "new_symbol_path", "value",
+        "footprint_id", "dnp", "pad_nets", "preserve",
+    }
+    if set(change) != expected_fields:
+        raise RuntimeError(f"{reference} rebind change fields mismatch")
+    if change["reference"] != reference:
+        raise RuntimeError(f"unexpected rebind change reference: {change['reference']}")
+    if not isinstance(change["kiid"], str) or not change["kiid"]:
+        raise RuntimeError(f"{reference} kiid must be nonempty")
+    try:
+        uuid.UUID(change["kiid"])
+    except (ValueError, AttributeError) as error:
+        raise RuntimeError(f"{reference} kiid must be a UUID") from error
+    old_path = _require_symbol_path(change["old_symbol_path"], f"{reference} old_symbol_path")
+    new_path = _require_symbol_path(change["new_symbol_path"], f"{reference} new_symbol_path")
+    if old_path == new_path:
+        raise RuntimeError(f"{reference} rebind symbol paths must differ")
+    contract = contracts[reference]
+    for field in ("value", "footprint_id", "dnp", "pad_nets"):
+        if change[field] != contract[field]:
+            raise RuntimeError(f"{reference} rebind {field} mismatch")
+    preserve = change["preserve"]
+    if not isinstance(preserve, dict) or set(preserve) != {"position", "rotation", "layer", "locked"}:
+        raise RuntimeError(f"{reference} rebind preserve shape mismatch")
+    position = preserve["position"]
+    if not isinstance(position, dict) or set(position) != {"x", "y"}:
+        raise RuntimeError(f"{reference} rebind preserve position mismatch")
+    _finite_number(position["x"], f"{reference} rebind preserve x")
+    _finite_number(position["y"], f"{reference} rebind preserve y")
+    _finite_number(preserve["rotation"], f"{reference} rebind preserve rotation")
+    if not isinstance(preserve["layer"], str) or not preserve["layer"]:
+        raise RuntimeError(f"{reference} rebind preserve layer mismatch")
+    if type(preserve["locked"]) is not bool:
+        raise RuntimeError(f"{reference} rebind preserve locked mismatch")
+
+
+def _validate_rebind_plan(
+    payload: dict[str, Any],
+    *,
+    expected_status: str,
+    expected_planned: int,
+    expected_applied: int,
+    require_undo: bool,
+) -> dict[str, Any]:
+    if not isinstance(payload, dict) or set(payload) != {
+        "status", "plan_revision", "coverage", "changes", "diagnostics", "undo",
+    }:
+        raise RuntimeError("rebind plan fields mismatch")
+    if payload["status"] != expected_status:
+        raise RuntimeError(f"rebind status mismatch: expected {expected_status}")
+    if not isinstance(payload["plan_revision"], str) or not payload["plan_revision"]:
+        raise RuntimeError("rebind plan_revision must be nonempty")
+    if payload["diagnostics"] != []:
+        raise RuntimeError(f"rebind diagnostic mismatch: {payload['diagnostics']}")
+    coverage = payload["coverage"]
+    expected_coverage = {
+        "source": "saved_schematic_hierarchy",
+        "transport": "live_kicad_ipc",
+        "atomicity": "single_kicad_undo_commit",
+        "requested": len(REBIND_REFS),
+        "eligible": 0 if expected_status == "noop" else len(REBIND_REFS),
+        "planned": expected_planned,
+        "applied": expected_applied,
+        "conflicts": 0,
+    }
+    if not isinstance(coverage, dict) or set(coverage) != {
+        *expected_coverage, "hierarchy_files",
+    }:
+        raise RuntimeError("rebind coverage fields mismatch")
+    if type(coverage["hierarchy_files"]) is not int or coverage["hierarchy_files"] < 1:
+        raise RuntimeError("rebind hierarchy_files mismatch")
+    for field, expected in expected_coverage.items():
+        if type(coverage[field]) is not type(expected) or coverage[field] != expected:
+            raise RuntimeError(f"rebind coverage {field} mismatch")
+    changes = payload["changes"]
+    if expected_status == "noop":
+        if changes != []:
+            raise RuntimeError("rebind noop must not report changes")
+    else:
+        if not isinstance(changes, list) or len(changes) != len(REBIND_REFS):
+            raise RuntimeError("rebind must report exactly 146 changes")
+        by_reference = {change.get("reference"): change for change in changes if isinstance(change, dict)}
+        if len(by_reference) != len(changes) or tuple(sorted(by_reference)) != REBIND_REFS:
+            raise RuntimeError("rebind change references mismatch")
+        if tuple(change["reference"] for change in changes) != REBIND_REFS:
+            raise RuntimeError("rebind change order mismatch")
+        contracts = _rebind_component_contracts()
+        for reference in REBIND_REFS:
+            _validate_rebind_change(by_reference[reference], reference, contracts)
+    undo = payload["undo"]
+    if require_undo and (not isinstance(undo, str) or not undo.strip()):
+        raise RuntimeError("rebind apply result must include undo guidance")
+    if not require_undo and undo is not None:
+        raise RuntimeError("rebind dry-run/noop result must not include undo guidance")
+    return payload
+
+
 def _require_connector_pads(client: McpClient, board: Path) -> dict[str, Any]:
     connector_pads = {}
     for reference in sorted(CONNECTOR_PAD_NETS):
@@ -781,6 +924,63 @@ def sync_debug_connectors(
         _board_nets_from_pads(before_tp_pads),
     )
 
+    rebind_args = {
+        "schematic": str(schematic.resolve()),
+        "board": str(board.resolve()),
+        "references": list(REBIND_REFS),
+    }
+    rebind_dry_run = _validate_rebind_plan(
+        client.call_tool_json(
+            "rebind_pcb_schematic_identities", {**rebind_args, "dry_run": True}
+        ),
+        expected_status="ready",
+        expected_planned=len(REBIND_REFS),
+        expected_applied=0,
+        require_undo=False,
+    )
+    rebind_apply = _validate_rebind_plan(
+        client.call_tool_json(
+            "rebind_pcb_schematic_identities",
+            {
+                **rebind_args,
+                "dry_run": False,
+                "expected_plan_revision": rebind_dry_run["plan_revision"],
+            },
+        ),
+        expected_status="applied",
+        expected_planned=len(REBIND_REFS),
+        expected_applied=len(REBIND_REFS),
+        require_undo=True,
+    )
+    if rebind_apply["plan_revision"] != rebind_dry_run["plan_revision"]:
+        raise RuntimeError("rebind apply result plan_revision differs from dry run")
+    rebind_noop = _validate_rebind_plan(
+        client.call_tool_json(
+            "rebind_pcb_schematic_identities", {**rebind_args, "dry_run": True}
+        ),
+        expected_status="noop",
+        expected_planned=0,
+        expected_applied=0,
+        require_undo=False,
+    )
+    post_rebind_inventory = _require_exact_inventory(
+        client, board, OLD_BOARD_REFS, "post-rebind 169"
+    )
+    if post_rebind_inventory != before_inventory:
+        raise RuntimeError("post-rebind component inventory differs from pre-rebind state")
+    post_rebind_tp_pads = _require_tp_pads(client, board)
+    if post_rebind_tp_pads != before_tp_pads:
+        raise RuntimeError("post-rebind TP pad state differs from pre-rebind state")
+    post_rebind_traces = _require_empty_traces(
+        client,
+        board,
+        OLD_BOARD_REFS,
+        "post-rebind trace binding 169",
+        _board_nets_from_pads(post_rebind_tp_pads),
+    )
+    if post_rebind_traces != before_traces:
+        raise RuntimeError("post-rebind trace state differs from pre-rebind state")
+
     first_dry = _validate_sync_plan(
         client.call_tool_json(
             "update_pcb_from_schematic",
@@ -840,6 +1040,30 @@ def sync_debug_connectors(
         raise RuntimeError("apply result plan_revision differs from second dry run")
 
     pre_save_refs = _require_exact_references(client, board, FINAL_BOARD_REFS, "final 152")
+    pre_save_connector_pads = _require_connector_pads(client, board)
+    pre_save_traces = _require_empty_traces(
+        client,
+        board,
+        FINAL_BOARD_REFS,
+        "pre-save trace binding 152",
+        {
+            pad["net"]: pad["board_net"]
+            for connector in pre_save_connector_pads.values()
+            for pad in connector["pads"]
+        },
+    )
+    pre_save_noop = _validate_sync_plan(
+        client.call_tool_json(
+            "update_pcb_from_schematic",
+            {"schematic": str(schematic.resolve()), "board": str(board.resolve()), "dry_run": True},
+        ),
+        expected_status="noop",
+        expected_board_only=0,
+        expected_board_only_applied=0,
+        expected_added_applied=0,
+        expected_skipped_applied=0,
+        require_undo=False,
+    )
     client.call_tool("save_project", {})
     after_schematic_hash = _sha256(schematic)
     after_board_hash = _sha256(board)
@@ -894,11 +1118,24 @@ def sync_debug_connectors(
             "tp_pads": before_tp_pads,
             "traces": before_traces,
         },
+        "rebind_dry_run": rebind_dry_run,
+        "rebind_apply": rebind_apply,
+        "rebind_noop": rebind_noop,
+        "post_rebind": {
+            "inventory": post_rebind_inventory,
+            "tp_pads": post_rebind_tp_pads,
+            "traces": post_rebind_traces,
+        },
         "first_dry_run": first_dry,
         "delete_results": delete_results,
         "second_dry_run": second_dry,
         "apply": apply_result,
-        "pre_save": {"references": pre_save_refs},
+        "pre_save": {
+            "references": pre_save_refs,
+            "connector_pads": pre_save_connector_pads,
+            "traces": pre_save_traces,
+            "noop": pre_save_noop,
+        },
         "post_save": {
             "references": post_save_refs,
             "connectors": post_save_connectors,
