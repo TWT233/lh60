@@ -480,15 +480,40 @@ def apply_socket_placements(client: McpClient, board: Path | str = BOARD) -> Non
         )
 
 
-def _require_closed_board_result(
-    result: dict[str, object],
-    operation: str,
-    reference: str,
-) -> None:
-    if result.get("source") != "file":
-        raise RuntimeError(
-            f"{reference} {operation} must use the closed-board file path"
-        )
+_BATCH_SET_COMPONENT_POSES_SCHEMA = {
+    "additionalProperties": False,
+    "properties": {
+        "board": {"type": "string"},
+        "placements": {
+            "items": {
+                "additionalProperties": False,
+                "properties": {
+                    "layer": {
+                        "enum": ["F.Cu", "B.Cu"],
+                        "type": "string",
+                    },
+                    "reference": {"type": "string"},
+                    "rotation": {"type": "number"},
+                    "x": {"type": "number"},
+                    "y": {"type": "number"},
+                },
+                "required": ["reference", "x", "y", "rotation", "layer"],
+                "type": "object",
+            },
+            "type": "array",
+        },
+    },
+    "required": ["board", "placements"],
+    "type": "object",
+}
+
+
+def _matches_finite_numeric_evidence(value: object, expected: float) -> bool:
+    return (
+        type(value) in (int, float)
+        and math.isfinite(value)
+        and value == expected
+    )
 
 
 def apply_connector_placements(
@@ -497,74 +522,78 @@ def apply_connector_placements(
 ) -> tuple[dict[str, object], ...]:
     board_path = str(board)
     schemas = client.tool_schemas("pcb_components")
-    required = {"move_component", "rotate_component", "flip_component"}
-    missing = required - set(schemas)
-    if missing:
+    schema = schemas.get("batch_set_component_poses")
+    if schema is None:
         raise RuntimeError(
-            f"Konnect pcb_components is missing required tools: {sorted(missing)}"
+            "Konnect pcb_components is missing required tool: "
+            "batch_set_component_poses"
         )
+    if schema != _BATCH_SET_COMPONENT_POSES_SCHEMA:
+        raise RuntimeError("batch_set_component_poses schema mismatch")
 
-    applied = []
-    for placement in frozen_connector_placements():
-        move = client.call_tool_json(
-            "move_component",
-            {
-                "board": board_path,
-                "reference": placement.reference,
-                "x": placement.x_mm,
-                "y": placement.y_mm,
-            },
-        )
-        _require_closed_board_result(move, "move", placement.reference)
+    plan = frozen_connector_placements()
+    requested = [
+        {
+            "reference": placement.reference,
+            "x": placement.x_mm,
+            "y": placement.y_mm,
+            "rotation": placement.rotation_deg,
+            "layer": placement.layer,
+        }
+        for placement in plan
+    ]
+    result = client.call_tool_json(
+        "batch_set_component_poses",
+        {"board": board_path, "placements": requested},
+    )
+
+    changed = result.get("changed")
+    updated_count = result.get("updated_count")
+    placements = result.get("placements")
+    if result.get("source") != "file":
+        raise RuntimeError("atomic connector placement must use the file source")
+    if result.get("atomic") is not True:
+        raise RuntimeError("atomic connector placement did not prove atomic=true")
+    if not isinstance(changed, bool):
+        raise RuntimeError("atomic connector placement changed must be bool")
+    if isinstance(updated_count, bool) or not isinstance(updated_count, int):
+        raise RuntimeError("atomic connector placement updated_count must be int")
+    if not isinstance(placements, list) or len(placements) != len(plan):
+        raise RuntimeError("atomic connector placement evidence must contain six items")
+
+    evidence = []
+    references = []
+    changed_count = 0
+    for expected, item in zip(requested, placements):
+        if not isinstance(item, dict):
+            raise RuntimeError("atomic connector placement item must be an object")
+        item_changed = item.get("changed")
+        if not isinstance(item_changed, bool):
+            raise RuntimeError("atomic connector placement item changed must be bool")
+        references.append(item.get("reference"))
         if (
-            move.get("moved") != placement.reference
-            or move.get("x") != placement.x_mm
-            or move.get("y") != placement.y_mm
+            item.get("reference") != expected["reference"]
+            or item.get("layer") != expected["layer"]
+            or any(
+                not _matches_finite_numeric_evidence(
+                    item.get(field),
+                    expected[field],
+                )
+                for field in ("x", "y", "rotation")
+            )
         ):
-            raise RuntimeError(f"{placement.reference} move readback mismatch")
+            raise RuntimeError("atomic connector placement pose evidence mismatch")
+        changed_count += int(item_changed)
+        evidence.append({**expected, "changed": item_changed})
 
-        rotation = client.call_tool_json(
-            "rotate_component",
-            {
-                "board": board_path,
-                "reference": placement.reference,
-                "rotation": placement.rotation_deg,
-            },
-        )
-        _require_closed_board_result(rotation, "rotation", placement.reference)
-        if (
-            rotation.get("rotated") != placement.reference
-            or rotation.get("rotation") != placement.rotation_deg
-        ):
-            raise RuntimeError(f"{placement.reference} rotation readback mismatch")
-
-        flip = client.call_tool_json(
-            "flip_component",
-            {
-                "board": board_path,
-                "reference": placement.reference,
-                "layer": placement.layer,
-            },
-        )
-        _require_closed_board_result(flip, "flip", placement.reference)
-        if (
-            flip.get("flipped") != placement.reference
-            or flip.get("layer") != placement.layer
-            or not isinstance(flip.get("changed"), bool)
-        ):
-            raise RuntimeError(f"{placement.reference} flip readback mismatch")
-
-        applied.append(
-            {
-                "reference": placement.reference,
-                "x": placement.x_mm,
-                "y": placement.y_mm,
-                "rotation": placement.rotation_deg,
-                "layer": placement.layer,
-                "flip_changed": flip["changed"],
-            }
-        )
-    return tuple(applied)
+    expected_references = [placement.reference for placement in plan]
+    if len(set(references)) != len(references) or references != expected_references:
+        raise RuntimeError("atomic connector placement references mismatch")
+    if updated_count != changed_count:
+        raise RuntimeError("atomic connector placement updated_count mismatch")
+    if changed is not (updated_count > 0):
+        raise RuntimeError("atomic connector placement changed/count mismatch")
+    return tuple(evidence)
 
 
 def parse_args() -> argparse.Namespace:
