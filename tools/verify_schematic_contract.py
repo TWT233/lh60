@@ -136,6 +136,35 @@ class SchematicPlanContractTest(unittest.TestCase):
             {"lh60-core:Conn_01x03", "lh60-core:Conn_01x04", "lh60-core:Conn_01x05"},
         )
 
+    def test_only_power_flags_define_explicit_instance_flag_overrides(self):
+        from tools.lh60_design.schematic import POWER_FLAG_INSTANCE_FLAGS
+
+        plan = self.plan()
+        flagged = {}
+        unflagged_references = []
+        for component in plan.components:
+            flags = (component.in_bom, component.on_board, component.dnp)
+            if flags != (None, None, None):
+                flagged[component.reference] = {
+                    "in_bom": component.in_bom,
+                    "on_board": component.on_board,
+                    "dnp": component.dnp,
+                }
+            else:
+                unflagged_references.append(component.reference)
+
+        self.assertEqual(
+            POWER_FLAG_INSTANCE_FLAGS,
+            {
+                "#FLG01": {"in_bom": True, "on_board": False, "dnp": False},
+                "#FLG02": {"in_bom": True, "on_board": False, "dnp": False},
+                "#FLG03": {"in_bom": True, "on_board": False, "dnp": False},
+            },
+        )
+        self.assertEqual(flagged, POWER_FLAG_INSTANCE_FLAGS)
+        self.assertEqual(len(unflagged_references), 152)
+        self.assertFalse(any(reference.startswith("#FLG") for reference in unflagged_references))
+
     def test_every_physical_key_has_one_traceable_switch(self):
         from tools.lh60_design.layout import physical_keys
         from tools.lh60_design.schematic import switch_references

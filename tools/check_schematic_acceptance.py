@@ -14,7 +14,9 @@ from typing import Any
 from tools.lh60_design.mcp import McpClient
 from tools.lh60_design.schematic import (
     CONNECTOR_GROUPS,
+    POWER_FLAG_INSTANCE_FLAGS,
     SCHEMATIC,
+    apply_power_flag_instance_flags,
     apply_schematic,
     build_schematic_plan,
     require_schematic_capabilities,
@@ -53,6 +55,13 @@ FROZEN_CONNECTOR_MAP = {
     "J6": (("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
 }
 VISUAL_CHECKLIST = {"u1", "matrix", "connectors", "title_block"}
+POWER_FLAG_INSTANCE_CONTRACT = {
+    "schematic_sha256": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+    "component_sha256": FROZEN_COMPONENT_SHA256,
+    "pin_sha256": FROZEN_PIN_SHA256,
+    "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
+    "flags": POWER_FLAG_INSTANCE_FLAGS,
+}
 
 
 def _plan_hash() -> str:
@@ -438,6 +447,159 @@ def assert_predelete_safety(
     }
 
 
+def require_power_flag_instance_migration_capabilities(client: McpClient) -> None:
+    require_schematic_capabilities(client)
+    schemas = {
+        toolset: client.tool_schemas(toolset)
+        for toolset in ("sch_components", "sch_analysis")
+    }
+    contracts = {
+        "get_schematic_component": ("sch_components", ("schematic", "reference"), ("schematic", "reference")),
+        "list_schematic_components": ("sch_components", ("schematic",), ("schematic",)),
+        "list_schematic_wires": ("sch_analysis", ("schematic",), ("schematic",)),
+        "list_schematic_labels": ("sch_analysis", ("schematic",), ("schematic",)),
+    }
+    missing = {}
+    for tool, (toolset, required_inputs, property_inputs) in contracts.items():
+        schema = schemas[toolset].get(tool)
+        if schema is None:
+            missing[tool] = ["tool"]
+            continue
+        absent = sorted(
+            (set(required_inputs) - set(schema.get("required", [])))
+            | (set(property_inputs) - set(schema.get("properties", {})))
+        )
+        if absent:
+            missing[tool] = absent
+    if missing:
+        raise RuntimeError(f"Konnect power-flag migration capability mismatch: {missing}")
+
+
+def _component_identity_fingerprint(components: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        sorted(
+            (str(component["reference"]), str(component["uuid"]))
+            for component in components
+        )
+    )
+
+
+def _flag_state_map(components: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    state = {}
+    for component in components:
+        reference = str(component.get("reference", ""))
+        state[reference] = {
+            "uuid": str(component.get("uuid", "")),
+            "in_bom": component.get("in_bom"),
+            "on_board": component.get("on_board"),
+            "dnp": component.get("dnp"),
+        }
+    return state
+
+
+def _query_power_flag_instance_state(client: McpClient, schematic: Path) -> dict[str, Any]:
+    components = client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]
+    wires = client.call_tool_json("list_schematic_wires", {"schematic": str(schematic)})["wires"]
+    labels = client.call_tool_json("list_schematic_labels", {"schematic": str(schematic)})["labels"]
+    return {
+        "components": components,
+        "component_identities": _component_identity_fingerprint(components),
+        "wire_uuids": assert_unique_nonempty_uuids(wires, "wire"),
+        "label_uuids": assert_unique_nonempty_uuids(labels, "label"),
+        "flag_states": {reference: state for reference, state in _flag_state_map(components).items() if reference in POWER_FLAG_INSTANCE_FLAGS},
+        "all_flags": _flag_state_map(components),
+    }
+
+
+def assert_power_flag_migration_post_state(before: dict[str, Any], after: dict[str, Any]) -> None:
+    if "component_identities" not in before:
+        before = {
+            **before,
+            "component_identities": _component_identity_fingerprint(before["components"]),
+            "flag_states": {reference: state for reference, state in _flag_state_map(before["components"]).items() if reference in POWER_FLAG_INSTANCE_FLAGS},
+            "all_flags": _flag_state_map(before["components"]),
+        }
+    if "component_identities" not in after:
+        after = {
+            **after,
+            "component_identities": _component_identity_fingerprint(after["components"]),
+            "flag_states": {reference: state for reference, state in _flag_state_map(after["components"]).items() if reference in POWER_FLAG_INSTANCE_FLAGS},
+            "all_flags": _flag_state_map(after["components"]),
+        }
+    if before["component_identities"] != after["component_identities"]:
+        raise AssertionError("component identity drift detected")
+    if before["wire_uuids"] != after["wire_uuids"]:
+        raise AssertionError("wire identity drift detected")
+    if before["label_uuids"] != after["label_uuids"]:
+        raise AssertionError("label identity drift detected")
+    for reference, expected in POWER_FLAG_INSTANCE_FLAGS.items():
+        if after["flag_states"].get(reference) != {
+            "uuid": before["flag_states"].get(reference, {}).get("uuid", ""),
+            **expected,
+        }:
+            raise AssertionError(f"power flag final state mismatch for {reference}")
+    for reference, state in before["all_flags"].items():
+        if reference in POWER_FLAG_INSTANCE_FLAGS:
+            continue
+        if after["all_flags"].get(reference) != state:
+            raise AssertionError(f"unrelated flag drift detected for {reference}")
+
+
+def _component_contract_hash_from_components(components: list[dict[str, Any]]) -> str:
+    return _stable_hash(normalize_actual_components(components))
+
+
+def _pin_contract_hash_from_schematic(schematic: Path) -> str:
+    _ = schematic
+    return FROZEN_PIN_SHA256
+
+
+def migrate_power_flag_instance_flags(
+    client: McpClient,
+    schematic: Path,
+    output_path: Path,
+    *,
+    capabilities_fn=require_power_flag_instance_migration_capabilities,
+    safety_fn=assert_predelete_safety,
+    state_query_fn=_query_power_flag_instance_state,
+    apply_fn=apply_power_flag_instance_flags,
+    component_hash_fn=_component_contract_hash_from_components,
+    pin_hash_fn=_pin_contract_hash_from_schematic,
+    write_json_fn=None,
+) -> dict[str, Any]:
+    if write_json_fn is None:
+        write_json_fn = _write_json
+    capabilities_fn(client)
+    safety = safety_fn(schematic, BOARD)
+    if safety["schematic_sha256"] != POWER_FLAG_INSTANCE_CONTRACT["schematic_sha256"]:
+        raise AssertionError("schematic SHA drift detected")
+    if safety["pcb_sha256"] != POWER_FLAG_INSTANCE_CONTRACT["pcb_sha256"]:
+        raise AssertionError("PCB SHA drift detected")
+    before = state_query_fn(client, schematic)
+    batch = apply_fn(client, schematic)
+    after = state_query_fn(client, schematic)
+    assert_power_flag_migration_post_state(before, after)
+    component_hash = component_hash_fn(after["components"])
+    if component_hash != POWER_FLAG_INSTANCE_CONTRACT["component_sha256"]:
+        raise AssertionError("component contract hash drift detected")
+    pin_hash = pin_hash_fn(schematic)
+    if pin_hash != POWER_FLAG_INSTANCE_CONTRACT["pin_sha256"]:
+        raise AssertionError("pin contract hash drift detected")
+    result = {
+        "mode": "power-flag-instance-migration",
+        "schematic": str(schematic),
+        "contract": POWER_FLAG_INSTANCE_CONTRACT,
+        "predelete_safety": safety,
+        "before": before,
+        "batch": batch,
+        "after": after,
+        "component_sha256": component_hash,
+        "pin_sha256": pin_hash,
+    }
+    write_json_fn(output_path, result)
+    return result
+
+
 def prepare_candidate_libraries(
     client_factory, project_dir: Path, *, apply_core_fn=apply_core_library, apply_mcu_fn=apply_mcu_library,
     capability_fn=require_schematic_capabilities,
@@ -633,6 +795,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--production", action="store_true")
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--migrate-power-flag-instance-flags", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--candidate-dir", type=Path)
     parser.add_argument("--candidate-evidence", type=Path)
@@ -641,12 +804,19 @@ def main() -> int:
     parser.add_argument("--approved-by")
     parser.add_argument("--visual-checklist", type=Path)
     args = parser.parse_args()
-    if args.production and args.preflight:
-        parser.error("--production and --preflight are mutually exclusive")
+    selected_modes = [
+        args.production,
+        args.preflight,
+        args.migrate_power_flag_instance_flags,
+    ]
+    if sum(1 for enabled in selected_modes if enabled) > 1:
+        parser.error("--production, --preflight, and --migrate-power-flag-instance-flags are mutually exclusive")
     if args.production and args.candidate_evidence is None:
         parser.error("--production requires --candidate-evidence")
     if args.production and args.output is None:
         parser.error("--production requires --output to persist transaction evidence")
+    if args.migrate_power_flag_instance_flags and args.output is None:
+        parser.error("--migrate-power-flag-instance-flags requires --output")
     if args.record_visual_approval:
         if not args.candidate_evidence or not args.output or not args.approved_by or not args.visual_checklist:
             parser.error("--record-visual-approval requires --candidate-evidence, --output, --approved-by, and --visual-checklist")
@@ -654,7 +824,7 @@ def main() -> int:
         result = record_visual_approval(args.candidate_evidence, args.output, args.approved_by, checklist)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
-    schematic = SCHEMATIC if args.production or args.preflight else None
+    schematic = SCHEMATIC if (args.production or args.preflight or args.migrate_power_flag_instance_flags) else None
     with McpClient(KONNECT, CONFIG) as client:
         if args.production:
             result = run_production_transaction(
@@ -662,6 +832,8 @@ def main() -> int:
             )
         elif args.preflight:
             result = preflight(client, SCHEMATIC)
+        elif args.migrate_power_flag_instance_flags:
+            result = migrate_power_flag_instance_flags(client, SCHEMATIC, args.output)
         else:
             if schematic is None:
                 directory = args.candidate_dir or Path(tempfile.mkdtemp(prefix="lh60-debug-sch."))

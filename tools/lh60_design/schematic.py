@@ -43,6 +43,11 @@ POWER_FLAG_POSITIONS_MM = {
 RETIRED_SWITCH_REFERENCES = {
     "r3_rshift_2.75u": "SW59",
 }
+POWER_FLAG_INSTANCE_FLAGS = {
+    "#FLG01": {"in_bom": True, "on_board": False, "dnp": False},
+    "#FLG02": {"in_bom": True, "on_board": False, "dnp": False},
+    "#FLG03": {"in_bom": True, "on_board": False, "dnp": False},
+}
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,9 @@ class SchematicComponent:
     physical_key_id: str | None = None
     logical_node_id: str | None = None
     fields: tuple[tuple[str, str], ...] = ()
+    in_bom: bool | None = None
+    on_board: bool | None = None
+    dnp: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -262,6 +270,7 @@ def _support_components() -> tuple[SchematicComponent, ...]:
         ("#FLG02", "3V3"),
         ("#FLG03", "GND"),
     ):
+        flags = POWER_FLAG_INSTANCE_FLAGS[reference]
         components.append(
             SchematicComponent(
                 kind="power_flag",
@@ -271,6 +280,9 @@ def _support_components() -> tuple[SchematicComponent, ...]:
                 footprint="",
                 x=POWER_FLAG_POSITIONS_MM[reference][0],
                 y=POWER_FLAG_POSITIONS_MM[reference][1],
+                in_bom=flags["in_bom"],
+                on_board=flags["on_board"],
+                dnp=flags["dnp"],
             )
         )
     return tuple(components)
@@ -393,6 +405,23 @@ def _edit_payload(component: SchematicComponent) -> dict[str, object]:
     }
     if component.fields:
         payload["fields"] = dict(component.fields)
+    return payload
+
+
+def _instance_flag_payload(component: SchematicComponent) -> dict[str, object] | None:
+    if (
+        component.in_bom is None
+        and component.on_board is None
+        and component.dnp is None
+    ):
+        return None
+    payload: dict[str, object] = {"reference": component.reference}
+    if component.in_bom is not None:
+        payload["in_bom"] = component.in_bom
+    if component.on_board is not None:
+        payload["on_board"] = component.on_board
+    if component.dnp is not None:
+        payload["dnp"] = component.dnp
     return payload
 
 
@@ -531,6 +560,89 @@ def _verify_final_symbol_refresh(
     _require_empty_list_result(result, "pins_moved", "update_symbols_from_library")
 
 
+def apply_power_flag_instance_flags(
+    client: McpClient,
+    schematic: Path = SCHEMATIC,
+) -> dict[str, object]:
+    plan = build_schematic_plan()
+    edits = [
+        payload
+        for component in plan.components
+        if (payload := _instance_flag_payload(component)) is not None
+    ]
+    result = _call_tool_json(
+        client,
+        "batch_edit_schematic_components",
+        {
+            "schematic": str(schematic),
+            "edits": edits,
+        },
+    )
+    if result.get("atomic") is not True:
+        raise RuntimeError("batch_edit_schematic_components did not complete atomically")
+    if result.get("updated_count") != len(edits):
+        updated_entries = result.get("updated", [])
+        if not isinstance(updated_entries, list) or result.get("updated_count") != len(updated_entries):
+            raise RuntimeError("batch_edit_schematic_components updated_count mismatch")
+    updated = result.get("updated", [])
+    unchanged = result.get("unchanged", [])
+    if not isinstance(updated, list) or not isinstance(unchanged, list):
+        raise RuntimeError("batch_edit_schematic_components accounting must be lists")
+    expected = {reference: dict(flags) for reference, flags in POWER_FLAG_INSTANCE_FLAGS.items()}
+    seen = set()
+    for key, entries in (("updated", updated), ("unchanged", unchanged)):
+        for item in entries:
+            if isinstance(item, str):
+                reference = item
+                flags = expected.get(reference)
+                changed_flags = []
+            elif isinstance(item, dict):
+                reference = item.get("reference")
+                flags = item.get("flags", expected.get(str(reference)))
+                changed_flags = item.get("changed_flags", [])
+            else:
+                raise RuntimeError(f"batch_edit_schematic_components {key} entry is invalid: {item!r}")
+            if reference not in expected:
+                raise RuntimeError(f"batch_edit_schematic_components returned unexpected reference: {reference!r}")
+            if flags != expected[reference]:
+                raise RuntimeError(f"batch_edit_schematic_components final flags mismatch for {reference}")
+            if not isinstance(changed_flags, list):
+                raise RuntimeError(f"batch_edit_schematic_components changed_flags mismatch for {reference}")
+            invalid_changed_flags = set(changed_flags) - {"dnp", "in_bom", "on_board"}
+            if invalid_changed_flags:
+                raise RuntimeError(f"batch_edit_schematic_components changed_flags mismatch for {reference}")
+            seen.add(str(reference))
+    if seen != set(expected):
+        raise RuntimeError(
+            f"batch_edit_schematic_components accounting mismatch: seen={sorted(seen)}, expected={sorted(expected)}"
+        )
+    return result
+
+
+def _require_nested_flag_edit_schema(schema: dict[str, object]) -> None:
+    properties = schema.get("properties", {})
+    if not isinstance(properties, dict):
+        raise RuntimeError("Konnect schematic input contract mismatch: batch_edit_schematic_components properties missing")
+    edits = properties.get("edits")
+    if not isinstance(edits, dict):
+        raise RuntimeError("Konnect schematic input contract mismatch: batch_edit_schematic_components.edits missing")
+    items = edits.get("items")
+    if not isinstance(items, dict):
+        raise RuntimeError("Konnect schematic input contract mismatch: batch_edit_schematic_components.edits.items missing")
+    item_properties = items.get("properties")
+    if not isinstance(item_properties, dict):
+        raise RuntimeError(
+            "Konnect schematic input contract mismatch: batch_edit_schematic_components.edits.items.properties missing"
+        )
+    for flag in ("in_bom", "on_board", "dnp"):
+        descriptor = item_properties.get(flag)
+        if not isinstance(descriptor, dict) or descriptor.get("type") != "boolean":
+            raise RuntimeError(
+                "Konnect schematic input contract mismatch: "
+                f"batch_edit_schematic_components nested flag {flag} missing or not boolean"
+            )
+
+
 def require_schematic_capabilities(client: McpClient) -> None:
     """Fail closed unless the deployed Konnect supports every A3 apply step."""
     schemas = {
@@ -548,6 +660,8 @@ def require_schematic_capabilities(client: McpClient) -> None:
         },
         "sch_wiring": {"batch_delete_schematic_wire"},
         "sch_components": {
+            "get_schematic_component",
+            "list_schematic_components",
             "set_schematic_page",
             "update_symbols_from_library",
             "reset_schematic_field_positions",
@@ -594,6 +708,7 @@ def require_schematic_capabilities(client: McpClient) -> None:
             }
     if missing_inputs:
         raise RuntimeError(f"Konnect schematic input contract mismatch: {missing_inputs}")
+    _require_nested_flag_edit_schema(schemas["sch_batch"]["batch_edit_schematic_components"])
 
 
 def apply_schematic(
@@ -652,6 +767,7 @@ def apply_schematic(
         },
     )
     _verify_final_symbol_refresh(client, schematic)
+    apply_power_flag_instance_flags(client, schematic)
 
 
 def parse_args() -> argparse.Namespace:

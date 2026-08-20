@@ -12,6 +12,7 @@ def disjoint_acceptance_schemas():
 
     return {
         "sch_components": {
+            "get_schematic_component": schema(("schematic", "reference"), "schematic", "reference"),
             "list_schematic_components": schema(("schematic",), "schematic"),
         },
         "sch_batch": {
@@ -284,6 +285,236 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "flip_component"):
             require_production_capabilities(FakeClient())
 
+    def test_narrow_migration_capability_gate_requires_read_tools_before_write(self):
+        from tools.check_schematic_acceptance import require_power_flag_instance_migration_capabilities
+        from tools.verify_schematic_apply import complete_schematic_schemas
+
+        class FakeClient:
+            def tool_schemas(self, toolset):
+                schemas = complete_schematic_schemas()
+                if toolset in schemas:
+                    data = deepcopy(schemas[toolset])
+                elif toolset == "sch_analysis":
+                    data = {
+                        "list_schematic_wires": {"required": ["schematic"], "properties": {"schematic": {}}},
+                        "list_schematic_labels": {"required": ["schematic"], "properties": {"schematic": {}}},
+                    }
+                else:
+                    raise AssertionError(toolset)
+                if toolset == "sch_batch":
+                    data["batch_edit_schematic_components"]["properties"]["edits"] = {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                name: {"type": kind}
+                                for name, kind in (
+                                    ("reference", "string"),
+                                    ("in_bom", "boolean"),
+                                    ("on_board", "boolean"),
+                                    ("dnp", "boolean"),
+                                )
+                            },
+                        },
+                    }
+                return data
+
+        require_power_flag_instance_migration_capabilities(FakeClient())
+
+        class MissingAnalysis(FakeClient):
+            def tool_schemas(self, toolset):
+                data = super().tool_schemas(toolset)
+                if toolset == "sch_analysis":
+                    data.pop("list_schematic_labels")
+                return data
+
+        with self.assertRaisesRegex(RuntimeError, "list_schematic_labels"):
+            require_power_flag_instance_migration_capabilities(MissingAnalysis())
+
+    def test_narrow_migration_applies_one_flag_batch_and_preserves_identities(self):
+        from tools.check_schematic_acceptance import migrate_power_flag_instance_flags
+
+        component_payload = {
+            "components": [
+                {
+                    "reference": "#FLG01",
+                    "uuid": "flag-1",
+                    "lib_id": "lh60-core:PowerFlag",
+                    "value": "PWR_FLAG",
+                    "footprint": "",
+                    "in_bom": True,
+                    "on_board": True,
+                    "dnp": False,
+                },
+                {
+                    "reference": "#FLG02",
+                    "uuid": "flag-2",
+                    "lib_id": "lh60-core:PowerFlag",
+                    "value": "PWR_FLAG",
+                    "footprint": "",
+                    "in_bom": True,
+                    "on_board": True,
+                    "dnp": False,
+                },
+                {
+                    "reference": "#FLG03",
+                    "uuid": "flag-3",
+                    "lib_id": "lh60-core:PowerFlag",
+                    "value": "PWR_FLAG",
+                    "footprint": "",
+                    "in_bom": True,
+                    "on_board": True,
+                    "dnp": False,
+                },
+            ]
+        }
+        wires = {"wires": [{"uuid": "wire-1"}, {"uuid": "wire-2"}]}
+        labels = {"labels": [{"uuid": "label-1"}, {"uuid": "label-2"}]}
+        batch_result = {
+            "atomic": True,
+            "updated_count": 3,
+            "updated": [
+                {
+                    "reference": f"#FLG0{index}",
+                    "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                    "changed_flags": ["on_board"],
+                }
+                for index in range(1, 4)
+            ],
+            "unchanged": [],
+        }
+        calls = []
+
+        class FakeClient:
+            def __init__(self):
+                self.component_calls = 0
+
+            def tool_schemas(self, toolset):
+                from tools.verify_schematic_apply import complete_schematic_schemas
+
+                schemas = complete_schematic_schemas()
+                if toolset in schemas:
+                    data = deepcopy(schemas[toolset])
+                elif toolset == "sch_analysis":
+                    data = {
+                        "list_schematic_wires": {"required": ["schematic"], "properties": {"schematic": {}}},
+                        "list_schematic_labels": {"required": ["schematic"], "properties": {"schematic": {}}},
+                    }
+                else:
+                    raise AssertionError(toolset)
+                if toolset == "sch_batch":
+                    data["batch_edit_schematic_components"]["properties"]["edits"] = {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                name: {"type": kind}
+                                for name, kind in (
+                                    ("reference", "string"),
+                                    ("in_bom", "boolean"),
+                                    ("on_board", "boolean"),
+                                    ("dnp", "boolean"),
+                                )
+                            },
+                        },
+                    }
+                return data
+
+            def call_tool(self, name, arguments):
+                calls.append((name, arguments))
+                if name == "batch_edit_schematic_components":
+                    return tool_text_result(batch_result)
+                raise AssertionError(name)
+
+            def call_tool_json(self, name, arguments):
+                calls.append((name, arguments))
+                if name == "list_schematic_components":
+                    self.component_calls += 1
+                    payload = deepcopy(component_payload)
+                    if self.component_calls > 1:
+                        for component in payload["components"]:
+                            if component["reference"].startswith("#FLG"):
+                                component["on_board"] = False
+                    return payload
+                if name == "list_schematic_wires":
+                    return deepcopy(wires)
+                if name == "list_schematic_labels":
+                    return deepcopy(labels)
+                raise AssertionError(name)
+
+        result = migrate_power_flag_instance_flags(
+            FakeClient(),
+            Path("/tmp/lh60.kicad_sch"),
+            Path("/tmp/evidence.json"),
+            safety_fn=lambda schematic, board: {
+                "schematic_sha256": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
+            },
+            component_hash_fn=lambda components: "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18",
+            pin_hash_fn=lambda schematic: "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58",
+            write_json_fn=lambda path, payload: calls.append(("write_json", {"path": str(path), "payload": payload})),
+        )
+        batch_calls = [call for call in calls if call[0] == "batch_edit_schematic_components"]
+        self.assertEqual(len(batch_calls), 1)
+        self.assertEqual(
+            batch_calls[0][1],
+            {
+                "schematic": "/tmp/lh60.kicad_sch",
+                "edits": [
+                    {"reference": "#FLG01", "in_bom": True, "on_board": False, "dnp": False},
+                    {"reference": "#FLG02", "in_bom": True, "on_board": False, "dnp": False},
+                    {"reference": "#FLG03", "in_bom": True, "on_board": False, "dnp": False},
+                ],
+            },
+        )
+        self.assertEqual(
+            [name for name, _ in calls if name in {"list_schematic_components", "list_schematic_wires", "list_schematic_labels"}],
+            [
+                "list_schematic_components",
+                "list_schematic_wires",
+                "list_schematic_labels",
+                "list_schematic_components",
+                "list_schematic_wires",
+                "list_schematic_labels",
+            ],
+        )
+        self.assertEqual(result["batch"]["updated_count"], 3)
+
+    def test_narrow_migration_rejects_identity_or_non_flag_drift(self):
+        from tools.check_schematic_acceptance import assert_power_flag_migration_post_state
+
+        before = {
+            "components": [
+                {"reference": "#FLG01", "uuid": "flag-1", "in_bom": True, "on_board": True, "dnp": False},
+                {"reference": "#FLG02", "uuid": "flag-2", "in_bom": True, "on_board": True, "dnp": False},
+                {"reference": "#FLG03", "uuid": "flag-3", "in_bom": True, "on_board": True, "dnp": False},
+                {"reference": "U1", "uuid": "u1", "in_bom": None, "on_board": None, "dnp": None},
+            ],
+            "wire_uuids": ["wire-1"],
+            "label_uuids": ["label-1"],
+        }
+        after = {
+            "components": [
+                {"reference": "#FLG01", "uuid": "flag-1", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG02", "uuid": "flag-2", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG03", "uuid": "flag-3", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "U1", "uuid": "u1", "in_bom": None, "on_board": None, "dnp": None},
+            ],
+            "wire_uuids": ["wire-1"],
+            "label_uuids": ["label-1"],
+        }
+        assert_power_flag_migration_post_state(before, after)
+
+        drifted = deepcopy(after)
+        drifted["components"][3]["dnp"] = True
+        with self.assertRaisesRegex(AssertionError, "unrelated flag drift"):
+            assert_power_flag_migration_post_state(before, drifted)
+
+        rewired = deepcopy(after)
+        rewired["wire_uuids"] = ["wire-2"]
+        with self.assertRaisesRegex(AssertionError, "wire identity"):
+            assert_power_flag_migration_post_state(before, rewired)
+
     def test_semantic_comparison_normalizes_net_and_pin_order(self):
         from tools.check_schematic_acceptance import assert_semantically_equal
 
@@ -385,6 +616,16 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         }
         with self.assertRaisesRegex(AssertionError, "inventory mismatch"):
             _assert_acceptance(data)
+
+    def test_cli_exposes_narrow_migration_mode_and_requires_output(self):
+        import sys
+        from unittest import mock
+
+        from tools import check_schematic_acceptance as checker
+
+        with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags"]):
+            with self.assertRaisesRegex(SystemExit, "2"):
+                checker.main()
 
     def test_approval_recording_requires_human_identity_and_complete_checklist(self):
         from tools.check_schematic_acceptance import record_visual_approval
@@ -536,6 +777,22 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                             "unchanged": [],
                         }
                     )
+                if name == "batch_edit_schematic_components" and len(arguments["edits"]) == 3:
+                    return tool_text_result(
+                        {
+                            "atomic": True,
+                            "updated_count": 3,
+                            "updated": [
+                                {
+                                    "reference": f"#FLG0{index}",
+                                    "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                                    "changed_flags": ["dnp", "in_bom", "on_board"],
+                                }
+                                for index in range(1, 4)
+                            ],
+                            "unchanged": [],
+                        }
+                    )
                 return tool_text_result({"ok": True})
 
             def call_tool_json(self, name, arguments):
@@ -675,6 +932,22 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                                 "no_property": [],
                                 "not_found": [],
                                 "moved": ["U1.Reference", "U1.Value"],
+                                "unchanged": [],
+                            }
+                        )
+                    if name == "batch_edit_schematic_components" and len(arguments["edits"]) == 3:
+                        return tool_text_result(
+                            {
+                                "atomic": True,
+                                "updated_count": 3,
+                                "updated": [
+                                    {
+                                        "reference": f"#FLG0{index}",
+                                        "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                                        "changed_flags": ["dnp", "in_bom", "on_board"],
+                                    }
+                                    for index in range(1, 4)
+                                ],
                                 "unchanged": [],
                             }
                         )
