@@ -451,13 +451,14 @@ def require_power_flag_instance_migration_capabilities(client: McpClient) -> Non
     require_schematic_capabilities(client)
     schemas = {
         toolset: client.tool_schemas(toolset)
-        for toolset in ("sch_components", "sch_analysis")
+        for toolset in ("sch_components", "sch_analysis", "sch_export")
     }
     contracts = {
         "get_schematic_component": ("sch_components", ("schematic", "reference"), ("schematic", "reference")),
         "list_schematic_components": ("sch_components", ("schematic",), ("schematic",)),
         "list_schematic_wires": ("sch_analysis", ("schematic",), ("schematic",)),
         "list_schematic_labels": ("sch_analysis", ("schematic",), ("schematic",)),
+        "export_netlist_summary": ("sch_export", ("schematic",), ("schematic",)),
     }
     missing = {}
     for tool, (toolset, required_inputs, property_inputs) in contracts.items():
@@ -549,9 +550,9 @@ def _component_contract_hash_from_components(components: list[dict[str, Any]]) -
     return _stable_hash(normalize_actual_components(components))
 
 
-def _pin_contract_hash_from_schematic(schematic: Path) -> str:
-    _ = schematic
-    return FROZEN_PIN_SHA256
+def _pin_contract_hash_from_schematic(client: McpClient, schematic: Path) -> str:
+    netlist = client.call_tool_json("export_netlist_summary", {"schematic": str(schematic)})
+    return _stable_hash(normalize_exported_pins(netlist))
 
 
 def migrate_power_flag_instance_flags(
@@ -576,21 +577,27 @@ def migrate_power_flag_instance_flags(
     if safety["pcb_sha256"] != POWER_FLAG_INSTANCE_CONTRACT["pcb_sha256"]:
         raise AssertionError("PCB SHA drift detected")
     before = state_query_fn(client, schematic)
+    before_pin_hash = pin_hash_fn(client, schematic)
+    if before_pin_hash != POWER_FLAG_INSTANCE_CONTRACT["pin_sha256"]:
+        raise AssertionError("pin contract hash drift detected before migration")
     batch = apply_fn(client, schematic)
     after = state_query_fn(client, schematic)
     assert_power_flag_migration_post_state(before, after)
     component_hash = component_hash_fn(after["components"])
     if component_hash != POWER_FLAG_INSTANCE_CONTRACT["component_sha256"]:
         raise AssertionError("component contract hash drift detected")
-    pin_hash = pin_hash_fn(schematic)
+    pin_hash = pin_hash_fn(client, schematic)
+    if pin_hash != before_pin_hash:
+        raise AssertionError("pin contract hash drift detected after migration")
     if pin_hash != POWER_FLAG_INSTANCE_CONTRACT["pin_sha256"]:
-        raise AssertionError("pin contract hash drift detected")
+        raise AssertionError("pin contract hash drift detected after migration")
     result = {
         "mode": "power-flag-instance-migration",
         "schematic": str(schematic),
         "contract": POWER_FLAG_INSTANCE_CONTRACT,
         "predelete_safety": safety,
         "before": before,
+        "before_pin_sha256": before_pin_hash,
         "batch": batch,
         "after": after,
         "component_sha256": component_hash,

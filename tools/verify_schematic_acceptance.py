@@ -299,6 +299,10 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                         "list_schematic_wires": {"required": ["schematic"], "properties": {"schematic": {}}},
                         "list_schematic_labels": {"required": ["schematic"], "properties": {"schematic": {}}},
                     }
+                elif toolset == "sch_export":
+                    data = {
+                        "export_netlist_summary": {"required": ["schematic"], "properties": {"schematic": {}}},
+                    }
                 else:
                     raise AssertionError(toolset)
                 if toolset == "sch_batch":
@@ -330,6 +334,16 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "list_schematic_labels"):
             require_power_flag_instance_migration_capabilities(MissingAnalysis())
+
+        class MissingNetlist(FakeClient):
+            def tool_schemas(self, toolset):
+                data = super().tool_schemas(toolset)
+                if toolset == "sch_export":
+                    data.pop("export_netlist_summary")
+                return data
+
+        with self.assertRaisesRegex(RuntimeError, "export_netlist_summary"):
+            require_power_flag_instance_migration_capabilities(MissingNetlist())
 
     def test_narrow_migration_applies_one_flag_batch_and_preserves_identities(self):
         from tools.check_schematic_acceptance import migrate_power_flag_instance_flags
@@ -370,6 +384,18 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         }
         wires = {"wires": [{"uuid": "wire-1"}, {"uuid": "wire-2"}]}
         labels = {"labels": [{"uuid": "label-1"}, {"uuid": "label-2"}]}
+        netlist_before = {
+            "components": [
+                {"reference": "U1", "pins": [{"number": "23", "net": "VSYS"}]},
+                {"reference": "J1", "pins": [{"number": "1", "net": "VSYS"}]},
+                {"reference": "J1", "pins": [{"number": "2", "net": "3V3"}]},
+                {"reference": "J1", "pins": [{"number": "3", "net": "GND"}]},
+                {"reference": "#FLG01", "pins": [{"number": "1", "net": "VSYS"}]},
+                {"reference": "#FLG02", "pins": [{"number": "1", "net": "3V3"}]},
+                {"reference": "#FLG03", "pins": [{"number": "1", "net": "GND"}]},
+            ]
+        }
+        netlist_after = deepcopy(netlist_before)
         batch_result = {
             "atomic": True,
             "updated_count": 3,
@@ -399,6 +425,10 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                     data = {
                         "list_schematic_wires": {"required": ["schematic"], "properties": {"schematic": {}}},
                         "list_schematic_labels": {"required": ["schematic"], "properties": {"schematic": {}}},
+                    }
+                elif toolset == "sch_export":
+                    data = {
+                        "export_netlist_summary": {"required": ["schematic"], "properties": {"schematic": {}}},
                     }
                 else:
                     raise AssertionError(toolset)
@@ -440,6 +470,8 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                     return deepcopy(wires)
                 if name == "list_schematic_labels":
                     return deepcopy(labels)
+                if name == "export_netlist_summary":
+                    return deepcopy(netlist_after if self.component_calls > 1 else netlist_before)
                 raise AssertionError(name)
 
         result = migrate_power_flag_instance_flags(
@@ -451,7 +483,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
             },
             component_hash_fn=lambda components: "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18",
-            pin_hash_fn=lambda schematic: "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58",
+            pin_hash_fn=lambda client, schematic: calls.append(("export_netlist_summary", {"schematic": str(schematic)})) or "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58",
             write_json_fn=lambda path, payload: calls.append(("write_json", {"path": str(path), "payload": payload})),
         )
         batch_calls = [call for call in calls if call[0] == "batch_edit_schematic_components"]
@@ -468,17 +500,90 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             },
         )
         self.assertEqual(
-            [name for name, _ in calls if name in {"list_schematic_components", "list_schematic_wires", "list_schematic_labels"}],
+            [name for name, _ in calls if name in {"list_schematic_components", "list_schematic_wires", "list_schematic_labels", "export_netlist_summary"}],
             [
                 "list_schematic_components",
                 "list_schematic_wires",
                 "list_schematic_labels",
+                "export_netlist_summary",
                 "list_schematic_components",
                 "list_schematic_wires",
                 "list_schematic_labels",
+                "export_netlist_summary",
             ],
         )
         self.assertEqual(result["batch"]["updated_count"], 3)
+
+    def test_narrow_migration_rejects_pin_hash_drift_from_runtime_netlist(self):
+        from tools.check_schematic_acceptance import migrate_power_flag_instance_flags
+
+        component_payload = {
+            "components": [
+                {"reference": "#FLG01", "uuid": "flag-1", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG02", "uuid": "flag-2", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG03", "uuid": "flag-3", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
+            ]
+        }
+
+        class FakeClient:
+            def tool_schemas(self, toolset):
+                from tools.verify_schematic_apply import complete_schematic_schemas
+
+                schemas = complete_schematic_schemas()
+                if toolset in schemas:
+                    data = deepcopy(schemas[toolset])
+                elif toolset == "sch_analysis":
+                    data = {
+                        "list_schematic_wires": {"required": ["schematic"], "properties": {"schematic": {}}},
+                        "list_schematic_labels": {"required": ["schematic"], "properties": {"schematic": {}}},
+                    }
+                elif toolset == "sch_export":
+                    data = {
+                        "export_netlist_summary": {"required": ["schematic"], "properties": {"schematic": {}}},
+                    }
+                else:
+                    raise AssertionError(toolset)
+                return data
+
+            def call_tool(self, name, arguments):
+                if name == "batch_edit_schematic_components":
+                    return tool_text_result(
+                        {
+                            "atomic": True,
+                            "updated_count": 3,
+                            "updated": [
+                                {"reference": "#FLG01", "flags": {"in_bom": True, "on_board": False, "dnp": False}, "changed_flags": []},
+                                {"reference": "#FLG02", "flags": {"in_bom": True, "on_board": False, "dnp": False}, "changed_flags": []},
+                                {"reference": "#FLG03", "flags": {"in_bom": True, "on_board": False, "dnp": False}, "changed_flags": []},
+                            ],
+                            "unchanged": [],
+                        }
+                    )
+                raise AssertionError(name)
+
+            def call_tool_json(self, name, arguments):
+                if name == "list_schematic_components":
+                    return deepcopy(component_payload)
+                if name == "list_schematic_wires":
+                    return {"wires": [{"uuid": "wire-1"}]}
+                if name == "list_schematic_labels":
+                    return {"labels": [{"uuid": "label-1"}]}
+                if name == "export_netlist_summary":
+                    return {"components": [{"reference": "U1", "pins": [{"number": "99", "net": "WRONG"}]}]}
+                raise AssertionError(name)
+
+        with self.assertRaisesRegex(AssertionError, "pin contract hash drift"):
+            migrate_power_flag_instance_flags(
+                FakeClient(),
+                Path("/tmp/lh60.kicad_sch"),
+                Path("/tmp/evidence.json"),
+                safety_fn=lambda schematic, board: {
+                    "schematic_sha256": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                    "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
+                },
+                component_hash_fn=lambda components: "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18",
+                write_json_fn=lambda *unused: None,
+            )
 
     def test_narrow_migration_rejects_identity_or_non_flag_drift(self):
         from tools.check_schematic_acceptance import assert_power_flag_migration_post_state
@@ -626,6 +731,51 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags"]):
             with self.assertRaisesRegex(SystemExit, "2"):
                 checker.main()
+
+    def test_cli_rejects_migration_mode_with_other_modes(self):
+        import sys
+        from unittest import mock
+
+        from tools import check_schematic_acceptance as checker
+
+        for argv in (
+            ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags", "--production", "--output", "/tmp/out.json", "--candidate-evidence", "/tmp/evidence.json"],
+            ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags", "--preflight", "--output", "/tmp/out.json"],
+            ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags", "--record-visual-approval", "--output", "/tmp/out.json"],
+        ):
+            with self.subTest(argv=argv):
+                with mock.patch.object(sys, "argv", argv):
+                    with self.assertRaisesRegex(SystemExit, "2"):
+                        checker.main()
+
+    def test_cli_dispatches_only_narrow_migration_mode(self):
+        import sys
+        from unittest import mock
+
+        from tools import check_schematic_acceptance as checker
+
+        calls = []
+
+        class FakeClient:
+            def __enter__(self):
+                calls.append(("client-enter", None))
+                return self
+
+            def __exit__(self, *unused):
+                calls.append(("client-exit", None))
+                return None
+
+        with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags", "--output", "/tmp/out.json"]):
+            with mock.patch.object(checker, "McpClient", return_value=FakeClient()):
+                with mock.patch.object(checker, "migrate_power_flag_instance_flags", side_effect=lambda client, schematic, output: calls.append(("migrate", (str(schematic), str(output)))) or {"mode": "power-flag-instance-migration"}):
+                    with mock.patch.object(checker, "run_production_transaction", side_effect=AssertionError("production-called")):
+                        with mock.patch.object(checker, "preflight", side_effect=AssertionError("preflight-called")):
+                            with mock.patch.object(checker, "candidate", side_effect=AssertionError("candidate-called")):
+                                checker.main()
+
+        self.assertEqual(calls[0][0], "client-enter")
+        self.assertEqual(calls[1], ("migrate", (str(checker.SCHEMATIC), "/tmp/out.json")))
+        self.assertEqual(calls[-1][0], "client-exit")
 
     def test_approval_recording_requires_human_identity_and_complete_checklist(self):
         from tools.check_schematic_acceptance import record_visual_approval

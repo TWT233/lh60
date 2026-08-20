@@ -623,6 +623,126 @@ class SchematicApplyContractTest(unittest.TestCase):
         self.assertTrue(result["atomic"])
         self.assertEqual(result["updated_count"], 3)
 
+    def test_power_flag_instance_apply_helper_rejects_malformed_accounting(self):
+        from tools.lh60_design.schematic import apply_power_flag_instance_flags
+
+        cases = (
+            (
+                "updated-count-mismatch",
+                {
+                    "atomic": True,
+                    "updated_count": 2,
+                    "updated": [
+                        {
+                            "reference": "#FLG01",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                        {
+                            "reference": "#FLG02",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                        {
+                            "reference": "#FLG03",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                    ],
+                    "unchanged": [],
+                },
+                "updated_count",
+            ),
+            (
+                "total-accounting-mismatch",
+                {
+                    "atomic": True,
+                    "updated_count": 2,
+                    "updated": [
+                        {
+                            "reference": "#FLG01",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                        {
+                            "reference": "#FLG02",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                    ],
+                    "unchanged": [],
+                },
+                "accounting",
+            ),
+            (
+                "duplicate-reference",
+                {
+                    "atomic": True,
+                    "updated_count": 2,
+                    "updated": [
+                        {
+                            "reference": "#FLG01",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                        {
+                            "reference": "#FLG01",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                    ],
+                    "unchanged": [
+                        {
+                            "reference": "#FLG03",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": [],
+                        }
+                    ],
+                },
+                "unique",
+            ),
+            (
+                "wrong-flags",
+                {
+                    "atomic": True,
+                    "updated_count": 3,
+                    "updated": [
+                        {
+                            "reference": "#FLG01",
+                            "flags": {"in_bom": True, "on_board": True, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                        {
+                            "reference": "#FLG02",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                        {
+                            "reference": "#FLG03",
+                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
+                            "changed_flags": ["on_board"],
+                        },
+                    ],
+                    "unchanged": [],
+                },
+                "final flags mismatch",
+            ),
+        )
+
+        class FakeClient:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def call_tool(self, name, arguments):
+                if name != "batch_edit_schematic_components":
+                    raise AssertionError(name)
+                return tool_text_result(self.payload)
+
+        for label, payload, message in cases:
+            with self.subTest(label=label):
+                with self.assertRaisesRegex(RuntimeError, message):
+                    apply_power_flag_instance_flags(FakeClient(payload), "/tmp/lh60-debug.kicad_sch")
+
     def test_apply_aborts_before_wiring_on_early_refresh_diagnostics(self):
         from tools.lh60_design.schematic import apply_schematic
 

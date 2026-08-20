@@ -580,16 +580,16 @@ def apply_power_flag_instance_flags(
     )
     if result.get("atomic") is not True:
         raise RuntimeError("batch_edit_schematic_components did not complete atomically")
-    if result.get("updated_count") != len(edits):
-        updated_entries = result.get("updated", [])
-        if not isinstance(updated_entries, list) or result.get("updated_count") != len(updated_entries):
-            raise RuntimeError("batch_edit_schematic_components updated_count mismatch")
     updated = result.get("updated", [])
     unchanged = result.get("unchanged", [])
     if not isinstance(updated, list) or not isinstance(unchanged, list):
         raise RuntimeError("batch_edit_schematic_components accounting must be lists")
+    if result.get("updated_count") != len(updated):
+        raise RuntimeError("batch_edit_schematic_components updated_count mismatch")
+    if len(updated) + len(unchanged) != len(edits):
+        raise RuntimeError("batch_edit_schematic_components accounting mismatch")
     expected = {reference: dict(flags) for reference, flags in POWER_FLAG_INSTANCE_FLAGS.items()}
-    seen = set()
+    seen = []
     for key, entries in (("updated", updated), ("unchanged", unchanged)):
         for item in entries:
             if isinstance(item, str):
@@ -611,8 +611,10 @@ def apply_power_flag_instance_flags(
             invalid_changed_flags = set(changed_flags) - {"dnp", "in_bom", "on_board"}
             if invalid_changed_flags:
                 raise RuntimeError(f"batch_edit_schematic_components changed_flags mismatch for {reference}")
-            seen.add(str(reference))
-    if seen != set(expected):
+            seen.append(str(reference))
+    if len(seen) != len(set(seen)):
+        raise RuntimeError("batch_edit_schematic_components references must be unique")
+    if set(seen) != set(expected):
         raise RuntimeError(
             f"batch_edit_schematic_components accounting mismatch: seen={sorted(seen)}, expected={sorted(expected)}"
         )
