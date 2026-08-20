@@ -8,7 +8,7 @@ It is a production-evidence report, not a fabrication release note.
 
 Evidence source:
 
-- production evidence root: `/data00/home/wangqiyilang/.cache/r3-identity-rebind/l6-production.PN3Aga`
+- one-off production provenance root: `/data00/home/wangqiyilang/.cache/r3-identity-rebind/l6-production.PN3Aga`
 - worktree commit under report: `97b30f0c223d8d77df9562c87ef0045fc67596db`
 
 ## Status
@@ -62,29 +62,29 @@ surface stable and path-based.
 
 | Ref | Pin | Net | X (mm) | Y (mm) | Rot (deg) | Layer | Access Envelope | Pin 1 | 15 mm Extraction |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| J1 | 1 | VSYS | 282.50 | 36.00 | 0.0 | B.Cu | right-edge power header, 15 mm extraction | readable | yes |
-| J1 | 2 | 3V3 | 282.50 | 33.46 | 0.0 | B.Cu | right-edge power header, 15 mm extraction | readable | yes |
-| J1 | 3 | GND | 282.50 | 30.92 | 0.0 | B.Cu | right-edge power header, 15 mm extraction | readable | yes |
-| J2 | 1 | COL0 | 77.50 | 92.00 | 0.0 | B.Cu | top-edge column group A, 15 mm extraction | readable | yes |
-| J2 | 2 | COL1 | 77.50 | 89.46 | 0.0 | B.Cu | top-edge column group A, 15 mm extraction | readable | yes |
-| J2 | 3 | COL2 | 77.50 | 86.92 | 0.0 | B.Cu | top-edge column group A, 15 mm extraction | readable | yes |
-| J2 | 4 | COL3 | 77.50 | 84.38 | 0.0 | B.Cu | top-edge column group A, 15 mm extraction | readable | yes |
-| J2 | 5 | COL4 | 77.50 | 81.84 | 0.0 | B.Cu | top-edge column group A, 15 mm extraction | readable | yes |
-| J3 | 1 | COL5 | 107.50 | 92.00 | 0.0 | B.Cu | top-edge column group B, 15 mm extraction | readable | yes |
-| J3 | 2 | COL6 | 107.50 | 89.46 | 0.0 | B.Cu | top-edge column group B, 15 mm extraction | readable | yes |
-| J3 | 3 | COL7 | 107.50 | 86.92 | 0.0 | B.Cu | top-edge column group B, 15 mm extraction | readable | yes |
-| J3 | 4 | COL8 | 107.50 | 84.38 | 0.0 | B.Cu | top-edge column group B, 15 mm extraction | readable | yes |
-| J3 | 5 | COL9 | 107.50 | 81.84 | 0.0 | B.Cu | top-edge column group B, 15 mm extraction | readable | yes |
-| J4 | 1 | ROW0 | 3.00 | 49.50 | 0.0 | B.Cu | left-edge row group A, 15 mm extraction | readable | yes |
-| J4 | 2 | ROW1 | 3.00 | 46.96 | 0.0 | B.Cu | left-edge row group A, 15 mm extraction | readable | yes |
-| J4 | 3 | ROW2 | 3.00 | 44.42 | 0.0 | B.Cu | left-edge row group A, 15 mm extraction | readable | yes |
-| J4 | 4 | ROW3 | 3.00 | 41.88 | 0.0 | B.Cu | left-edge row group A, 15 mm extraction | readable | yes |
-| J5 | 1 | ROW4 | 3.00 | 55.50 | 180.0 | B.Cu | left-edge row group B, 15 mm extraction | readable | yes |
-| J5 | 2 | ROW5 | 3.00 | 58.04 | 180.0 | B.Cu | left-edge row group B, 15 mm extraction | readable | yes |
-| J5 | 3 | ROW6 | 3.00 | 60.58 | 180.0 | B.Cu | left-edge row group B, 15 mm extraction | readable | yes |
-| J6 | 1 | GP27 | 282.50 | 42.00 | 180.0 | B.Cu | right-edge aux header, 15 mm extraction | readable | yes |
-| J6 | 2 | GP28 | 282.50 | 44.54 | 180.0 | B.Cu | right-edge aux header, 15 mm extraction | readable | yes |
-| J6 | 3 | GP29 | 282.50 | 47.08 | 180.0 | B.Cu | right-edge aux header, 15 mm extraction | readable | yes |
+| J1 | 1 | VSYS | 282.50 | 36.00 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | readable | yes |
+| J1 | 2 | 3V3 | 282.50 | 33.46 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | readable | yes |
+| J1 | 3 | GND | 282.50 | 30.92 | 0.0 | B.Cu | `Rect(280.23, 28.65, 284.77, 38.27)` | readable | yes |
+| J2 | 1 | COL0 | 77.50 | 92.00 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
+| J2 | 2 | COL1 | 77.50 | 89.46 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
+| J2 | 3 | COL2 | 77.50 | 86.92 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
+| J2 | 4 | COL3 | 77.50 | 84.38 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
+| J2 | 5 | COL4 | 77.50 | 81.84 | 0.0 | B.Cu | `Rect(75.23, 79.57, 79.77, 94.27)` | readable | yes |
+| J3 | 1 | COL5 | 107.50 | 92.00 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
+| J3 | 2 | COL6 | 107.50 | 89.46 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
+| J3 | 3 | COL7 | 107.50 | 86.92 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
+| J3 | 4 | COL8 | 107.50 | 84.38 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
+| J3 | 5 | COL9 | 107.50 | 81.84 | 0.0 | B.Cu | `Rect(105.23, 79.57, 109.77, 94.27)` | readable | yes |
+| J4 | 1 | ROW0 | 3.00 | 49.50 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
+| J4 | 2 | ROW1 | 3.00 | 46.96 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
+| J4 | 3 | ROW2 | 3.00 | 44.42 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
+| J4 | 4 | ROW3 | 3.00 | 41.88 | 0.0 | B.Cu | `Rect(0.73, 39.61, 5.27, 51.77)` | readable | yes |
+| J5 | 1 | ROW4 | 3.00 | 55.50 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | readable | yes |
+| J5 | 2 | ROW5 | 3.00 | 58.04 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | readable | yes |
+| J5 | 3 | ROW6 | 3.00 | 60.58 | 180.0 | B.Cu | `Rect(0.73, 53.23, 5.27, 62.85)` | readable | yes |
+| J6 | 1 | GP27 | 282.50 | 42.00 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | readable | yes |
+| J6 | 2 | GP28 | 282.50 | 44.54 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | readable | yes |
+| J6 | 3 | GP29 | 282.50 | 47.08 | 180.0 | B.Cu | `Rect(280.23, 39.73, 284.77, 49.35)` | readable | yes |
 
 ## Evidence Digests
 
@@ -106,23 +106,43 @@ Konnect changes deployed for the production placement evidence:
   - `3e73a40`
   - `c3098c1`
   - `136b969`
-- deployed binary digest: `ff931a...`
+- deployed binary digest: `ff931a373e205402950a209596ab96958da837393dd84cfd9effcdc499daa0e3`
 
 ## Reproducible Gates
 
-The delivery artifact is this report plus the production evidence directory.
-Do not treat a temporary shell path as the deliverable.
+The delivery artifact is this repo-local report plus the repo-local checker
+entrypoint. The cache directory above is historical provenance from one
+production run, not the long-term delivery surface.
 
-Re-run gates from the checked-out repository and stable evidence root:
+Canonical rerun contract for this report family, once the acceptance checker
+unit merges into the repository:
 
 ```bash
+# Preconditions:
+# 1. KiCad must be running with the target production board open.
+# 2. The Konnect IPC socket must be reachable from the deployed binary.
+# 3. The checker writes fresh evidence paths chosen by the operator; those
+#    outputs become the new run artifacts, not this historical cache path.
+PYTHONDONTWRITEBYTECODE=1 python tools/check_pcb_acceptance.py \
+  --production \
+  --output docs/reports/2026-08-18-debug-connectors-placement.json \
+  --svg docs/reports/2026-08-18-debug-connectors-placement.svg \
+  --positions docs/reports/2026-08-18-debug-connectors-placement.csv
 python -m compileall -q tools
 git diff --check
 ```
 
-Production evidence should be verified against:
+This report preserves `save_count == 1` as immutable historical production
+evidence from the run rooted at
+`/data00/home/wangqiyilang/.cache/r3-identity-rebind/l6-production.PN3Aga`.
+A read-only checker rerun is expected to validate placement, hashes, digests,
+and exported tables, but it does not retroactively reproduce that original
+write count.
 
-- the production evidence root
+Historical provenance for the recorded production run should still be verified
+against:
+
+- the one-off provenance root
 - the reported worktree commit
 - `readback.json` for connector coordinates, layer, pad nets, and final DRC tuple
 - `closed-placement.json` for placement transform summary
@@ -130,7 +150,7 @@ Production evidence should be verified against:
 - `positions.csv` to confirm no `J1..J6` rows are emitted in PnP output
 - `back.svg` and `back.png` as the rendered back-side review artifacts
 - the recorded schematic and PCB hashes
-- the `save_count == 1` assertion
+- the historical `save_count == 1` assertion
 - the post-run DRC tuple `163/367/0`
 - the nearest `B.CrtYd` clearance snapshots
 - the connector pin table above
