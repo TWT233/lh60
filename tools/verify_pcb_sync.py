@@ -517,6 +517,34 @@ class ExactOwnershipClient:
 
 
 class PcbSyncContractTest(unittest.TestCase):
+    def test_hash_gate_accepts_migrated_schematic_and_rejects_pre_migration_hash(self):
+        import tools.sync_debug_connectors as pcb_sync
+
+        migrated_schematic_hash = (
+            "5322b7f21c10854aef14f7ca92ac35353f9fb9b7abd215451b4b4678a41aa1ac"
+        )
+        pre_migration_schematic_hash = (
+            "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9"
+        )
+
+        self.assertEqual(pcb_sync.EXPECTED_SCHEMATIC_HASH, migrated_schematic_hash)
+
+        with mock.patch(
+            "tools.sync_debug_connectors._sha256",
+            side_effect=[migrated_schematic_hash, pcb_sync.EXPECTED_BOARD_HASH],
+        ):
+            self.assertEqual(
+                pcb_sync._validate_hashes(pcb_sync.SCHEMATIC, pcb_sync.BOARD),
+                (migrated_schematic_hash, pcb_sync.EXPECTED_BOARD_HASH),
+            )
+
+        with mock.patch(
+            "tools.sync_debug_connectors._sha256",
+            side_effect=[pre_migration_schematic_hash, pcb_sync.EXPECTED_BOARD_HASH],
+        ):
+            with self.assertRaisesRegex(RuntimeError, "protected schematic hash mismatch"):
+                pcb_sync._validate_hashes(pcb_sync.SCHEMATIC, pcb_sync.BOARD)
+
     def test_literal_maps_and_exact_reference_inventories_are_frozen(self):
         from tools.sync_debug_connectors import (
             CONNECTOR_FOOTPRINTS as actual_footprints,
@@ -726,6 +754,7 @@ class PcbSyncContractTest(unittest.TestCase):
                     capture_baseline(client, SCHEMATIC, BOARD)
 
     def test_safety_count_fields_reject_booleans(self):
+        import tools.sync_debug_connectors as pcb_sync
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, capture_baseline, sync_debug_connectors
 
         component_client = FakeClient()
@@ -787,6 +816,7 @@ class PcbSyncContractTest(unittest.TestCase):
             capture_baseline(client, SCHEMATIC, BOARD)
 
     def test_sync_refuses_any_pre_delete_mismatch_before_first_delete(self):
+        import tools.sync_debug_connectors as pcb_sync
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
 
         bad_hash_baseline = {
@@ -823,6 +853,7 @@ class PcbSyncContractTest(unittest.TestCase):
                 self.assertFalse(any(name == "save_project" for name, _ in client.calls))
 
     def test_sync_refuses_live_inventory_that_differs_from_the_captured_baseline(self):
+        import tools.sync_debug_connectors as pcb_sync
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
 
         baseline = baseline_fixture()
@@ -911,6 +942,7 @@ class PcbSyncContractTest(unittest.TestCase):
                         pcb_sync._require_baseline_git_revision(baseline_sha)
 
     def test_sync_executes_exact_delete_review_apply_and_save_contract(self):
+        import tools.sync_debug_connectors as pcb_sync
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, capture_baseline, sync_debug_connectors
 
         capture_client = FakeClient()
@@ -988,7 +1020,7 @@ class PcbSyncContractTest(unittest.TestCase):
             nonlocal board_hash_calls
             hash_events.append(("hash", path.resolve()))
             if path.resolve() == SCHEMATIC.resolve():
-                return "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9"
+                return pcb_sync.EXPECTED_SCHEMATIC_HASH
             board_hash_calls += 1
             if board_hash_calls == 1:
                 return "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664"
@@ -1072,7 +1104,7 @@ class PcbSyncContractTest(unittest.TestCase):
         self.assertEqual(
             evidence["before_hashes"],
             {
-                "schematic": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                "schematic": pcb_sync.EXPECTED_SCHEMATIC_HASH,
                 "board": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
             },
         )
@@ -1086,7 +1118,7 @@ class PcbSyncContractTest(unittest.TestCase):
         self.assertEqual(
             evidence["after_hashes"],
             {
-                "schematic": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                "schematic": pcb_sync.EXPECTED_SCHEMATIC_HASH,
                 "board": "saved-board-hash",
             },
         )
@@ -1385,6 +1417,7 @@ class PcbSyncContractTest(unittest.TestCase):
                 self.assertFalse(any(name == "save_project" for name, _ in client.calls))
 
     def test_sync_post_save_validation_failure_never_saves_twice(self):
+        import tools.sync_debug_connectors as pcb_sync
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
 
         cases = ("attribute", "pad", "zone", "track", "trace", "drc")
@@ -1447,9 +1480,9 @@ class PcbSyncContractTest(unittest.TestCase):
                 baseline = baseline_fixture()
                 hash_values = iter(
                     (
-                        "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                        pcb_sync.EXPECTED_SCHEMATIC_HASH,
                         "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
-                        "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                        pcb_sync.EXPECTED_SCHEMATIC_HASH,
                         "saved-board-hash",
                     )
                 )
@@ -1463,6 +1496,7 @@ class PcbSyncContractTest(unittest.TestCase):
                 )
 
     def test_sync_refuses_empty_apply_undo_and_final_noop_drift(self):
+        import tools.sync_debug_connectors as pcb_sync
         from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
 
         apply_undo_client = FakeClient()
@@ -1570,9 +1604,9 @@ class PcbSyncContractTest(unittest.TestCase):
         )
         hash_values = iter(
             (
-                "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                pcb_sync.EXPECTED_SCHEMATIC_HASH,
                 "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
-                "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                pcb_sync.EXPECTED_SCHEMATIC_HASH,
                 "saved-board-hash",
             )
         )
