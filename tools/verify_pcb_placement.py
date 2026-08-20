@@ -1,5 +1,8 @@
 from collections import Counter
+from copy import deepcopy
+from dataclasses import replace
 import unittest
+from unittest import mock
 
 
 class SocketPlacementPlanTest(unittest.TestCase):
@@ -334,197 +337,285 @@ class ConnectorPlacementPlanTest(unittest.TestCase):
                         1.0,
                     )
 
-    def test_apply_sets_each_header_pose_then_idempotent_back_side(self):
+    @staticmethod
+    def _batch_pose_schema():
+        return {
+            "additionalProperties": False,
+            "properties": {
+                "board": {"type": "string"},
+                "placements": {
+                    "items": {
+                        "additionalProperties": False,
+                        "properties": {
+                            "layer": {
+                                "enum": ["F.Cu", "B.Cu"],
+                                "type": "string",
+                            },
+                            "reference": {"type": "string"},
+                            "rotation": {"type": "number"},
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                        },
+                        "required": [
+                            "reference",
+                            "x",
+                            "y",
+                            "rotation",
+                            "layer",
+                        ],
+                        "type": "object",
+                    },
+                    "type": "array",
+                },
+            },
+            "required": ["board", "placements"],
+            "type": "object",
+        }
+
+    @staticmethod
+    def _atomic_response(changed):
+        from tools.lh60_design.pcb import frozen_connector_placements
+
+        return {
+            "source": "file",
+            "atomic": True,
+            "changed": changed,
+            "updated_count": 6 if changed else 0,
+            "placements": [
+                {
+                    "reference": placement.reference,
+                    "x": placement.x_mm,
+                    "y": placement.y_mm,
+                    "rotation": placement.rotation_deg,
+                    "layer": placement.layer,
+                    "changed": changed,
+                }
+                for placement in frozen_connector_placements()
+            ],
+        }
+
+    def _fake_atomic_client(self, *, schemas=None, response=None, stateful=False):
+        test_case = self
+
+        class FakeClient:
+            def __init__(self):
+                self.calls = []
+                self.apply_count = 0
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                if schemas is None:
+                    return {
+                        "batch_set_component_poses": test_case._batch_pose_schema()
+                    }
+                return deepcopy(schemas)
+
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                if stateful:
+                    changed = self.apply_count == 0
+                    self.apply_count += 1
+                    return test_case._atomic_response(changed)
+                if response is None:
+                    raise AssertionError("unexpected atomic tool call")
+                return deepcopy(response)
+
+        return FakeClient()
+
+    def _assert_rejected_atomic_response(self, response):
+        from tools.lh60_design.pcb import apply_connector_placements
+
+        client = self._fake_atomic_client(response=response)
+        with self.assertRaises(RuntimeError):
+            apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
+        self.assertEqual(client.calls[0], ("load", "pcb_components"))
+        self.assertEqual(client.calls[1][0], "batch_set_component_poses")
+        self.assertEqual(len(client.calls), 2)
+
+    def test_apply_sets_all_header_poses_atomically_then_reports_idempotence(self):
         from tools.lh60_design.pcb import (
             apply_connector_placements,
             frozen_connector_placements,
         )
 
-        class FakeClient:
-            def __init__(self):
-                self.calls = []
-                self.layers = {
-                    placement.reference: "F.Cu"
-                    for placement in frozen_connector_placements()
-                }
-
-            def tool_schemas(self, toolset):
-                self.calls.append(("load", toolset))
-                return {
-                    "move_component": {},
-                    "rotate_component": {},
-                    "flip_component": {},
-                }
-
-            def call_tool_json(self, name, arguments):
-                self.calls.append((name, arguments))
-                placement = next(
-                    item
-                    for item in frozen_connector_placements()
-                    if item.reference == arguments["reference"]
-                )
-                if name == "move_component":
-                    return {
-                        "moved": placement.reference,
-                        "x": placement.x_mm,
-                        "y": placement.y_mm,
-                        "source": "file",
-                    }
-                if name == "rotate_component":
-                    return {
-                        "rotated": placement.reference,
-                        "rotation": placement.rotation_deg,
-                        "source": "file",
-                    }
-                changed = self.layers[placement.reference] != arguments["layer"]
-                self.layers[placement.reference] = arguments["layer"]
-                return {
-                    "flipped": placement.reference,
-                    "layer": self.layers[placement.reference],
-                    "changed": changed,
-                    "source": "file",
-                }
-
-        client = FakeClient()
+        client = self._fake_atomic_client(stateful=True)
         first = apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
         second = apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
         plan = frozen_connector_placements()
 
-        self.assertEqual(len(client.calls), 2 * (1 + 3 * len(plan)))
-        for pass_index, (applied, expected_changed) in enumerate(
-            ((first, True), (second, False))
-        ):
-            offset = pass_index * (1 + 3 * len(plan))
-            self.assertEqual(client.calls[offset], ("load", "pcb_components"))
+        self.assertEqual(len(client.calls), 4)
+        expected_payload = [
+            {
+                "reference": placement.reference,
+                "x": placement.x_mm,
+                "y": placement.y_mm,
+                "rotation": placement.rotation_deg,
+                "layer": placement.layer,
+            }
+            for placement in plan
+        ]
+        self.assertEqual(
+            client.calls,
+            [
+                ("load", "pcb_components"),
+                (
+                    "batch_set_component_poses",
+                    {
+                        "board": "/tmp/lh60.kicad_pcb",
+                        "placements": expected_payload,
+                    },
+                ),
+                ("load", "pcb_components"),
+                (
+                    "batch_set_component_poses",
+                    {
+                        "board": "/tmp/lh60.kicad_pcb",
+                        "placements": expected_payload,
+                    },
+                ),
+            ],
+        )
+        for applied, expected_changed in ((first, True), (second, False)):
             self.assertEqual(
                 [item["reference"] for item in applied],
                 [placement.reference for placement in plan],
             )
             self.assertTrue(all(item["layer"] == "B.Cu" for item in applied))
             self.assertTrue(
-                all(item["flip_changed"] is expected_changed for item in applied)
+                all(item["changed"] is expected_changed for item in applied)
             )
-            for index, placement in enumerate(plan):
-                move, rotate, flip = client.calls[
-                    offset + 1 + index * 3 : offset + 4 + index * 3
-                ]
-                self.assertEqual(
-                    move,
-                    (
-                        "move_component",
-                        {
-                            "board": "/tmp/lh60.kicad_pcb",
-                            "reference": placement.reference,
-                            "x": placement.x_mm,
-                            "y": placement.y_mm,
-                        },
-                    ),
-                )
-                self.assertEqual(
-                    rotate,
-                    (
-                        "rotate_component",
-                        {
-                            "board": "/tmp/lh60.kicad_pcb",
-                            "reference": placement.reference,
-                            "rotation": placement.rotation_deg,
-                        },
-                    ),
-                )
-                self.assertEqual(
-                    flip,
-                    (
-                        "flip_component",
-                        {
-                            "board": "/tmp/lh60.kicad_pcb",
-                            "reference": placement.reference,
-                            "layer": "B.Cu",
-                        },
-                    ),
-                )
 
-        self.assertEqual(
-            client.layers,
-            {placement.reference: "B.Cu" for placement in plan},
-        )
-
-    def test_apply_rejects_flip_results_that_do_not_prove_the_target_final_state(self):
+    def test_apply_requires_the_exact_deployed_atomic_batch_schema(self):
         from tools.lh60_design.pcb import apply_connector_placements
 
-        class InvalidFlipClient:
-            def __init__(self, field, value):
-                self.field = field
-                self.value = value
+        missing = self._fake_atomic_client(schemas={})
+        with self.assertRaisesRegex(RuntimeError, "batch_set_component_poses"):
+            apply_connector_placements(missing, "/tmp/lh60.kicad_pcb")
+        self.assertEqual(missing.calls, [("load", "pcb_components")])
 
-            def tool_schemas(self, _toolset):
-                return {
-                    "move_component": {},
-                    "rotate_component": {},
-                    "flip_component": {},
-                }
+        malformed_schemas = []
+        for path in (
+            ("additionalProperties",),
+            ("properties", "placements", "items", "additionalProperties"),
+            ("properties", "placements", "items", "required"),
+            (
+                "properties",
+                "placements",
+                "items",
+                "properties",
+                "layer",
+                "enum",
+            ),
+        ):
+            schema = self._batch_pose_schema()
+            target = schema
+            for key in path[:-1]:
+                target = target[key]
+            target.pop(path[-1])
+            malformed_schemas.append(("/".join(path), schema))
 
-            def call_tool_json(self, name, arguments):
-                reference = arguments["reference"]
-                if name == "move_component":
-                    return {
-                        "moved": reference,
-                        "x": arguments["x"],
-                        "y": arguments["y"],
-                        "source": "file",
-                    }
-                if name == "rotate_component":
-                    return {
-                        "rotated": reference,
-                        "rotation": arguments["rotation"],
-                        "source": "file",
-                    }
-                result = {
-                    "flipped": reference,
-                    "layer": "B.Cu",
-                    "changed": True,
-                    "source": "file",
-                }
-                result[self.field] = self.value
-                return result
+        schema = self._batch_pose_schema()
+        schema["properties"]["placements"]["items"]["properties"]["x"] = {
+            "type": "integer"
+        }
+        malformed_schemas.append(("nested x type", schema))
 
-        cases = (
-            ("flipped", "J2", "flip readback mismatch"),
-            ("layer", "F.Cu", "flip readback mismatch"),
-            ("source", "ipc", "closed-board file path"),
+        for name, malformed_schema in malformed_schemas:
+            with self.subTest(name=name):
+                client = self._fake_atomic_client(
+                    schemas={"batch_set_component_poses": malformed_schema}
+                )
+                with self.assertRaisesRegex(RuntimeError, "schema"):
+                    apply_connector_placements(client, "/tmp/lh60.kicad_pcb")
+                self.assertEqual(client.calls, [("load", "pcb_components")])
+
+    def test_apply_rejects_invalid_atomic_response_metadata_and_counts(self):
+        invalid_responses = []
+        for field, value in (
+            ("source", "ipc"),
+            ("atomic", False),
+            ("atomic", 1),
+            ("changed", 1),
+            ("updated_count", True),
+            ("updated_count", 6.0),
+            ("updated_count", 5),
+            ("changed", False),
+        ):
+            response = self._atomic_response(True)
+            response[field] = value
+            invalid_responses.append((f"{field}={value!r}", response))
+
+        for name, response in invalid_responses:
+            with self.subTest(name=name):
+                self._assert_rejected_atomic_response(response)
+
+    def test_apply_rejects_malformed_or_inexact_atomic_placement_evidence(self):
+        invalid_responses = []
+
+        response = self._atomic_response(True)
+        response["placements"] = tuple(response["placements"])
+        invalid_responses.append(("placements is not a list", response))
+
+        response = self._atomic_response(True)
+        response["placements"].pop()
+        response["updated_count"] = 5
+        invalid_responses.append(("wrong placement count", response))
+
+        response = self._atomic_response(True)
+        response["placements"][0], response["placements"][1] = (
+            response["placements"][1],
+            response["placements"][0],
         )
-        for field, value, error in cases:
-            with self.subTest(field=field):
-                with self.assertRaisesRegex(RuntimeError, error):
-                    apply_connector_placements(
-                        InvalidFlipClient(field, value),
-                        "/tmp/lh60.kicad_pcb",
-                    )
+        invalid_responses.append(("wrong reference order", response))
 
-    def test_apply_refuses_missing_schema_or_non_file_response(self):
-        from tools.lh60_design.pcb import apply_connector_placements
+        response = self._atomic_response(True)
+        response["placements"][1] = deepcopy(response["placements"][0])
+        invalid_responses.append(("duplicate reference", response))
 
-        class MissingFlipClient:
-            def tool_schemas(self, _toolset):
-                return {"move_component": {}, "rotate_component": {}}
+        for field, value in (
+            ("x", 281.5),
+            ("y", 35.0),
+            ("rotation", 180.0),
+            ("layer", "F.Cu"),
+        ):
+            response = self._atomic_response(True)
+            response["placements"][0][field] = value
+            invalid_responses.append((f"wrong {field}", response))
 
-        with self.assertRaisesRegex(RuntimeError, "flip_component"):
-            apply_connector_placements(MissingFlipClient(), "/tmp/lh60.kicad_pcb")
+        response = self._atomic_response(True)
+        response["placements"][0]["changed"] = 1
+        invalid_responses.append(("item changed is not bool", response))
 
-        class LiveMoveClient:
-            def tool_schemas(self, _toolset):
-                return {
-                    "move_component": {},
-                    "rotate_component": {},
-                    "flip_component": {},
-                }
+        response = self._atomic_response(True)
+        response["placements"][0].pop("changed")
+        invalid_responses.append(("item changed is missing", response))
 
-            def call_tool_json(self, name, arguments):
-                if name == "move_component":
-                    return {"moved": arguments["reference"], "source": "ipc"}
-                raise AssertionError("must stop before rotate/flip")
+        response = self._atomic_response(True)
+        response["placements"][0] = "J1"
+        invalid_responses.append(("placement is not an object", response))
 
-        with self.assertRaisesRegex(RuntimeError, "closed-board"):
-            apply_connector_placements(LiveMoveClient(), "/tmp/lh60.kicad_pcb")
+        for field in ("x", "y", "rotation"):
+            for value in (float("nan"), float("inf"), float("-inf")):
+                response = self._atomic_response(True)
+                response["placements"][0][field] = value
+                invalid_responses.append((f"non-finite {field}={value!r}", response))
+
+        for name, response in invalid_responses:
+            with self.subTest(name=name):
+                self._assert_rejected_atomic_response(response)
+
+    def test_apply_rejects_bool_pose_numbers_even_when_they_equal_zero_or_one(self):
+        from tools.lh60_design import pcb
+
+        plan = list(pcb.frozen_connector_placements())
+        plan[0] = replace(plan[0], x_mm=0.0, y_mm=1.0, rotation_deg=0.0)
+
+        with mock.patch.object(pcb, "FROZEN_CONNECTOR_PLACEMENTS", tuple(plan)):
+            for field, value in (("x", False), ("y", True), ("rotation", False)):
+                with self.subTest(field=field, value=value):
+                    response = self._atomic_response(True)
+                    response["placements"][0][field] = value
+                    self._assert_rejected_atomic_response(response)
 
 
 if __name__ == "__main__":
