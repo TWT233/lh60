@@ -35,14 +35,21 @@ ROOT = Path(__file__).resolve().parents[1]
 KONNECT = Path("/data00/home/wangqiyilang/.local/bin/konnect")
 CONFIG = Path.home() / ".config/konnect/config.toml"
 BOARD = ROOT / "lh60.kicad_pcb"
-EXPECTED_BASELINE = {"component_count": 172, "wire_count": 290, "label_count": 339}
+
+
+CURRENT_ACCEPTANCE_BASELINE = {"component_count": 155, "wire_count": 0, "label_count": 339}
 EXPECTED_INVENTORY = {"mcu": 1, "switch": 75, "diode": 70, "connector": 6, "flag": 3}
-EXPECTED_PRODUCTION_TESTPOINTS = {f"TP{index}" for index in range(1, 24)}
-EXPECTED_PRODUCTION_REFERENCES = (
+EXPECTED_PRODUCTION_REFERENCES = frozenset(
+    {"U1", *{f"J{index}" for index in range(1, 7)}, *{f"#FLG{index:02d}" for index in range(1, 4)}}
+    | {f"D{index}" for index in range(1, 71)}
+    | {f"SW{index}" for index in range(1, 77) if index != 59}
+)
+LEGACY_CONVERGENCE_BASELINE = {"component_count": 172, "wire_count": 290, "label_count": 339}
+LEGACY_CONVERGENCE_REFERENCES = frozenset(
     {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
     | {f"D{index}" for index in range(1, 71)}
     | {f"SW{index}" for index in range(1, 77) if index != 59}
-    | EXPECTED_PRODUCTION_TESTPOINTS
+    | {f"TP{index}" for index in range(1, 24)}
 )
 FROZEN_COMPONENT_SHA256 = "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18"
 FROZEN_PIN_SHA256 = "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58"
@@ -105,14 +112,13 @@ def classify_known_diagnostics(layout: dict[str, Any], orphans: dict[str, Any]) 
 def _load_acceptance_toolsets(client: McpClient) -> None:
     schemas = {
         toolset: client.tool_schemas(toolset)
-        for toolset in ("sch_components", "sch_batch", "sch_wiring", "sch_analysis", "sch_export")
+        for toolset in ("sch_components", "sch_batch", "sch_analysis", "sch_export")
     }
     contracts = {
         "list_schematic_components": ("sch_components", ("schematic",), ("schematic",)),
         "get_schematic_layout": ("sch_batch", ("schematic",), ("schematic",)),
         "validate_wire_connections": ("sch_batch", ("schematic",), ("schematic",)),
         "validate_component_connections": ("sch_batch", ("schematic",), ("schematic",)),
-        "batch_delete_schematic_wire": ("sch_wiring", ("schematic", "uuids"), ("schematic", "uuids")),
         "export_netlist_summary": ("sch_export", ("schematic",), ("schematic",)),
         "run_erc": ("sch_export", ("schematic",), ("schematic", "severity")),
         "export_schematic_svg": ("sch_export", ("schematic", "output"), ("schematic", "output")),
@@ -177,6 +183,8 @@ def _query(client: McpClient, schematic: Path, svg_output: Path) -> dict[str, An
         "components": client.call_tool_json("list_schematic_components", args),
         "netlist": client.call_tool_json("export_netlist_summary", args),
         "layout": client.call_tool_json("get_schematic_layout", args),
+        "wires": client.call_tool_json("list_schematic_wires", args),
+        "labels": client.call_tool_json("list_schematic_labels", args),
         "overlaps": client.call_tool_json("check_schematic_overlaps", args),
         "orphans": client.call_tool_json("find_orphan_items", args),
         "shorts": client.call_tool_json("find_shorted_nets", args),
@@ -299,8 +307,13 @@ def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
     if inventory != EXPECTED_INVENTORY or len(components) != 155:
         raise AssertionError(f"inventory mismatch: {inventory}, total={len(components)}")
     refs = [component["reference"] for component in components]
-    if len(set(refs)) != len(refs) or any(ref.startswith("TP") for ref in refs) or "SW59" in refs:
-        raise AssertionError("references are not unique or contain retired debug items")
+    state = {
+        "layout": layout,
+        "wire_uuids": assert_unique_nonempty_uuids(data["wires"]["wires"], "wire"),
+        "label_uuids": assert_unique_nonempty_uuids(data["labels"]["labels"], "label"),
+        "references": refs,
+    }
+    assert_current_production_state(state)
     if any("TestPoint" in component.get("footprint", "") for component in components):
         raise AssertionError("TestPoint footprint remains")
     if layout["wire_count"] != 0 or layout["label_count"] != 339:
@@ -317,7 +330,7 @@ def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def acceptance_record(data: dict[str, Any]) -> dict[str, Any]:
-    """Convert query output into the evidence needed to authorize convergence."""
+    """Convert a full read-only query into reusable acceptance evidence."""
     return {
         "acceptance": _assert_acceptance(data),
         "gates": {
@@ -405,20 +418,31 @@ def assert_candidate_evidence(
             raise AssertionError(f"candidate evidence visual approval {field} mismatch")
 
 
-def assert_production_preflight(
-    state: dict[str, Any], expected_references: set[str] = EXPECTED_PRODUCTION_REFERENCES,
+def _assert_schematic_state(
+    state: dict[str, Any], baseline: dict[str, int], references: frozenset[str], description: str,
 ) -> None:
     layout = state["layout"]
-    if {key: layout.get(key) for key in EXPECTED_BASELINE} != EXPECTED_BASELINE:
-        raise AssertionError(f"production baseline mismatch: {layout}")
-    for name, expected_count in (("wire", 290), ("label", 339)):
+    if {key: layout.get(key) for key in baseline} != baseline:
+        raise AssertionError(f"{description} baseline mismatch: {layout}")
+    for name, expected_count in (("wire", baseline["wire_count"]), ("label", baseline["label_count"])):
         if len(state[f"{name}_uuids"]) != expected_count:
-            raise AssertionError(f"production {name} UUID count mismatch")
-    if set(state["references"]) != expected_references:
-        raise AssertionError("production references mismatch")
-    found_testpoints = {ref for ref in state["references"] if ref.startswith("TP")}
-    if found_testpoints != EXPECTED_PRODUCTION_TESTPOINTS:
+            raise AssertionError(f"{description} {name} UUID count mismatch")
+    if len(state["references"]) != len(references) or set(state["references"]) != references:
+        raise AssertionError(f"{description} references mismatch")
+
+
+def assert_current_production_state(state: dict[str, Any]) -> None:
+    _assert_schematic_state(
+        state, CURRENT_ACCEPTANCE_BASELINE, EXPECTED_PRODUCTION_REFERENCES, "production",
+    )
+    if any(reference.startswith("TP") for reference in state["references"]):
         raise AssertionError("production TestPoint inventory mismatch")
+
+
+def assert_legacy_convergence_preflight(state: dict[str, Any]) -> None:
+    _assert_schematic_state(
+        state, LEGACY_CONVERGENCE_BASELINE, LEGACY_CONVERGENCE_REFERENCES, "legacy convergence",
+    )
 
 
 def _working_tree_is_clean() -> bool:
@@ -704,7 +728,8 @@ def verify_candidate_libraries(
     return {"symbols": list(symbols), "footprints": list(footprints)}
 
 
-def preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
+def legacy_convergence_preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
+    """Query the retired L4 source baseline for the one-time convergence path."""
     _load_acceptance_toolsets(client)
     layout = client.call_tool_json("get_schematic_layout", {"schematic": str(schematic)})
     wires = client.call_tool_json("list_schematic_wires", {"schematic": str(schematic)})["wires"]
@@ -713,11 +738,11 @@ def preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
     label_uuids = assert_unique_nonempty_uuids(labels, "label")
     refs = [item["reference"] for item in client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]]
     state = {"layout": layout, "wire_uuids": wire_uuids, "label_uuids": label_uuids, "references": refs}
-    assert_production_preflight(state)
+    assert_legacy_convergence_preflight(state)
     return state
 
 
-def converge(client: McpClient, schematic: Path, state: dict[str, Any]) -> None:
+def legacy_converge(client: McpClient, schematic: Path, state: dict[str, Any]) -> None:
     require_schematic_capabilities(client)
     client.call_tool("batch_delete_schematic_wire", {"schematic": str(schematic), "uuids": state["wire_uuids"]})
     client.call_tool("batch_delete", {"schematic": str(schematic), "uuids": state["label_uuids"]})
@@ -755,9 +780,8 @@ def run_production_transaction(
     *,
     expected_plan_hash: str | None = None,
     expected_git_sha: str | None = None,
-    expected_references: set[str] | None = None,
-    preflight_fn=preflight,
-    converge_fn=converge,
+    preflight_fn=legacy_convergence_preflight,
+    converge_fn=legacy_converge,
     acceptance_fn=_query_acceptance_record,
     candidate_fn=None,
     candidate_acceptance_fn=_query_acceptance_record,
@@ -775,9 +799,7 @@ def run_production_transaction(
     safety = safety_fn(schematic, BOARD)
 
     state = preflight_fn(client, schematic)
-    assert_production_preflight(
-        state, expected_references if expected_references is not None else EXPECTED_PRODUCTION_REFERENCES
-    )
+    assert_legacy_convergence_preflight(state)
     converge_fn(client, schematic, state)
 
     with tempfile.TemporaryDirectory(prefix="lh60-production-acceptance.") as directory:
@@ -866,10 +888,6 @@ def main() -> int:
     ]
     if sum(1 for enabled in selected_modes if enabled) > 1:
         parser.error("--production, --preflight, and --migrate-power-flag-instance-flags are mutually exclusive")
-    if args.production and args.candidate_evidence is None:
-        parser.error("--production requires --candidate-evidence")
-    if args.production and args.output is None:
-        parser.error("--production requires --output to persist transaction evidence")
     if args.migrate_power_flag_instance_flags and args.output is None:
         parser.error("--migrate-power-flag-instance-flags requires --output")
     if args.record_visual_approval:
@@ -881,13 +899,7 @@ def main() -> int:
         return 0
     schematic = SCHEMATIC if (args.production or args.preflight or args.migrate_power_flag_instance_flags) else None
     with McpClient(KONNECT, CONFIG) as client:
-        if args.production:
-            result = run_production_transaction(
-                client, SCHEMATIC, args.candidate_evidence, args.output
-            )
-        elif args.preflight:
-            result = preflight(client, SCHEMATIC)
-        elif args.migrate_power_flag_instance_flags:
+        if args.migrate_power_flag_instance_flags:
             result = migrate_power_flag_instance_flags(client, SCHEMATIC, args.output)
         else:
             if schematic is None:
@@ -897,13 +909,14 @@ def main() -> int:
             svg_output = Path(tempfile.mkdtemp(prefix="lh60-sch-svg.")) / "lh60.svg"
             data = _query(client, schematic, svg_output)
             result = {
-                "mode": "production" if args.production else "candidate",
+                "mode": "production" if (args.production or args.preflight) else "candidate",
                 "schematic": str(schematic),
-                "plan_hash": _plan_hash(),
                 "git_sha": _git_sha(),
                 **acceptance_record(data),
                 "queries": data,
             }
+            if not (args.production or args.preflight):
+                result["plan_hash"] = _plan_hash()
             if args.render:
                 result["render_sha256"] = hashlib.sha256(args.render.read_bytes()).hexdigest()
     rendered = json.dumps(result, indent=2, sort_keys=True)
