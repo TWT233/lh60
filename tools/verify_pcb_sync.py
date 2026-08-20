@@ -758,6 +758,37 @@ class ExactOwnershipClient:
 
 
 class PcbSyncContractTest(unittest.TestCase):
+    def setUp(self):
+        import tools.sync_debug_connectors as pcb_sync
+
+        schematic = pcb_sync.SCHEMATIC.resolve()
+        board = pcb_sync.BOARD.resolve()
+
+        def frozen_pre_sync_hash(path):
+            resolved = Path(path).resolve()
+            if resolved == schematic:
+                return pcb_sync.EXPECTED_SCHEMATIC_HASH
+            if resolved == board:
+                return pcb_sync.EXPECTED_BOARD_HASH
+            raise AssertionError(f"unexpected protected fixture path: {resolved}")
+
+        hash_patcher = mock.patch.object(
+            pcb_sync,
+            "_sha256",
+            side_effect=frozen_pre_sync_hash,
+        )
+        hash_patcher.start()
+        self.addCleanup(hash_patcher.stop)
+
+    def test_fake_client_hash_fixture_returns_frozen_pre_sync_hashes(self):
+        import tools.sync_debug_connectors as pcb_sync
+
+        self.assertEqual(pcb_sync._sha256(pcb_sync.BOARD), pcb_sync.EXPECTED_BOARD_HASH)
+        self.assertEqual(
+            pcb_sync._sha256(pcb_sync.SCHEMATIC),
+            pcb_sync.EXPECTED_SCHEMATIC_HASH,
+        )
+
     def test_sync_plan_normalizes_root_net_names_and_rejects_invalid_board_net_forms(self):
         import tools.sync_debug_connectors as pcb_sync
 
@@ -966,6 +997,13 @@ class PcbSyncContractTest(unittest.TestCase):
             side_effect=[pre_migration_schematic_hash, pcb_sync.EXPECTED_BOARD_HASH],
         ):
             with self.assertRaisesRegex(RuntimeError, "protected schematic hash mismatch"):
+                pcb_sync._validate_hashes(pcb_sync.SCHEMATIC, pcb_sync.BOARD)
+
+        with mock.patch(
+            "tools.sync_debug_connectors._sha256",
+            side_effect=[migrated_schematic_hash, "wrong-board-hash"],
+        ):
+            with self.assertRaisesRegex(RuntimeError, "protected PCB hash mismatch"):
                 pcb_sync._validate_hashes(pcb_sync.SCHEMATIC, pcb_sync.BOARD)
 
     def test_literal_maps_and_exact_reference_inventories_are_frozen(self):
