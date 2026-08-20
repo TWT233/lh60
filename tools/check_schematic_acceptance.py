@@ -62,7 +62,10 @@ POWER_FLAG_INSTANCE_CONTRACT = {
     "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
     "flags": POWER_FLAG_INSTANCE_FLAGS,
 }
-EXPECTED_MIGRATION_REFERENCES = frozenset(component.reference for component in build_schematic_plan().components)
+
+
+def _expected_migration_references() -> frozenset[str]:
+    return frozenset(component.reference for component in build_schematic_plan().components)
 
 
 def _plan_hash() -> str:
@@ -502,7 +505,7 @@ def _sorted_migration_references(components: list[dict[str, Any]]) -> list[str]:
     flag_like_references = {reference for reference in references if reference.startswith("#FLG")}
     if flag_like_references != set(POWER_FLAG_INSTANCE_FLAGS):
         raise AssertionError("power flag reference set mismatch")
-    if set(references) != EXPECTED_MIGRATION_REFERENCES:
+    if set(references) != _expected_migration_references():
         raise AssertionError("reference inventory mismatch")
     return sorted(references)
 
@@ -620,6 +623,7 @@ def migrate_power_flag_instance_flags(
         raise AssertionError("schematic SHA drift detected")
     if safety["pcb_sha256"] != POWER_FLAG_INSTANCE_CONTRACT["pcb_sha256"]:
         raise AssertionError("PCB SHA drift detected")
+    _expected_migration_references()
     before = state_query_fn(client, schematic)
     before_pin_hash = pin_hash_fn(client, schematic)
     if before_pin_hash != POWER_FLAG_INSTANCE_CONTRACT["pin_sha256"]:

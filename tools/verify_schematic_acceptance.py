@@ -1,9 +1,12 @@
+import importlib
+import sys
 import unittest
 from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 
 def disjoint_acceptance_schemas():
@@ -94,6 +97,40 @@ def migration_component_details():
 
 
 class SchematicAcceptanceContractTest(unittest.TestCase):
+    def test_checker_import_and_cli_parser_paths_do_not_build_migration_plan(self):
+        import tools.lh60_design.schematic as schematic_module
+
+        original_checker = sys.modules.get("tools.check_schematic_acceptance")
+        sys.modules.pop("tools.check_schematic_acceptance", None)
+        try:
+            with mock.patch.object(
+                schematic_module,
+                "build_schematic_plan",
+                side_effect=AssertionError("plan builder called"),
+            ):
+                checker = importlib.import_module("tools.check_schematic_acceptance")
+                with mock.patch.object(
+                    sys,
+                    "argv",
+                    ["check_schematic_acceptance.py", "--help"],
+                ):
+                    with self.assertRaises(SystemExit) as help_exit:
+                        checker.main()
+                self.assertEqual(help_exit.exception.code, 0)
+
+                with mock.patch.object(
+                    sys,
+                    "argv",
+                    ["check_schematic_acceptance.py", "--migrate-power-flag-instance-flags"],
+                ):
+                    with self.assertRaises(SystemExit) as parser_exit:
+                        checker.main()
+                self.assertEqual(parser_exit.exception.code, 2)
+        finally:
+            sys.modules.pop("tools.check_schematic_acceptance", None)
+            if original_checker is not None:
+                sys.modules["tools.check_schematic_acceptance"] = original_checker
+
     def test_candidate_registers_every_footprint_library_needed_by_plan(self):
         from tools.check_schematic_acceptance import candidate_library_registrations
 
@@ -521,6 +558,33 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         self.assertEqual(result["batch"]["updated_count"], 3)
         self.assertEqual(len(result["before"]["component_identities"]), len(migration_references()))
         self.assertEqual(result["before"]["component_identities"], result["after"]["component_identities"])
+
+    def test_narrow_migration_plan_derivation_failure_happens_before_live_queries_or_output_write(self):
+        from tools import check_schematic_acceptance as checker
+
+        calls = []
+
+        with mock.patch.object(
+            checker,
+            "build_schematic_plan",
+            side_effect=AssertionError("plan builder called"),
+        ):
+            with self.assertRaisesRegex(AssertionError, "plan builder called"):
+                checker.migrate_power_flag_instance_flags(
+                    object(),
+                    Path("/tmp/lh60.kicad_sch"),
+                    Path("/tmp/evidence.json"),
+                    capabilities_fn=lambda client: calls.append(("capabilities", None)),
+                    safety_fn=lambda schematic, board: calls.append(("safety", None)) or {
+                        "schematic_sha256": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
+                        "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
+                    },
+                    state_query_fn=lambda *args, **kwargs: calls.append(("state_query", None)),
+                    apply_fn=lambda *args, **kwargs: calls.append(("apply", None)),
+                    write_json_fn=lambda *args, **kwargs: calls.append(("write_json", None)),
+                )
+
+        self.assertEqual(calls, [("capabilities", None), ("safety", None)])
 
     def test_power_flag_state_query_requires_exact_getter_identities(self):
         from tools.check_schematic_acceptance import _query_power_flag_instance_state
