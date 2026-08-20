@@ -117,12 +117,11 @@ def graphics_payload(layer, count):
 
 def drc_payload(
     *,
-    j_test_id="unconnected_items",
     total=530,
     unconnected=367,
     design=163,
-    errors=367,
-    warnings=163,
+    errors=457,
+    warnings=73,
 ):
     return {
         "total_violations": total,
@@ -137,14 +136,22 @@ def drc_payload(
         "truncated": False,
         "violations": [
             {
-                "test_id": j_test_id,
+                "rule": "unconnected_items",
+                "description": "Unconnected between U1 and U2",
+                "pos": {"x": 1.0, "y": 2.0},
                 "severity": "warning",
-                "layer": "B.Cu",
-                "message": "connector finding",
-                "references": ["J1"],
             }
         ],
     }
+
+
+def drc_report_text(*sections):
+    lines = []
+    for rule, entries in sections:
+        lines.append(f"[{rule}]:")
+        lines.extend(entries)
+        lines.append("")
+    return "\n".join(lines).strip() + "\n"
 
 
 class FakeClient:
@@ -243,29 +250,52 @@ class PcbAcceptanceContractTest(unittest.TestCase):
             root = Path(directory)
             board = root / "lh60.kicad_pcb"
             board.write_text("board")
+            drc_report = drc_report_text(
+                ("unconnected_items", ["warning: Item of J1 remains intentionally unconnected"]),
+                ("clearance", ["warning: Item of U1 to U2"]),
+            )
 
             def fake_run(command, check, capture_output, text):
-                self.assertEqual(
-                    command,
-                    [
-                        "kicad-cli",
-                        "pcb",
-                        "export",
-                        "svg",
-                        "--output",
-                        str(root / "back.svg"),
-                        "--layers",
-                        "B.SilkS,B.Fab,B.CrtYd,Edge.Cuts",
-                        "--mode-single",
-                        "--mirror",
-                        "--exclude-drawing-sheet",
-                        "--fit-page-to-board",
-                        "--page-size-mode",
-                        "2",
-                        str(board.resolve()),
-                    ],
-                )
-                (root / "back.svg").write_text("<svg/>")
+                if command[1:3] == ["pcb", "drc"]:
+                    self.assertEqual(
+                        command,
+                        [
+                            "kicad-cli",
+                            "pcb",
+                            "drc",
+                            "--format",
+                            "report",
+                            "--units",
+                            "mm",
+                            "--severity-all",
+                            "--output",
+                            str(root / "drc.rpt"),
+                            str(board.resolve()),
+                        ],
+                    )
+                    (root / "drc.rpt").write_text(drc_report)
+                else:
+                    self.assertEqual(
+                        command,
+                        [
+                            "kicad-cli",
+                            "pcb",
+                            "export",
+                            "svg",
+                            "--output",
+                            str(root / "back.svg"),
+                            "--layers",
+                            "B.SilkS,B.Fab,B.CrtYd,Edge.Cuts",
+                            "--mode-single",
+                            "--mirror",
+                            "--exclude-drawing-sheet",
+                            "--fit-page-to-board",
+                            "--page-size-mode",
+                            "2",
+                            str(board.resolve()),
+                        ],
+                    )
+                    (root / "back.svg").write_text("<svg/>")
                 return mock.Mock(stdout="", stderr="", returncode=0)
 
             with mock.patch.object(checker, "_git_sha", return_value="a" * 40), mock.patch.object(
@@ -286,8 +316,12 @@ class PcbAcceptanceContractTest(unittest.TestCase):
         self.assertEqual(evidence["pad_nets"]["J6"]["3"], "GP29")
         self.assertEqual(evidence["drc"]["total_violations"], 530)
         self.assertEqual(evidence["drc"]["design_rule_violations"], 163)
-        self.assertEqual(evidence["drc"]["errors"], 367)
-        self.assertEqual(evidence["drc"]["warnings"], 163)
+        self.assertEqual(evidence["drc"]["errors"], 457)
+        self.assertEqual(evidence["drc"]["warnings"], 73)
+        self.assertEqual(
+            evidence["drc"]["report_sha256"],
+            hashlib.sha256(drc_report.encode()).hexdigest(),
+        )
         self.assertEqual(evidence["git_sha"], "a" * 40)
         self.assertEqual(
             evidence["board_sha256"],
@@ -384,17 +418,28 @@ class PcbAcceptanceContractTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "J1 pad-net mismatch"):
                 checker._require_connector_pad_nets(client, board)
 
-    def test_acceptance_rejects_unexpected_j_related_drc_findings(self):
+    def test_acceptance_rejects_unexpected_j_related_drc_report_findings(self):
         import tools.check_pcb_acceptance as checker
 
         client = FakeClient()
-        client.queue_json("run_drc", drc_payload(j_test_id="clearance"))
+        client.queue_json("run_drc", drc_payload())
 
         with TemporaryDirectory() as directory:
-            board = Path(directory) / "lh60.kicad_pcb"
+            root = Path(directory)
+            board = root / "lh60.kicad_pcb"
             board.write_text("board")
-            with self.assertRaisesRegex(RuntimeError, "unexpected J-related DRC finding"):
-                checker._require_drc(client, board)
+            report = drc_report_text(
+                ("clearance", ["error: Footprint text of J1 collides with U1"]),
+            )
+
+            def fake_run(command, check, capture_output, text):
+                self.assertEqual(command[1:3], ["pcb", "drc"])
+                (root / "drc.rpt").write_text(report)
+                return mock.Mock(stdout="", stderr="", returncode=0)
+
+            with mock.patch.object(checker.subprocess, "run", side_effect=fake_run):
+                with self.assertRaisesRegex(RuntimeError, "unexpected J-related DRC report finding"):
+                    checker._require_drc(client, board, root, kicad_cli=Path("kicad-cli"))
 
     def test_acceptance_rejects_drc_counter_drift(self):
         import tools.check_pcb_acceptance as checker
@@ -406,7 +451,21 @@ class PcbAcceptanceContractTest(unittest.TestCase):
             board = Path(directory) / "lh60.kicad_pcb"
             board.write_text("board")
             with self.assertRaisesRegex(RuntimeError, "DRC total_violations mismatch"):
-                checker._require_drc(client, board)
+                checker._require_drc(client, board, Path(directory), kicad_cli=Path("kicad-cli"))
+
+    def test_acceptance_rejects_missing_drc_report(self):
+        import tools.check_pcb_acceptance as checker
+
+        client = FakeClient()
+        client.queue_json("run_drc", drc_payload())
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            board = root / "lh60.kicad_pcb"
+            board.write_text("board")
+            with mock.patch.object(checker.subprocess, "run", return_value=mock.Mock(returncode=0)):
+                with self.assertRaisesRegex(RuntimeError, "DRC report missing"):
+                    checker._require_drc(client, board, root, kicad_cli=Path("kicad-cli"))
 
     def test_acceptance_rejects_position_export_with_connectors(self):
         import tools.check_pcb_acceptance as checker
@@ -419,6 +478,33 @@ class PcbAcceptanceContractTest(unittest.TestCase):
             board.write_text("board")
             with self.assertRaisesRegex(RuntimeError, "position export must exclude J1"):
                 checker._require_position_export_without_connectors(client, board, root / "positions.csv")
+
+    def test_acceptance_rejects_position_export_without_ref_column(self):
+        import tools.check_pcb_acceptance as checker
+
+        client = FakeClient(position_csv="Designator,Val\nU1,MCU\n")
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            board = root / "lh60.kicad_pcb"
+            board.write_text("board")
+            with self.assertRaisesRegex(RuntimeError, "position export must contain Ref column"):
+                checker._require_position_export_without_connectors(client, board, root / "positions.csv")
+
+    def test_acceptance_ignores_connector_names_outside_ref_column(self):
+        import tools.check_pcb_acceptance as checker
+
+        client = FakeClient(position_csv="Ref,Val,Package\nU1,J1 regulator,J2-body\n")
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            board = root / "lh60.kicad_pcb"
+            board.write_text("board")
+            evidence = checker._require_position_export_without_connectors(
+                client, board, root / "positions.csv"
+            )
+
+        self.assertEqual(evidence["rows"], 1)
 
     def test_acceptance_rejects_missing_svg_output(self):
         import tools.check_pcb_acceptance as checker
