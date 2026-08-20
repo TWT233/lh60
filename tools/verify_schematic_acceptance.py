@@ -352,7 +352,6 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             "components": [
                 {
                     "reference": "#FLG01",
-                    "uuid": "flag-1",
                     "lib_id": "lh60-core:PowerFlag",
                     "value": "PWR_FLAG",
                     "footprint": "",
@@ -362,7 +361,6 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 },
                 {
                     "reference": "#FLG02",
-                    "uuid": "flag-2",
                     "lib_id": "lh60-core:PowerFlag",
                     "value": "PWR_FLAG",
                     "footprint": "",
@@ -372,7 +370,6 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 },
                 {
                     "reference": "#FLG03",
-                    "uuid": "flag-3",
                     "lib_id": "lh60-core:PowerFlag",
                     "value": "PWR_FLAG",
                     "footprint": "",
@@ -414,6 +411,11 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         class FakeClient:
             def __init__(self):
                 self.component_calls = 0
+                self.component_details = {
+                    "#FLG01": {"reference": "#FLG01", "uuid": "flag-1"},
+                    "#FLG02": {"reference": "#FLG02", "uuid": "flag-2"},
+                    "#FLG03": {"reference": "#FLG03", "uuid": "flag-3"},
+                }
 
             def tool_schemas(self, toolset):
                 from tools.verify_schematic_apply import complete_schematic_schemas
@@ -466,6 +468,8 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                             if component["reference"].startswith("#FLG"):
                                 component["on_board"] = False
                     return payload
+                if name == "get_schematic_component":
+                    return deepcopy(self.component_details[arguments["reference"]])
                 if name == "list_schematic_wires":
                     return deepcopy(wires)
                 if name == "list_schematic_labels":
@@ -500,13 +504,29 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             },
         )
         self.assertEqual(
-            [name for name, _ in calls if name in {"list_schematic_components", "list_schematic_wires", "list_schematic_labels", "export_netlist_summary"}],
+            [
+                name
+                for name, _ in calls
+                if name in {
+                    "list_schematic_components",
+                    "get_schematic_component",
+                    "list_schematic_wires",
+                    "list_schematic_labels",
+                    "export_netlist_summary",
+                }
+            ],
             [
                 "list_schematic_components",
+                "get_schematic_component",
+                "get_schematic_component",
+                "get_schematic_component",
                 "list_schematic_wires",
                 "list_schematic_labels",
                 "export_netlist_summary",
                 "list_schematic_components",
+                "get_schematic_component",
+                "get_schematic_component",
+                "get_schematic_component",
                 "list_schematic_wires",
                 "list_schematic_labels",
                 "export_netlist_summary",
@@ -514,14 +534,151 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         )
         self.assertEqual(result["batch"]["updated_count"], 3)
 
+    def test_power_flag_state_query_requires_exact_getter_identities(self):
+        from tools.check_schematic_acceptance import _query_power_flag_instance_state
+
+        component_payload = {
+            "components": [
+                {
+                    "reference": "#FLG01",
+                    "lib_id": "lh60-core:PowerFlag",
+                    "value": "PWR_FLAG",
+                    "footprint": "",
+                    "in_bom": True,
+                    "on_board": True,
+                    "dnp": False,
+                },
+                {
+                    "reference": "#FLG02",
+                    "lib_id": "lh60-core:PowerFlag",
+                    "value": "PWR_FLAG",
+                    "footprint": "",
+                    "in_bom": True,
+                    "on_board": True,
+                    "dnp": False,
+                },
+                {
+                    "reference": "#FLG03",
+                    "lib_id": "lh60-core:PowerFlag",
+                    "value": "PWR_FLAG",
+                    "footprint": "",
+                    "in_bom": True,
+                    "on_board": True,
+                    "dnp": False,
+                },
+                {
+                    "reference": "U1",
+                    "lib_id": "lh60-mcu:RP2040-Tiny",
+                    "value": "RP2040-Tiny",
+                    "footprint": "lh60-mcu:MCU_RP2040-Tiny_SMD",
+                    "in_bom": None,
+                    "on_board": None,
+                    "dnp": None,
+                },
+            ]
+        }
+
+        class FakeClient:
+            def __init__(self, details):
+                self.details = details
+                self.calls = []
+
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "list_schematic_components":
+                    return deepcopy(component_payload)
+                if name == "get_schematic_component":
+                    return deepcopy(self.details.get(arguments["reference"], {}))
+                if name == "list_schematic_wires":
+                    return {"wires": [{"uuid": "wire-1"}]}
+                if name == "list_schematic_labels":
+                    return {"labels": [{"uuid": "label-1"}]}
+                raise AssertionError(name)
+
+        ok_client = FakeClient(
+            {
+                "#FLG01": {"reference": "#FLG01", "uuid": "flag-1"},
+                "#FLG02": {"reference": "#FLG02", "uuid": "flag-2"},
+                "#FLG03": {"reference": "#FLG03", "uuid": "flag-3"},
+            }
+        )
+        result = _query_power_flag_instance_state(ok_client, Path("/tmp/lh60.kicad_sch"))
+        self.assertEqual(
+            result["component_identities"],
+            (("#FLG01", "flag-1"), ("#FLG02", "flag-2"), ("#FLG03", "flag-3")),
+        )
+        self.assertEqual(result["flag_states"]["#FLG01"]["uuid"], "flag-1")
+        self.assertEqual(
+            [name for name, _ in ok_client.calls],
+            [
+                "list_schematic_components",
+                "get_schematic_component",
+                "get_schematic_component",
+                "get_schematic_component",
+                "list_schematic_wires",
+                "list_schematic_labels",
+            ],
+        )
+        self.assertEqual(
+            [arguments["reference"] for name, arguments in ok_client.calls if name == "get_schematic_component"],
+            ["#FLG01", "#FLG02", "#FLG03"],
+        )
+
+        error_cases = (
+            (
+                "missing-detail",
+                {
+                    "#FLG01": {"reference": "#FLG01", "uuid": "flag-1"},
+                    "#FLG02": {"reference": "#FLG02", "uuid": "flag-2"},
+                },
+                AssertionError,
+                "identity mismatch",
+            ),
+            (
+                "empty-uuid",
+                {
+                    "#FLG01": {"reference": "#FLG01", "uuid": "flag-1"},
+                    "#FLG02": {"reference": "#FLG02", "uuid": ""},
+                    "#FLG03": {"reference": "#FLG03", "uuid": "flag-3"},
+                },
+                AssertionError,
+                "nonempty",
+            ),
+            (
+                "mismatched-reference",
+                {
+                    "#FLG01": {"reference": "#FLG01", "uuid": "flag-1"},
+                    "#FLG02": {"reference": "#WRONG", "uuid": "flag-2"},
+                    "#FLG03": {"reference": "#FLG03", "uuid": "flag-3"},
+                },
+                AssertionError,
+                "identity mismatch",
+            ),
+            (
+                "duplicate-uuid",
+                {
+                    "#FLG01": {"reference": "#FLG01", "uuid": "flag-1"},
+                    "#FLG02": {"reference": "#FLG02", "uuid": "flag-1"},
+                    "#FLG03": {"reference": "#FLG03", "uuid": "flag-3"},
+                },
+                AssertionError,
+                "unique",
+            ),
+        )
+        for label, details, error_type, message in error_cases:
+            with self.subTest(label=label):
+                client = FakeClient(details)
+                with self.assertRaisesRegex(error_type, message):
+                    _query_power_flag_instance_state(client, Path("/tmp/lh60.kicad_sch"))
+
     def test_narrow_migration_rejects_pin_hash_drift_from_runtime_netlist(self):
         from tools.check_schematic_acceptance import migrate_power_flag_instance_flags
 
         component_payload = {
             "components": [
-                {"reference": "#FLG01", "uuid": "flag-1", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
-                {"reference": "#FLG02", "uuid": "flag-2", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
-                {"reference": "#FLG03", "uuid": "flag-3", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG01", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG02", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
+                {"reference": "#FLG03", "lib_id": "lh60-core:PowerFlag", "value": "PWR_FLAG", "footprint": "", "in_bom": True, "on_board": False, "dnp": False},
             ]
         }
 
@@ -564,6 +721,8 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             def call_tool_json(self, name, arguments):
                 if name == "list_schematic_components":
                     return deepcopy(component_payload)
+                if name == "get_schematic_component":
+                    return {"reference": arguments["reference"], "uuid": f"uuid-{arguments['reference']}"}
                 if name == "list_schematic_wires":
                     return {"wires": [{"uuid": "wire-1"}]}
                 if name == "list_schematic_labels":

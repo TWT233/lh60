@@ -477,12 +477,19 @@ def require_power_flag_instance_migration_capabilities(client: McpClient) -> Non
 
 
 def _component_identity_fingerprint(components: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
-    return tuple(
+    identities = tuple(
         sorted(
-            (str(component["reference"]), str(component["uuid"]))
+            (str(component.get("reference", "")), str(component.get("uuid", "")))
             for component in components
         )
     )
+    if len({reference for reference, _uuid in identities}) != len(identities):
+        raise AssertionError("component identity references must be unique")
+    if len({_uuid for _reference, _uuid in identities}) != len(identities):
+        raise AssertionError("component identity uuids must be unique")
+    if any(not reference or not uuid for reference, uuid in identities):
+        raise AssertionError("component identity references and uuids must be nonempty")
+    return identities
 
 
 def _flag_state_map(components: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -498,16 +505,47 @@ def _flag_state_map(components: list[dict[str, Any]]) -> dict[str, dict[str, Any
     return state
 
 
+def _power_flag_identity_components(client: McpClient, schematic: Path, components: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    listed_references = [str(component.get("reference", "")) for component in components]
+    power_flag_references = [
+        reference
+        for reference in listed_references
+        if reference in POWER_FLAG_INSTANCE_FLAGS
+    ]
+    expected_references = sorted(POWER_FLAG_INSTANCE_FLAGS)
+    if sorted(power_flag_references) != expected_references:
+        raise AssertionError("power flag reference set mismatch")
+
+    identities = []
+    for reference in expected_references:
+        detail = client.call_tool_json(
+            "get_schematic_component",
+            {"schematic": str(schematic), "reference": reference},
+        )
+        if str(detail.get("reference", "")) != reference:
+            raise AssertionError(f"power flag identity mismatch for {reference}")
+        identities.append({"reference": reference, "uuid": str(detail.get("uuid", ""))})
+    _component_identity_fingerprint(identities)
+    return identities
+
+
 def _query_power_flag_instance_state(client: McpClient, schematic: Path) -> dict[str, Any]:
     components = client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]
+    identities = _power_flag_identity_components(client, schematic, components)
+    identity_by_reference = {item["reference"]: item["uuid"] for item in identities}
+    flag_states = {
+        reference: {**state, "uuid": identity_by_reference[reference]}
+        for reference, state in _flag_state_map(components).items()
+        if reference in POWER_FLAG_INSTANCE_FLAGS
+    }
     wires = client.call_tool_json("list_schematic_wires", {"schematic": str(schematic)})["wires"]
     labels = client.call_tool_json("list_schematic_labels", {"schematic": str(schematic)})["labels"]
     return {
         "components": components,
-        "component_identities": _component_identity_fingerprint(components),
+        "component_identities": _component_identity_fingerprint(identities),
         "wire_uuids": assert_unique_nonempty_uuids(wires, "wire"),
         "label_uuids": assert_unique_nonempty_uuids(labels, "label"),
-        "flag_states": {reference: state for reference, state in _flag_state_map(components).items() if reference in POWER_FLAG_INSTANCE_FLAGS},
+        "flag_states": flag_states,
         "all_flags": _flag_state_map(components),
     }
 
