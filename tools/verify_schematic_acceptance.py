@@ -48,7 +48,32 @@ def disjoint_acceptance_schemas():
     }
 
 
-def old_production_references():
+def current_production_references():
+    return set(
+        """
+        U1
+        D1 D2 D3 D4 D5 D6 D7 D8 D9 D10
+        D11 D12 D13 D14 D15 D16 D17 D18 D19 D20
+        D21 D22 D23 D24 D25 D26 D27 D28 D29 D30
+        D31 D32 D33 D34 D35 D36 D37 D38 D39 D40
+        D41 D42 D43 D44 D45 D46 D47 D48 D49 D50
+        D51 D52 D53 D54 D55 D56 D57 D58 D59 D60
+        D61 D62 D63 D64 D65 D66 D67 D68 D69 D70
+        SW1 SW2 SW3 SW4 SW5 SW6 SW7 SW8 SW9 SW10
+        SW11 SW12 SW13 SW14 SW15 SW16 SW17 SW18 SW19 SW20
+        SW21 SW22 SW23 SW24 SW25 SW26 SW27 SW28 SW29 SW30
+        SW31 SW32 SW33 SW34 SW35 SW36 SW37 SW38 SW39 SW40
+        SW41 SW42 SW43 SW44 SW45 SW46 SW47 SW48 SW49 SW50
+        SW51 SW52 SW53 SW54 SW55 SW56 SW57 SW58
+        SW60 SW61 SW62 SW63 SW64 SW65 SW66 SW67 SW68 SW69 SW70
+        SW71 SW72 SW73 SW74 SW75 SW76
+        J1 J2 J3 J4 J5 J6
+        #FLG01 #FLG02 #FLG03
+        """.split()
+    )
+
+
+def legacy_convergence_references():
     return (
         {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
         | {f"D{index}" for index in range(1, 71)}
@@ -198,31 +223,35 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "visual approval"):
             assert_candidate_evidence(rejected, "current-plan", "current-head")
 
-    def test_preflight_requires_exact_frozen_production_refs_and_uuid_counts(self):
-        from tools.check_schematic_acceptance import assert_production_preflight
+    def test_current_production_state_requires_exact_layout_references_and_uuid_counts(self):
+        from tools.check_schematic_acceptance import assert_current_production_state
 
-        expected_refs = (
-            {"U1", *{f"J{index}" for index in range(1, 7)}, *{f"#FLG{index:02d}" for index in range(1, 4)}}
-            | {f"D{index}" for index in range(1, 71)}
-            | {f"SW{index}" for index in range(1, 77) if index != 59}
-            | {f"TP{index}" for index in range(1, 24)}
-        )
-        state = {
-            "layout": {"component_count": 172, "wire_count": 290, "label_count": 339},
-            "wire_uuids": [f"wire-{index}" for index in range(290)],
+        expected_refs = current_production_references()
+        valid_state = {
+            "layout": {"component_count": 155, "wire_count": 0, "label_count": 339},
+            "wire_uuids": [],
             "label_uuids": [f"label-{index}" for index in range(339)],
             "references": sorted(expected_refs),
         }
-        assert_production_preflight(state, expected_refs)
+        assert_current_production_state(valid_state)
 
-        state["label_uuids"].pop()
-        with self.assertRaisesRegex(AssertionError, "label UUID count"):
-            assert_production_preflight(state, expected_refs)
-
-        state["label_uuids"].append("label-338")
-        state["references"].remove("TP23")
-        with self.assertRaisesRegex(AssertionError, "references"):
-            assert_production_preflight(state, expected_refs)
+        mutations = (
+            ("wire layout", lambda state: state["layout"].update(wire_count=1), "baseline"),
+            ("label layout", lambda state: state["layout"].update(label_count=338), "baseline"),
+            ("wire UUID count", lambda state: state["wire_uuids"].append("wire-0"), "wire UUID count"),
+            ("label UUID count", lambda state: state["label_uuids"].pop(), "label UUID count"),
+            (
+                "count-preserving reference substitution",
+                lambda state: (state["references"].remove("D70"), state["references"].append("D71")),
+                "references",
+            ),
+        )
+        for name, mutate, message in mutations:
+            with self.subTest(name=name):
+                state = deepcopy(valid_state)
+                mutate(state)
+                with self.assertRaisesRegex(AssertionError, message):
+                    assert_current_production_state(state)
 
     def test_production_transaction_refuses_before_delete_without_evidence(self):
         from tools.check_schematic_acceptance import run_production_transaction
@@ -262,12 +291,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             }
             evidence_path.write_text(__import__("json").dumps(evidence))
 
-            expected_refs = (
-                {"U1", *{f"J{index}" for index in range(1, 7)}, *{f"#FLG{index:02d}" for index in range(1, 4)}}
-                | {f"D{index}" for index in range(1, 71)}
-                | {f"SW{index}" for index in range(1, 77) if index != 59}
-                | {f"TP{index}" for index in range(1, 24)}
-            )
+            expected_refs = legacy_convergence_references()
             state = {
                 "layout": {"component_count": 172, "wire_count": 290, "label_count": 339},
                 "wire_uuids": [f"w{index}" for index in range(290)],
@@ -303,12 +327,41 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
 
             result = run_production_transaction(
                 FakeClient(), Path("/tmp/lh60.kicad_sch"), evidence_path, output_path,
-                expected_plan_hash="plan", expected_git_sha="head", expected_references=expected_refs,
+                expected_plan_hash="plan", expected_git_sha="head",
                 preflight_fn=preflight, converge_fn=converge, acceptance_fn=acceptance, candidate_fn=new_candidate, candidate_acceptance_fn=candidate_acceptance, capabilities_fn=lambda client: None, safety_fn=lambda schematic, board: {"pcb_sha256": "pcb"},
             )
             self.assertEqual([name for name, _ in calls], ["preflight", "delete-wires", "delete-labels", "delete-components", "empty", "apply", "post-acceptance", "second-candidate", "candidate-acceptance"])
             self.assertTrue(output_path.is_file())
             self.assertEqual(result["candidate_evidence"]["svg_sha256"], "svg")
+
+    def test_legacy_production_transaction_rejects_current_baseline_before_convergence(self):
+        from tools.check_schematic_acceptance import run_production_transaction
+
+        with TemporaryDirectory() as directory:
+            evidence_path = Path(directory) / "candidate.json"
+            evidence_path.write_text(json.dumps({
+                "plan_hash": "plan", "git_sha": "head", "acceptance": {"ok": True},
+                "gates": {"wire_validation": True, "component_validation": True, "erc_errors": 0, "erc_warnings": 0},
+                "svg_sha256": "svg", "render_sha256": "render",
+                "visual_approval": {"approved": True, "plan_hash": "plan", "git_sha": "head", "svg_sha256": "svg", "render_sha256": "render"},
+            }))
+            current_state = {
+                "layout": {"component_count": 155, "wire_count": 0, "label_count": 339},
+                "wire_uuids": [],
+                "label_uuids": [f"l{index}" for index in range(339)],
+                "references": sorted(current_production_references()),
+            }
+            convergence_calls = []
+            with self.assertRaisesRegex(AssertionError, "legacy convergence baseline"):
+                run_production_transaction(
+                    object(), Path("/tmp/lh60.kicad_sch"), evidence_path, Path(directory) / "out.json",
+                    expected_plan_hash="plan", expected_git_sha="head",
+                    preflight_fn=lambda client, schematic: current_state,
+                    converge_fn=lambda *args: convergence_calls.append(args),
+                    capabilities_fn=lambda client: None,
+                    safety_fn=lambda schematic, board: {"pcb_sha256": "pcb"},
+                )
+            self.assertEqual(convergence_calls, [])
 
     def test_production_transaction_refuses_before_delete_when_global_capability_is_missing(self):
         from tools.check_schematic_acceptance import run_production_transaction
@@ -885,12 +938,39 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 {"nets": [{"name": "ROW0", "pins": [{"reference": "D1", "pin_number": "1"}]}]},
             )
 
-    def test_frozen_production_reference_set_is_exactly_172_without_headers(self):
+    def test_frozen_production_reference_set_is_exact_literal_contract_without_testpoints(self):
         from tools.check_schematic_acceptance import EXPECTED_PRODUCTION_REFERENCES
 
-        self.assertEqual(EXPECTED_PRODUCTION_REFERENCES, old_production_references())
-        self.assertEqual(len(EXPECTED_PRODUCTION_REFERENCES), 172)
-        self.assertFalse(any(reference.startswith("J") for reference in EXPECTED_PRODUCTION_REFERENCES))
+        expected = current_production_references()
+        self.assertEqual(EXPECTED_PRODUCTION_REFERENCES, expected)
+        self.assertEqual(len(expected), 155)
+        self.assertEqual(
+            {reference for reference in expected if reference.startswith("D")},
+            set(
+                """
+                D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12 D13 D14 D15 D16 D17 D18 D19 D20
+                D21 D22 D23 D24 D25 D26 D27 D28 D29 D30 D31 D32 D33 D34 D35 D36 D37 D38 D39 D40
+                D41 D42 D43 D44 D45 D46 D47 D48 D49 D50 D51 D52 D53 D54 D55 D56 D57 D58 D59 D60
+                D61 D62 D63 D64 D65 D66 D67 D68 D69 D70
+                """.split()
+            ),
+        )
+        self.assertEqual(
+            {reference for reference in expected if reference.startswith("SW")},
+            set(
+                """
+                SW1 SW2 SW3 SW4 SW5 SW6 SW7 SW8 SW9 SW10 SW11 SW12 SW13 SW14 SW15 SW16 SW17 SW18 SW19 SW20
+                SW21 SW22 SW23 SW24 SW25 SW26 SW27 SW28 SW29 SW30 SW31 SW32 SW33 SW34 SW35 SW36 SW37 SW38 SW39 SW40
+                SW41 SW42 SW43 SW44 SW45 SW46 SW47 SW48 SW49 SW50 SW51 SW52 SW53 SW54 SW55 SW56 SW57 SW58
+                SW60 SW61 SW62 SW63 SW64 SW65 SW66 SW67 SW68 SW69 SW70 SW71 SW72 SW73 SW74 SW75 SW76
+                """.split()
+            ),
+        )
+        self.assertEqual({reference for reference in expected if reference.startswith("J")}, set("J1 J2 J3 J4 J5 J6".split()))
+        self.assertEqual({reference for reference in expected if reference.startswith("#FLG")}, {"#FLG01", "#FLG02", "#FLG03"})
+        self.assertIn("U1", expected)
+        self.assertNotIn("SW59", expected)
+        self.assertFalse(any(reference.startswith("TP") for reference in expected))
 
     def test_acceptance_schema_gate_rejects_wrong_toolset_ownership(self):
         from tools.check_schematic_acceptance import _load_acceptance_toolsets
@@ -1000,6 +1080,94 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                     with self.assertRaisesRegex(SystemExit, "2"):
                         checker.main()
 
+    def test_cli_production_runs_read_only_full_acceptance_without_candidate_evidence(self):
+        from tools import check_schematic_acceptance as checker
+
+        calls = []
+        acceptance = {
+            "acceptance": {"inventory": {"mcu": 1}},
+            "gates": {"wire_validation": True},
+            "semantic": {"NET": (("U1", "1"),)},
+            "svg_path": "/tmp/production.svg",
+            "svg_sha256": "svg",
+        }
+
+        class FakeClient:
+            def __enter__(self):
+                calls.append(("client-enter", None))
+                return self
+
+            def __exit__(self, *unused):
+                calls.append(("client-exit", None))
+                return None
+
+        def query(client, schematic, svg_output):
+            calls.append(("query", (str(schematic), svg_output.name)))
+            return {"queried": True}
+
+        def record(data):
+            calls.append(("acceptance-record", data))
+            return acceptance
+
+        with TemporaryDirectory() as directory:
+            output = Path(directory) / "production.json"
+            with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--production", "--output", str(output)]):
+                with mock.patch.object(checker, "McpClient", return_value=FakeClient()):
+                    with mock.patch.object(checker, "_query", side_effect=query):
+                        with mock.patch.object(checker, "acceptance_record", side_effect=record):
+                            with mock.patch.object(checker, "run_production_transaction", side_effect=AssertionError("transaction-called")):
+                                with mock.patch.object(checker, "legacy_convergence_preflight", side_effect=AssertionError("preflight-called")):
+                                    with mock.patch.object(checker, "legacy_converge", side_effect=AssertionError("converge-called")):
+                                        with mock.patch.object(checker, "apply_schematic", side_effect=AssertionError("apply-called")):
+                                            with mock.patch.object(checker, "candidate", side_effect=AssertionError("candidate-called")):
+                                                with mock.patch.object(checker, "migrate_power_flag_instance_flags", side_effect=AssertionError("migration-called")):
+                                                    checker.main()
+            persisted = json.loads(output.read_text())
+
+        self.assertEqual([name for name, _ in calls], ["client-enter", "query", "acceptance-record", "client-exit"])
+        self.assertEqual(persisted["mode"], "production")
+        self.assertEqual(persisted["acceptance"], acceptance["acceptance"])
+
+    def test_cli_production_output_is_optional(self):
+        from tools import check_schematic_acceptance as checker
+
+        class FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *unused):
+                return None
+
+        with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--production"]):
+            with mock.patch.object(checker, "McpClient", return_value=FakeClient()):
+                with mock.patch.object(checker, "_query", return_value={"queried": True}):
+                    with mock.patch.object(checker, "acceptance_record", return_value={"acceptance": {"inventory": {"mcu": 1}}}):
+                        with mock.patch.object(checker, "run_production_transaction", side_effect=AssertionError("transaction-called")):
+                            checker.main()
+
+    def test_cli_preflight_runs_same_read_only_full_acceptance_without_output(self):
+        from tools import check_schematic_acceptance as checker
+
+        calls = []
+
+        class FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *unused):
+                return None
+
+        with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--preflight"]):
+            with mock.patch.object(checker, "McpClient", return_value=FakeClient()):
+                with mock.patch.object(checker, "_query", side_effect=lambda *args: calls.append("query") or {"queried": True}):
+                    with mock.patch.object(checker, "acceptance_record", side_effect=lambda data: calls.append("acceptance-record") or {"acceptance": {"inventory": {"mcu": 1}}}):
+                        with mock.patch.object(checker, "run_production_transaction", side_effect=AssertionError("transaction-called")):
+                            with mock.patch.object(checker, "legacy_convergence_preflight", side_effect=AssertionError("legacy-preflight-called")):
+                                with mock.patch.object(checker, "legacy_converge", side_effect=AssertionError("converge-called")):
+                                    checker.main()
+
+        self.assertEqual(calls, ["query", "acceptance-record"])
+
     def test_cli_dispatches_only_narrow_migration_mode(self):
         import sys
         from unittest import mock
@@ -1021,7 +1189,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
             with mock.patch.object(checker, "McpClient", return_value=FakeClient()):
                 with mock.patch.object(checker, "migrate_power_flag_instance_flags", side_effect=lambda client, schematic, output: calls.append(("migrate", (str(schematic), str(output)))) or {"mode": "power-flag-instance-migration"}):
                     with mock.patch.object(checker, "run_production_transaction", side_effect=AssertionError("production-called")):
-                        with mock.patch.object(checker, "preflight", side_effect=AssertionError("preflight-called")):
+                        with mock.patch.object(checker, "legacy_convergence_preflight", side_effect=AssertionError("preflight-called")):
                             with mock.patch.object(checker, "candidate", side_effect=AssertionError("candidate-called")):
                                 checker.main()
 
@@ -1134,8 +1302,8 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
         self.assertEqual(first.name, "lh60-candidate.kicad_sch")
         self.assertEqual(second.name, "lh60-candidate.kicad_sch")
 
-    def test_real_preflight_and_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
-        from tools.check_schematic_acceptance import converge, preflight
+    def test_legacy_preflight_and_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
+        from tools.check_schematic_acceptance import legacy_converge, legacy_convergence_preflight
         from tools.verify_schematic_apply import complete_schematic_schemas
 
         class FakeClient:
@@ -1208,20 +1376,20 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                 if name == "list_schematic_labels":
                     return {"labels": [{"uuid": f"l{index}"} for index in range(339)]}
                 if name == "list_schematic_components":
-                    return {"components": [{"reference": reference} for reference in sorted(old_production_references())]}
+                    return {"components": [{"reference": reference} for reference in sorted(legacy_convergence_references())]}
                 raise AssertionError(name)
 
         client = FakeClient()
-        state = preflight(client, Path("/tmp/production.kicad_sch"))
-        converge(client, Path("/tmp/production.kicad_sch"), state)
+        state = legacy_convergence_preflight(client, Path("/tmp/production.kicad_sch"))
+        legacy_converge(client, Path("/tmp/production.kicad_sch"), state)
         deletes = [(name, arguments) for name, arguments in client.calls if name.startswith("batch_delete")]
         self.assertEqual([name for name, _ in deletes], ["batch_delete_schematic_wire", "batch_delete", "batch_delete_schematic_components"])
         self.assertEqual(deletes[0][1]["uuids"], [f"w{index}" for index in range(290)])
         self.assertEqual(deletes[1][1]["uuids"], [f"l{index}" for index in range(339)])
-        self.assertEqual(set(deletes[2][1]["references"]), old_production_references())
+        self.assertEqual(set(deletes[2][1]["references"]), legacy_convergence_references())
 
         with self.assertRaisesRegex(AssertionError, "did not empty"):
-            converge(FakeClient(empty_after_delete=False), Path("/tmp/production.kicad_sch"), state)
+            legacy_converge(FakeClient(empty_after_delete=False), Path("/tmp/production.kicad_sch"), state)
 
     def test_predelete_safety_records_pcb_hash_and_refuses_dirty_or_writer_state(self):
         from tools.check_schematic_acceptance import assert_predelete_safety
@@ -1361,7 +1529,7 @@ class SchematicAcceptanceContractTest(unittest.TestCase):
                         return {"component_count": 0 if deleted else 172, "wire_count": 0 if deleted else 290, "label_count": 0 if deleted else 339}
                     if name == "list_schematic_wires": return {"wires": [{"uuid": f"w{n}"} for n in range(290)]}
                     if name == "list_schematic_labels": return {"labels": [{"uuid": f"l{n}"} for n in range(339)]}
-                    if name == "list_schematic_components": return {"components": [{"reference": ref} for ref in old_production_references()]}
+                    if name == "list_schematic_components": return {"components": [{"reference": ref} for ref in legacy_convergence_references()]}
                     raise AssertionError(name)
 
             result = run_production_transaction(
