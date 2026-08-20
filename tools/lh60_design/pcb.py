@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import json
+import math
 from pathlib import Path
 
 from tools.lh60_design.layout import physical_keys
@@ -32,6 +33,90 @@ class FootprintPlacement:
     y_mm: float
     rotation_deg: float
     layer: str = "F.Cu"
+
+
+@dataclass(frozen=True)
+class AxisAlignedRect:
+    min_x: float
+    min_y: float
+    max_x: float
+    max_y: float
+
+    def distance_to(self, other: "AxisAlignedRect") -> float:
+        dx = max(other.min_x - self.max_x, self.min_x - other.max_x, 0.0)
+        dy = max(other.min_y - self.max_y, self.min_y - other.max_y, 0.0)
+        return math.hypot(dx, dy)
+
+
+@dataclass(frozen=True)
+class ConnectorPlacement:
+    reference: str
+    pin_count: int
+    x_mm: float
+    y_mm: float
+    rotation_deg: float
+    layer: str = "B.Cu"
+    extraction_clearance_mm: float = 15.0
+
+    def __post_init__(self) -> None:
+        if self.pin_count < 1:
+            raise ValueError("connector placement pin_count must be positive")
+        if not all(
+            math.isfinite(value)
+            for value in (self.x_mm, self.y_mm, self.rotation_deg)
+        ):
+            raise ValueError("connector placement coordinates must be finite")
+        if self.rotation_deg not in (0.0, 180.0):
+            raise ValueError("connector placement rotation must be 0 or 180 degrees")
+        if self.layer != "B.Cu":
+            raise ValueError("connector placement layer must be B.Cu")
+        if not math.isfinite(self.extraction_clearance_mm) or self.extraction_clearance_mm <= 0:
+            raise ValueError("connector extraction clearance must be positive")
+
+    @property
+    def pin1_direction(self) -> str:
+        if self.rotation_deg == 0.0:
+            return "south"
+        return "north"
+
+    def access_envelope(self) -> AxisAlignedRect:
+        """Return the XY housing envelope plus 1 mm assembly clearance.
+
+        The project-local header is 2.54 mm wide and ``pin_count * 2.54``
+        long.  After the canonical front definition is flipped to B.Cu, its
+        pins extend toward negative local Y.  Cable extraction is vertical
+        (Z); ``extraction_clearance_mm`` records that separate volume.
+        """
+
+        half_width = 2.54 / 2.0 + 1.0
+        pin1_end = 2.54 / 2.0 + 1.0
+        far_end = (self.pin_count - 1) * 2.54 + pin1_end
+        if self.rotation_deg == 0.0:
+            min_y = self.y_mm - far_end
+            max_y = self.y_mm + pin1_end
+        else:
+            min_y = self.y_mm - pin1_end
+            max_y = self.y_mm + far_end
+        return AxisAlignedRect(
+            min_x=self.x_mm - half_width,
+            min_y=min_y,
+            max_x=self.x_mm + half_width,
+            max_y=max_y,
+        )
+
+
+FROZEN_CONNECTOR_PLACEMENTS = (
+    ConnectorPlacement("J1", 3, 282.5, 36.0, 0.0),
+    ConnectorPlacement("J2", 5, 77.5, 92.0, 0.0),
+    ConnectorPlacement("J3", 5, 107.5, 92.0, 0.0),
+    ConnectorPlacement("J4", 4, 3.0, 49.5, 0.0),
+    ConnectorPlacement("J5", 3, 3.0, 55.5, 180.0),
+    ConnectorPlacement("J6", 3, 282.5, 42.0, 180.0),
+)
+
+
+def frozen_connector_placements() -> tuple[ConnectorPlacement, ...]:
+    return FROZEN_CONNECTOR_PLACEMENTS
 
 
 def _balanced_block(source: str, start: int) -> tuple[int, int]:
@@ -211,6 +296,93 @@ def apply_socket_placements(client: McpClient, board: Path | str = BOARD) -> Non
                 "rotation": placement.rotation_deg,
             },
         )
+
+
+def _require_closed_board_result(
+    result: dict[str, object],
+    operation: str,
+    reference: str,
+) -> None:
+    if result.get("source") != "file":
+        raise RuntimeError(
+            f"{reference} {operation} must use the closed-board file path"
+        )
+
+
+def apply_connector_placements(
+    client: McpClient,
+    board: Path | str = BOARD,
+) -> tuple[dict[str, object], ...]:
+    board_path = str(board)
+    schemas = client.tool_schemas("pcb_components")
+    required = {"move_component", "rotate_component", "flip_component"}
+    missing = required - set(schemas)
+    if missing:
+        raise RuntimeError(
+            f"Konnect pcb_components is missing required tools: {sorted(missing)}"
+        )
+
+    applied = []
+    for placement in frozen_connector_placements():
+        move = client.call_tool_json(
+            "move_component",
+            {
+                "board": board_path,
+                "reference": placement.reference,
+                "x": placement.x_mm,
+                "y": placement.y_mm,
+            },
+        )
+        _require_closed_board_result(move, "move", placement.reference)
+        if (
+            move.get("moved") != placement.reference
+            or move.get("x") != placement.x_mm
+            or move.get("y") != placement.y_mm
+        ):
+            raise RuntimeError(f"{placement.reference} move readback mismatch")
+
+        rotation = client.call_tool_json(
+            "rotate_component",
+            {
+                "board": board_path,
+                "reference": placement.reference,
+                "rotation": placement.rotation_deg,
+            },
+        )
+        _require_closed_board_result(rotation, "rotation", placement.reference)
+        if (
+            rotation.get("rotated") != placement.reference
+            or rotation.get("rotation") != placement.rotation_deg
+        ):
+            raise RuntimeError(f"{placement.reference} rotation readback mismatch")
+
+        flip = client.call_tool_json(
+            "flip_component",
+            {
+                "board": board_path,
+                "reference": placement.reference,
+                "layer": placement.layer,
+            },
+        )
+        _require_closed_board_result(flip, "flip", placement.reference)
+        if (
+            flip.get("flipped") != placement.reference
+            or flip.get("layer") != placement.layer
+            or not isinstance(flip.get("changed"), bool)
+        ):
+            raise RuntimeError(f"{placement.reference} flip readback mismatch")
+
+        applied.append(
+            {
+                "reference": placement.reference,
+                "x": placement.x_mm,
+                "y": placement.y_mm,
+                "rotation": placement.rotation_deg,
+                "layer": placement.layer,
+                "flip_changed": flip["changed"],
+            }
+        )
+    return tuple(applied)
 
 
 def parse_args() -> argparse.Namespace:
