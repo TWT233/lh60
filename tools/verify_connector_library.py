@@ -1,3 +1,4 @@
+import math
 import unittest
 from unittest import mock
 
@@ -103,6 +104,87 @@ class ConnectorFootprintContractTest(unittest.TestCase):
 
 
 class ConnectorPayloadContractTest(unittest.TestCase):
+    def test_connector_silkscreen_clears_pad_keepouts_and_matches_exact_contract(self):
+        from tools.lh60_design.core_library import _connector_graphics
+
+        pad_radius_mm = 0.85
+        silk_stroke_mm = 0.15
+        clearance_mm = 0.20
+        min_centerline_distance_mm = pad_radius_mm + clearance_mm + silk_stroke_mm / 2
+
+        def distance_point_to_segment(point, start, end):
+            px, py = point
+            sx, sy = start
+            ex, ey = end
+            dx = ex - sx
+            dy = ey - sy
+            denom = dx * dx + dy * dy
+            if denom == 0.0:
+                return math.hypot(px - sx, py - sy)
+            t = max(0.0, min(1.0, ((px - sx) * dx + (py - sy) * dy) / denom))
+            closest_x = sx + t * dx
+            closest_y = sy + t * dy
+            return math.hypot(px - closest_x, py - closest_y)
+
+        for count in (3, 4, 5):
+            with self.subTest(pin_count=count):
+                graphics = _connector_graphics(count)
+                silks = graphics["F.SilkS"]
+                bottom_y = (count - 1) * 2.54 + 1.27
+                expected_silks = [
+                    {
+                        "type": "line",
+                        "start": {"x": -1.52, "y": -1.52},
+                        "end": {"x": 1.52, "y": -1.52},
+                        "stroke_width_mm": 0.15,
+                    },
+                    {
+                        "type": "line",
+                        "start": {"x": -1.52, "y": bottom_y + 0.25},
+                        "end": {"x": 1.52, "y": bottom_y + 0.25},
+                        "stroke_width_mm": 0.15,
+                    },
+                    {
+                        "type": "line",
+                        "start": {"x": -1.52, "y": -1.52},
+                        "end": {"x": -1.52, "y": bottom_y + 0.25},
+                        "stroke_width_mm": 0.15,
+                    },
+                    {
+                        "type": "line",
+                        "start": {"x": 1.52, "y": -1.52},
+                        "end": {"x": 1.52, "y": bottom_y + 0.25},
+                        "stroke_width_mm": 0.15,
+                    },
+                    {
+                        "type": "line",
+                        "start": {"x": -2.3, "y": -1.52},
+                        "end": {"x": -1.52, "y": -1.52},
+                        "stroke_width_mm": 0.15,
+                    },
+                    {
+                        "type": "line",
+                        "start": {"x": -2.3, "y": -1.52},
+                        "end": {"x": -2.3, "y": 0.8},
+                        "stroke_width_mm": 0.15,
+                    },
+                ]
+                self.assertEqual(silks, expected_silks)
+
+                pad_centers = [(0.0, (index - 1) * 2.54) for index in range(1, count + 1)]
+                for item in silks:
+                    start = (item["start"]["x"], item["start"]["y"])
+                    end = (item["end"]["x"], item["end"]["y"])
+                    for center in pad_centers:
+                        self.assertGreaterEqual(
+                            distance_point_to_segment(center, start, end),
+                            min_centerline_distance_mm,
+                            (
+                                f"{count}-pin silk segment {start}->{end} must clear "
+                                f"pad keepout around {center}"
+                            ),
+                        )
+
     def test_connector_graphics_match_exact_fab_courtyard_and_silkscreen_contract(self):
         from tools.lh60_design.core_library import _connector_graphics
 
@@ -133,7 +215,7 @@ class ConnectorPayloadContractTest(unittest.TestCase):
             ],
         )
         self.assertTrue(all(item["stroke_width_mm"] == 0.15 for item in graphics["F.SilkS"]))
-        self.assertTrue(any(item["start"]["x"] == -2.2 for item in graphics["F.SilkS"]))
+        self.assertTrue(any(item["start"]["x"] == -2.3 for item in graphics["F.SilkS"]))
 
     def test_core_pad_payload_preserves_legacy_smd_behavior_and_optional_fields(self):
         from tools.lh60_design.core_library import CorePadSpec, _footprint_payload, CoreFootprintSpec
