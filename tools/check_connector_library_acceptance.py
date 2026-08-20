@@ -130,6 +130,31 @@ def _expected_connector_silks(pin_count: int) -> list[dict[str, object]]:
     ]
 
 
+def _normalize_connector_silk(silks: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [
+        {
+            "type": str(item["type"]),
+            "start": {
+                "x": float(item["start"]["x"]),
+                "y": float(item["start"]["y"]),
+            },
+            "end": {
+                "x": float(item["end"]["x"]),
+                "y": float(item["end"]["y"]),
+            },
+            "stroke_width_mm": float(item["stroke_width_mm"]),
+        }
+        for item in silks
+    ]
+
+
+def _silks_match_expected_geometry(
+    silks: list[dict[str, object]],
+    expected_silks: list[dict[str, object]],
+) -> bool:
+    return _normalize_connector_silk(silks) == expected_silks
+
+
 def _assert_footprint_contract(client: McpClient) -> None:
     for spec in _connector_footprints():
         path = FOOTPRINT_LIBRARY / f"{spec.name}.kicad_mod"
@@ -179,12 +204,16 @@ def _assert_footprint_contract(client: McpClient) -> None:
         if len(silks) != 6:
             raise AssertionError(f"{spec.name}: unexpected F.SilkS primitive count {len(silks)}")
         for item in silks:
+            if item.get("layer") != "F.SilkS":
+                raise AssertionError(f"{spec.name}: unexpected silk layer {item.get('layer')}")
             if item["type"] != "line":
                 raise AssertionError(f"{spec.name}: non-line silkscreen primitive {item}")
             _assert_close(item["stroke_width_mm"], 0.15, f"{spec.name}: silk stroke")
         expected_silks = _expected_connector_silks(len(spec.pads))
-        if silks != expected_silks:
-            raise AssertionError(f"{spec.name}: silk coordinates drifted: {silks}")
+        if not _silks_match_expected_geometry(silks, expected_silks):
+            raise AssertionError(
+                f"{spec.name}: silk coordinates drifted: {_normalize_connector_silk(silks)}"
+            )
 
         print(f"footprint {spec.name}: pads={data['pad_count']} graphics={data['graphic_count']}")
 

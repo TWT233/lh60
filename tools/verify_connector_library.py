@@ -104,6 +104,32 @@ class ConnectorFootprintContractTest(unittest.TestCase):
 
 
 class ConnectorPayloadContractTest(unittest.TestCase):
+    def test_live_acceptance_silk_normalization_ignores_extra_metadata_but_rejects_geometry_drift(self):
+        from tools.check_connector_library_acceptance import (
+            _expected_connector_silks,
+            _normalize_connector_silk,
+            _silks_match_expected_geometry,
+        )
+
+        live_shaped = [
+            {
+                **item,
+                "layer": "F.SilkS",
+                "item_id": None,
+            }
+            for item in _expected_connector_silks(5)
+        ]
+
+        self.assertEqual(_normalize_connector_silk(live_shaped), _expected_connector_silks(5))
+        self.assertTrue(_silks_match_expected_geometry(live_shaped, _expected_connector_silks(5)))
+
+        drifted = [dict(item) for item in live_shaped]
+        drifted[0] = {
+            **drifted[0],
+            "start": {"x": -1.42, "y": -1.52},
+        }
+        self.assertFalse(_silks_match_expected_geometry(drifted, _expected_connector_silks(5)))
+
     def test_connector_silkscreen_clears_pad_keepouts_and_matches_exact_contract(self):
         from tools.lh60_design.core_library import _connector_graphics
 
