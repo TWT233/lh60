@@ -213,14 +213,28 @@ def queue_rebind_stage(client):
     queue_rebind_readback(client)
 
 
-def queue_pre_save_gates(client, *, references=None):
+def queue_pre_save_gates(client, *, references=None, connector_positions=None):
+    connector_positions = (
+        staged_connector_positions()
+        if connector_positions is None
+        else connector_positions
+    )
     client.queue_json(
         "get_component_list",
-        component_list_payload(final_board_refs() if references is None else references),
+        component_list_payload(
+            final_board_refs() if references is None else references,
+            connector_positions=connector_positions,
+        ),
     )
     for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
         client.queue_json("get_component_pads", connector_pad_payload(reference))
-    client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+    client.queue_json(
+        "get_component_list",
+        component_list_payload(
+            final_board_refs(),
+            connector_positions=connector_positions,
+        ),
+    )
     for net_name in TP_NETS.values():
         client.queue_json("query_traces", empty_trace_payload(net_name))
     client.queue_json(
@@ -244,7 +258,19 @@ def final_board_refs():
     return shared_refs() | {f"J{index}" for index in range(1, 7)}
 
 
-def component_list_payload(references):
+def staged_connector_positions():
+    return {
+        "J1": (310.0, 90.0),
+        "J2": (310.0, 120.0),
+        "J3": (310.0, 150.0),
+        "J4": (340.0, 120.0),
+        "J5": (340.0, 150.0),
+        "J6": (340.0, 180.0),
+    }
+
+
+def component_list_payload(references, *, connector_positions=None):
+    connector_positions = {} if connector_positions is None else connector_positions
     components = [
             {
                 "reference": reference,
@@ -253,8 +279,16 @@ def component_list_payload(references):
                     reference, f"library:{reference}"
                 ),
                 "layer": "F.Cu",
-                "x": float(index),
-                "y": float(index) / 2.0,
+                "x": (
+                    connector_positions[reference][0]
+                    if reference in connector_positions
+                    else float(index)
+                ),
+                "y": (
+                    connector_positions[reference][1]
+                    if reference in connector_positions
+                    else float(index) / 2.0
+                ),
                 "rotation": 0.0,
             }
             for index, reference in enumerate(sorted(references), start=1)
@@ -543,7 +577,13 @@ def default_sync_changes():
 
 
 def queue_sync_through_apply(
-    client, *, delete_overrides=None, second_dry=None, apply=None, pre_save_references=None
+    client,
+    *,
+    delete_overrides=None,
+    second_dry=None,
+    apply=None,
+    pre_save_references=None,
+    pre_save_connector_positions=None,
 ):
     queue_pre_delete_live_state(client)
     queue_rebind_stage(client)
@@ -587,7 +627,11 @@ def queue_sync_through_apply(
             undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
         ),
     )
-    queue_pre_save_gates(client, references=pre_save_references)
+    queue_pre_save_gates(
+        client,
+        references=pre_save_references,
+        connector_positions=pre_save_connector_positions,
+    )
 
 
 class FakeClient:
@@ -1314,6 +1358,11 @@ class PcbSyncContractTest(unittest.TestCase):
         queue_capture_baseline_flow(capture_client)
 
         baseline = capture_baseline(capture_client, SCHEMATIC, BOARD)
+        pre_save_positions = staged_connector_positions()
+        post_save_positions = {
+            reference: (x + 42.0, y + 17.0)
+            for reference, (x, y) in pre_save_positions.items()
+        }
 
         client = FakeClient()
         queue_pre_delete_live_state(client)
@@ -1353,10 +1402,22 @@ class PcbSyncContractTest(unittest.TestCase):
                 undo="Ctrl-Z reverses the whole schematic-to-PCB update.",
             ),
         )
-        client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+        client.queue_json(
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=pre_save_positions,
+            ),
+        )
         for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
             client.queue_json("get_component_pads", connector_pad_payload(reference))
-        client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+        client.queue_json(
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=pre_save_positions,
+            ),
+        )
         for net_name in TP_NETS.values():
             client.queue_json("query_traces", empty_trace_payload(net_name))
         client.queue_json(
@@ -1371,16 +1432,22 @@ class PcbSyncContractTest(unittest.TestCase):
             ),
         )
         client.queue_raw("save_project", raw_text_result("Board saved successfully."))
-        post_save_components = component_list_payload(final_board_refs())
-        for component in post_save_components["components"]:
-            if component["reference"].startswith("J"):
-                component["x"] += 300.0
+        post_save_components = component_list_payload(
+            final_board_refs(),
+            connector_positions=post_save_positions,
+        )
         client.queue_json("get_component_list", post_save_components)
         for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
             client.queue_json("get_component_pads", connector_pad_payload(reference))
         client.queue_json("get_board_info", board_info_payload())
         client.queue_json("validate_for_manufacturing", manufacturing_payload())
-        client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+        client.queue_json(
+            "get_component_list",
+            component_list_payload(
+                final_board_refs(),
+                connector_positions=post_save_positions,
+            ),
+        )
         for net_name in TP_NETS.values():
             client.queue_json("query_traces", empty_trace_payload(net_name))
         client.queue_json("run_drc", drc_payload())
@@ -1556,12 +1623,32 @@ class PcbSyncContractTest(unittest.TestCase):
                 "board": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
             },
         )
+        self.assertEqual(set(evidence["pre_save"]["connectors"]), {f"J{index}" for index in range(1, 7)})
+        for reference, component in evidence["pre_save"]["connectors"].items():
+            self.assertEqual(component["value"], CONNECTOR_VALUES[reference])
+            self.assertEqual(component["footprint"], CONNECTOR_FOOTPRINTS[reference])
+            self.assertEqual(component["layer"], "F.Cu")
+            self.assertEqual(
+                (component["x"], component["y"]),
+                pre_save_positions[reference],
+            )
         self.assertEqual(set(evidence["post_save"]["connector_pads"]), {f"J{index}" for index in range(1, 7)})
         self.assertEqual(set(evidence["post_save"]["connectors"]), {f"J{index}" for index in range(1, 7)})
         for reference, component in evidence["post_save"]["connectors"].items():
             self.assertEqual(component["value"], CONNECTOR_VALUES[reference])
             self.assertEqual(component["footprint"], CONNECTOR_FOOTPRINTS[reference])
             self.assertEqual(component["layer"], "F.Cu")
+            self.assertEqual(
+                (component["x"], component["y"]),
+                post_save_positions[reference],
+            )
+            self.assertNotEqual(
+                (component["x"], component["y"]),
+                (
+                    evidence["pre_save"]["connectors"][reference]["x"],
+                    evidence["pre_save"]["connectors"][reference]["y"],
+                ),
+            )
         self.assertEqual(evidence["final_noop"]["status"], "noop")
         self.assertEqual(
             evidence["after_hashes"],
@@ -2116,6 +2203,36 @@ class PcbSyncContractTest(unittest.TestCase):
                 self.assertEqual(
                     sum(1 for name, _ in client.calls if name == "save_project"), 1
                 )
+
+    def test_sync_rejects_pre_save_connector_staged_inside_board_before_save(self):
+        import tools.sync_debug_connectors as pcb_sync
+        from tools.sync_debug_connectors import BOARD, SCHEMATIC, sync_debug_connectors
+
+        pre_save_positions = staged_connector_positions()
+        pre_save_positions["J1"] = (10.0, 10.0)
+        baseline = baseline_fixture()
+
+        client = FakeClient()
+        queue_sync_through_apply(
+            client,
+            pre_save_connector_positions=pre_save_positions,
+        )
+
+        hash_values = iter(
+            (
+                pcb_sync.EXPECTED_SCHEMATIC_HASH,
+                pcb_sync.EXPECTED_BOARD_HASH,
+            )
+        )
+        with mock.patch(
+            "tools.sync_debug_connectors._sha256", side_effect=lambda _path: next(hash_values)
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "J1 staged connector must remain outside board bounds",
+            ):
+                sync_debug_connectors(client, SCHEMATIC, BOARD, baseline)
+        self.assertFalse(any(name == "save_project" for name, _ in client.calls))
 
     def test_sync_refuses_empty_apply_undo_and_final_noop_drift(self):
         import tools.sync_debug_connectors as pcb_sync

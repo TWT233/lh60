@@ -1039,7 +1039,8 @@ def sync_debug_connectors(
     if apply_result["plan_revision"] != second_dry["plan_revision"]:
         raise RuntimeError("apply result plan_revision differs from second dry run")
 
-    pre_save_refs = _require_exact_references(client, board, FINAL_BOARD_REFS, "final 152")
+    pre_save_inventory = _require_exact_inventory(client, board, FINAL_BOARD_REFS, "final 152")
+    pre_save_refs = pre_save_inventory["references"]
     pre_save_connector_pads = _require_connector_pads(client, board)
     pre_save_traces = _require_empty_traces(
         client,
@@ -1064,6 +1065,7 @@ def sync_debug_connectors(
         expected_skipped_applied=0,
         require_undo=False,
     )
+    pre_save_connectors = _require_connector_instances(pre_save_inventory)
     client.call_tool("save_project", {})
     after_schematic_hash = _sha256(schematic)
     after_board_hash = _sha256(board)
@@ -1132,6 +1134,7 @@ def sync_debug_connectors(
         "apply": apply_result,
         "pre_save": {
             "references": pre_save_refs,
+            "connectors": pre_save_connectors,
             "connector_pads": pre_save_connector_pads,
             "traces": pre_save_traces,
             "noop": pre_save_noop,
