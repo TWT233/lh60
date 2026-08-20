@@ -88,6 +88,48 @@ def _graphics_by_layer(graphics: list[dict[str, object]]) -> dict[str, list[dict
     return by_layer
 
 
+def _expected_connector_silks(pin_count: int) -> list[dict[str, object]]:
+    bottom_y = (pin_count - 1) * 2.54 + 1.27
+    return [
+        {
+            "type": "line",
+            "start": {"x": -1.52, "y": -1.52},
+            "end": {"x": 1.52, "y": -1.52},
+            "stroke_width_mm": 0.15,
+        },
+        {
+            "type": "line",
+            "start": {"x": -1.52, "y": bottom_y + 0.25},
+            "end": {"x": 1.52, "y": bottom_y + 0.25},
+            "stroke_width_mm": 0.15,
+        },
+        {
+            "type": "line",
+            "start": {"x": -1.52, "y": -1.52},
+            "end": {"x": -1.52, "y": bottom_y + 0.25},
+            "stroke_width_mm": 0.15,
+        },
+        {
+            "type": "line",
+            "start": {"x": 1.52, "y": -1.52},
+            "end": {"x": 1.52, "y": bottom_y + 0.25},
+            "stroke_width_mm": 0.15,
+        },
+        {
+            "type": "line",
+            "start": {"x": -2.3, "y": -1.52},
+            "end": {"x": -1.52, "y": -1.52},
+            "stroke_width_mm": 0.15,
+        },
+        {
+            "type": "line",
+            "start": {"x": -2.3, "y": -1.52},
+            "end": {"x": -2.3, "y": 0.8},
+            "stroke_width_mm": 0.15,
+        },
+    ]
+
+
 def _assert_footprint_contract(client: McpClient) -> None:
     for spec in _connector_footprints():
         path = FOOTPRINT_LIBRARY / f"{spec.name}.kicad_mod"
@@ -140,12 +182,9 @@ def _assert_footprint_contract(client: McpClient) -> None:
             if item["type"] != "line":
                 raise AssertionError(f"{spec.name}: non-line silkscreen primitive {item}")
             _assert_close(item["stroke_width_mm"], 0.15, f"{spec.name}: silk stroke")
-        if not any(
-            math.isclose(item["start"]["x"], -2.2, abs_tol=MM_TOL)
-            and math.isclose(item["end"]["x"], -2.2, abs_tol=MM_TOL)
-            for item in silks
-        ):
-            raise AssertionError(f"{spec.name}: pin-1 marker missing")
+        expected_silks = _expected_connector_silks(len(spec.pads))
+        if silks != expected_silks:
+            raise AssertionError(f"{spec.name}: silk coordinates drifted: {silks}")
 
         print(f"footprint {spec.name}: pads={data['pad_count']} graphics={data['graphic_count']}")
 
