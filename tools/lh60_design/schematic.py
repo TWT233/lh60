@@ -403,7 +403,7 @@ def _edit_payload(component: SchematicComponent) -> dict[str, object]:
         "value": component.value,
         "footprint": component.footprint,
     }
-    if component.fields:
+    if component.lib_id not in {CORE_SWITCH, CORE_DIODE} and component.fields:
         payload["fields"] = dict(component.fields)
     return payload
 
