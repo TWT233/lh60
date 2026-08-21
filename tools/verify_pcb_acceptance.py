@@ -578,6 +578,31 @@ class PcbAcceptanceContractTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "J1 x mismatch"):
                 checker._require_connector_pose_and_graphics(client, board)
 
+    def test_acceptance_rejects_bool_and_nonfinite_pose_evidence(self):
+        import tools.check_pcb_acceptance as checker
+
+        malformed_poses = (
+            ("x", (False, 36.0, 0.0, "B.Cu")),
+            ("y", (282.5, False, 0.0, "B.Cu")),
+            ("rotation", (282.5, 36.0, False, "B.Cu")),
+            ("x", (float("nan"), 36.0, 0.0, "B.Cu")),
+            ("y", (282.5, float("inf"), 0.0, "B.Cu")),
+            ("rotation", (282.5, 36.0, float("-inf"), "B.Cu")),
+        )
+
+        for field, pose in malformed_poses:
+            with self.subTest(field=field, value=pose):
+                client = FakeClient()
+                client.queue_json(
+                    "get_component_list",
+                    connector_component_inventory(pose_override={"J1": pose}),
+                )
+                with TemporaryDirectory() as directory:
+                    board = Path(directory) / "lh60.kicad_pcb"
+                    board.write_text("board")
+                    with self.assertRaisesRegex(RuntimeError, f"J1 {field} mismatch"):
+                        checker._require_connector_pose_and_graphics(client, board)
+
     def test_acceptance_rejects_duplicate_inventory_reference(self):
         import tools.check_pcb_acceptance as checker
 

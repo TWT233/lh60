@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from tools.lh60_design.mcp import McpClient
-from tools.lh60_design.pcb import BOARD, frozen_connector_placements
+from tools.lh60_design.pcb import (
+    BOARD,
+    _matches_finite_numeric_evidence,
+    frozen_connector_placements,
+)
 from tools.verify_pcb_sync import CONNECTOR_PAD_NETS, final_board_refs
 
 
@@ -167,7 +171,7 @@ def _require_connector_pose_and_graphics(client: McpClient, board: Path) -> dict
             raise RuntimeError(f"{placement.reference} layer mismatch: expected B.Cu")
         for field, expected in (("x", placement.x_mm), ("y", placement.y_mm), ("rotation", placement.rotation_deg)):
             actual = component.get(field)
-            if actual != expected:
+            if not _matches_finite_numeric_evidence(actual, expected):
                 raise RuntimeError(
                     f"{placement.reference} {field} mismatch: expected {expected}, got {actual}"
                 )
