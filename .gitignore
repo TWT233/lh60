@@ -11,6 +11,9 @@
 *.000
 *.bak
 *.bck
+__pycache__/
+*.pyc
+.history/
 *.kicad_pcb-bak
 *.kicad_sch-bak
 *-backups
@@ -39,3 +42,6 @@ fp-info-cache
 
 # Generated Gerber/Drill
 FabOutput/
+
+# Git worktrees
+.worktrees/
