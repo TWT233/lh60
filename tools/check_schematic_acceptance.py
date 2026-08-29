@@ -115,6 +115,8 @@ def exact_label_selectors(labels: list[dict[str, Any]]) -> list[dict[str, str | 
 
 def classify_known_diagnostics(layout: dict[str, Any], orphans: dict[str, Any]) -> dict[str, Any]:
     count = int(orphans.get("orphan_count", -1))
+    if layout["wire_count"] == 0 and layout["label_count"] > 0 and count == 0:
+        return {"orphan_labels": 0, "classification": "connected_pin_end_labels"}
     if layout["wire_count"] == 0 and count == layout["label_count"]:
         return {"orphan_labels": count, "classification": "pin_end_labels"}
     raise AssertionError(

@@ -227,6 +227,13 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
             ),
             {"orphan_labels": 313, "classification": "pin_end_labels"},
         )
+        self.assertEqual(
+            classify_known_diagnostics(
+                {"wire_count": 0, "label_count": 313},
+                {"orphan_count": 0},
+            ),
+            {"orphan_labels": 0, "classification": "connected_pin_end_labels"},
+        )
 
     def test_candidate_evidence_requires_current_plan_head_gates_and_visual_approval(self):
         from tools.check_schematic_acceptance import assert_candidate_evidence
