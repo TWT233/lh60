@@ -1,3 +1,7 @@
+> Superseded after completed Tasks 0-3 by
+> `docs/superpowers/specs/2026-08-29-passive-ffc-keyboard-design.md`.
+> This document remains as the historical dual-board design record only.
+
 # LH60 External MCU FFC Tail Design
 
 ## Decision

@@ -1,3 +1,7 @@
+> Superseded after completed Tasks 0-3 by
+> `docs/superpowers/plans/2026-08-29-passive-ffc-keyboard.md`.
+> This document remains as the historical dual-board execution record only.
+
 # LH60 External MCU FFC Tail Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
