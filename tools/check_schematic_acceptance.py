@@ -242,7 +242,7 @@ def normalize_exported_pins(netlist: dict[str, Any]) -> list[dict[str, str]]:
         {"reference": str(component["reference"]), "pin_number": str(pin["number"]), "net_name": str(pin["net"])}
         for component in netlist.get("components", [])
         for pin in component.get("pins", [])
-        if pin.get("net")
+        if pin.get("net") and pin.get("net") != "~"
     ]
     return sorted(assignments, key=lambda item: (item["net_name"], item["reference"], int(item["pin_number"])))
 

@@ -346,6 +346,41 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
             data = checker._query(FakeClient(), schematic, svg_path)
             self.assertEqual(data["layout"]["no_connect_count"], 1)
 
+    def test_explicit_j1_23_no_connect_is_not_an_electrical_net_assignment(self):
+        from tools import check_schematic_acceptance as checker
+
+        netlist = {
+            "components": [
+                {
+                    "reference": "J1",
+                    "pins": [
+                        {"number": "1", "net": "GND"},
+                        {"number": "23", "net": "~"},
+                        {"number": "24", "net": "GND"},
+                    ],
+                }
+            ]
+        }
+        self.assertEqual(
+            checker.normalize_exported_pins(netlist),
+            [
+                {"reference": "J1", "pin_number": "1", "net_name": "GND"},
+                {"reference": "J1", "pin_number": "24", "net_name": "GND"},
+            ],
+        )
+        state = {
+            "layout": {"component_count": 146, "wire_count": 0, "label_count": 313, "no_connect_count": 1},
+            "wire_uuids": [],
+            "label_selectors": [{"net": f"N{index}", "x": float(index), "y": 0.0} for index in range(313)],
+            "references": sorted({"J1"} | {f"D{index}" for index in range(1, 71)} | {
+                f"SW{index}" for index in range(1, 77) if index != 59
+            }),
+        }
+        checker.assert_current_production_state(state)
+        state["layout"]["no_connect_count"] = 0
+        with self.assertRaisesRegex(AssertionError, "production baseline"):
+            checker.assert_current_production_state(state)
+
     def test_current_preflight_and_passive_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
         from tools.check_schematic_acceptance import current_155_preflight, passive_ffc_converge
         from tools.verify_schematic_apply import complete_schematic_schemas
