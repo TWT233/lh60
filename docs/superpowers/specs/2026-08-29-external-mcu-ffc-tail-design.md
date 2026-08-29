@@ -213,6 +213,23 @@ conductor, and a 6.00 mm stiffener. U3 must verify and freeze every exact
 coordinate, tolerance, paste aperture, mask opening, and housing dimension from
 the controlled drawing before authoring the production footprint.
 
+### Copper-clearance rule
+
+Adjacent 0.30 mm signal lands at 0.50 mm pitch have 0.20 mm copper spacing.
+KiCad's Board Setup minimum is an absolute floor and cannot be reduced by a
+pad-local override. Both projects therefore use a 0.20 mm absolute clearance
+floor plus a custom 0.25 mm rule for every unrelated copper pair. The sole
+0.20 mm exception is a pair of distinct signal pads belonging to the same
+placed `lh60-interconnect:FPC-05F-24PH20` footprint. Traces, vias, zones, other
+components, and copper belonging to different connector instances remain at
+0.25 mm or greater.
+
+This rule must be authored through a safe Konnect custom-rule operation and
+read back from the project. Before either production PCB uses it, a real KiCad
+10 DRC coupon must prove all three cases: the connector's 0.20 mm adjacent pads
+pass, unrelated copper at 0.24 mm fails, and unrelated copper at 0.25 mm passes.
+Lowering the global minimum without the complementary custom rule is forbidden.
+
 ### Pin numbering and orientation
 
 Pin 1 must be explicit in the symbol, footprint, both PCB silkscreens, assembly
