@@ -198,6 +198,64 @@ class InterconnectPayloadContractTest(unittest.TestCase):
         )
         self.assertNotIn("Parent.Reference", interconnect_library.CUSTOM_CLEARANCE_RULE_CONDITION)
 
+    def test_effective_rule_stack_rejects_layer_wide_025_clearance(self):
+        from tools.check_interconnect_library_acceptance import (
+            _assert_effective_clearance_stack,
+        )
+        from tools.lh60_design import interconnect_library
+
+        conflicting_rules = [
+            {
+                "name": "konnect:F.Cu:clearance",
+                "constraint": "clearance",
+                "minimum_mm": 0.25,
+                "condition": "",
+                "layer": "F.Cu",
+            },
+            {
+                "name": interconnect_library.CUSTOM_CLEARANCE_RULE_NAME,
+                "constraint": "clearance",
+                "minimum_mm": 0.25,
+                "condition": interconnect_library.CUSTOM_CLEARANCE_RULE_CONDITION,
+                "layer": None,
+            },
+        ]
+
+        with self.assertRaisesRegex(AssertionError, "conflicting unconditional layer clearance"):
+            _assert_effective_clearance_stack(conflicting_rules)
+
+    def test_effective_rule_stack_accepts_020_layer_floor_plus_exact_exception(self):
+        from tools.check_interconnect_library_acceptance import (
+            _assert_effective_clearance_stack,
+        )
+        from tools.lh60_design import interconnect_library
+
+        rules = [
+            {
+                "name": "konnect:F.Cu:clearance",
+                "constraint": "clearance",
+                "minimum_mm": 0.20,
+                "condition": "",
+                "layer": "F.Cu",
+            },
+            {
+                "name": "konnect:B.Cu:clearance",
+                "constraint": "clearance",
+                "minimum_mm": 0.20,
+                "condition": "",
+                "layer": "B.Cu",
+            },
+            {
+                "name": interconnect_library.CUSTOM_CLEARANCE_RULE_NAME,
+                "constraint": "clearance",
+                "minimum_mm": 0.25,
+                "condition": interconnect_library.CUSTOM_CLEARANCE_RULE_CONDITION,
+                "layer": None,
+            },
+        ]
+
+        _assert_effective_clearance_stack(rules)
+
     def test_symbol_definition_count_reads_existing_library(self):
         from tools.lh60_design import interconnect_library
 
@@ -252,6 +310,20 @@ class InterconnectPayloadContractTest(unittest.TestCase):
                     return {
                         "rules": [
                             {
+                                "name": "konnect:F.Cu:clearance",
+                                "constraint": "clearance",
+                                "minimum_mm": 0.20,
+                                "condition": "",
+                                "layer": "F.Cu",
+                            },
+                            {
+                                "name": "konnect:B.Cu:clearance",
+                                "constraint": "clearance",
+                                "minimum_mm": 0.20,
+                                "condition": "",
+                                "layer": "B.Cu",
+                            },
+                            {
                                 "name": interconnect_library.CUSTOM_CLEARANCE_RULE_NAME,
                                 "constraint": "clearance",
                                 "minimum_mm": 0.25,
@@ -283,6 +355,19 @@ class InterconnectPayloadContractTest(unittest.TestCase):
             ),
             client.calls,
         )
+        for layer in interconnect_library.COPPER_LAYERS:
+            self.assertIn(
+                (
+                    "set_layer_constraints",
+                    {
+                        "board": str(interconnect_library.BOARD),
+                        "layer": layer,
+                        "min_clearance": 0.20,
+                        "min_trace_width": 0.25,
+                    },
+                ),
+                client.calls,
+            )
         self.assertIn(
             (
                 "set_custom_rule",
