@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 from collections import defaultdict
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import sys
 
+from tools.lh60_design.interconnect import interboard_contract
 from tools.lh60_design.layout import PhysicalKey, physical_keys
 from tools.lh60_design.matrix import logical_nodes
 from tools.lh60_design.mcp import McpClient
@@ -15,10 +17,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMATIC = ROOT / "lh60.kicad_sch"
 CORE_SWITCH = "Switch:SW_Push"
 CORE_DIODE = "Device:D"
-CORE_POWER_FLAG = "lh60-core:PowerFlag"
-MCU_SYMBOL = "lh60-mcu:RP2040-Tiny"
-MCU_FOOTPRINT = "lh60-mcu:MCU_RP2040-Tiny_SMD"
 DIODE_FOOTPRINT = "lh60-core:D_SOD-323_Bottom"
+FFC_SYMBOL = "lh60-interconnect:FPC-05F-24PH20"
+FFC_FOOTPRINT = "lh60-interconnect:FPC-05F-24PH20"
 PAGE_SIZE = "A3"
 PAGE_PORTRAIT = False
 MATRIX_X0_MM = 20.32
@@ -26,27 +27,9 @@ MATRIX_Y0_MM = 20.32
 MATRIX_X_PITCH_MM = 30.48
 MATRIX_Y_PITCH_MM = 33.02
 SWITCH_Y_OFFSETS_MM = (10.16, 17.78)
-MCU_POSITION_MM = (350.52, 45.72)
-CONNECTOR_POSITIONS_MM = {
-    "J1": (330.20, 96.52),
-    "J2": (330.20, 134.62),
-    "J3": (330.20, 177.80),
-    "J4": (373.38, 134.62),
-    "J5": (373.38, 175.26),
-    "J6": (373.38, 215.90),
-}
-POWER_FLAG_POSITIONS_MM = {
-    "#FLG01": (381.00, 86.36),
-    "#FLG02": (381.00, 106.68),
-    "#FLG03": (381.00, 127.00),
-}
+FFC_POSITION_MM = (360.68, 45.72)
 RETIRED_SWITCH_REFERENCES = {
     "r3_rshift_2.75u": "SW59",
-}
-POWER_FLAG_INSTANCE_FLAGS = {
-    "#FLG01": {"in_bom": True, "on_board": False, "dnp": False},
-    "#FLG02": {"in_bom": True, "on_board": False, "dnp": False},
-    "#FLG03": {"in_bom": True, "on_board": False, "dnp": False},
 }
 
 
@@ -76,14 +59,9 @@ class PinConnection:
 
 
 @dataclass(frozen=True)
-class ConnectorGroup:
+class NoConnectPin:
     reference: str
-    value: str
-    lib_id: str
-    footprint: str
-    pin_map: tuple[tuple[str, str], ...]
-    x: float
-    y: float
+    pin_number: str
 
 
 @dataclass(frozen=True)
@@ -97,79 +75,10 @@ class FieldVisibility:
 class SchematicPlan:
     components: tuple[SchematicComponent, ...]
     connections: tuple[PinConnection, ...]
+    no_connects: tuple[NoConnectPin, ...]
     page_size: str
     portrait: bool
     field_visibility: tuple[FieldVisibility, ...]
-
-
-CONNECTOR_GROUPS = (
-    ConnectorGroup(
-        reference="J1",
-        value="PWR",
-        lib_id="lh60-core:Conn_01x03",
-        footprint="lh60-core:PinHeader_1x03_P2.54mm_Vertical",
-        pin_map=(("1", "VSYS"), ("2", "3V3"), ("3", "GND")),
-        x=CONNECTOR_POSITIONS_MM["J1"][0],
-        y=CONNECTOR_POSITIONS_MM["J1"][1],
-    ),
-    ConnectorGroup(
-        reference="J2",
-        value="COL_A",
-        lib_id="lh60-core:Conn_01x05",
-        footprint="lh60-core:PinHeader_1x05_P2.54mm_Vertical",
-        pin_map=(
-            ("1", "COL0"),
-            ("2", "COL1"),
-            ("3", "COL2"),
-            ("4", "COL3"),
-            ("5", "COL4"),
-        ),
-        x=CONNECTOR_POSITIONS_MM["J2"][0],
-        y=CONNECTOR_POSITIONS_MM["J2"][1],
-    ),
-    ConnectorGroup(
-        reference="J3",
-        value="COL_B",
-        lib_id="lh60-core:Conn_01x05",
-        footprint="lh60-core:PinHeader_1x05_P2.54mm_Vertical",
-        pin_map=(
-            ("1", "COL5"),
-            ("2", "COL6"),
-            ("3", "COL7"),
-            ("4", "COL8"),
-            ("5", "COL9"),
-        ),
-        x=CONNECTOR_POSITIONS_MM["J3"][0],
-        y=CONNECTOR_POSITIONS_MM["J3"][1],
-    ),
-    ConnectorGroup(
-        reference="J4",
-        value="ROW_A",
-        lib_id="lh60-core:Conn_01x04",
-        footprint="lh60-core:PinHeader_1x04_P2.54mm_Vertical",
-        pin_map=(("1", "ROW0"), ("2", "ROW1"), ("3", "ROW2"), ("4", "ROW3")),
-        x=CONNECTOR_POSITIONS_MM["J4"][0],
-        y=CONNECTOR_POSITIONS_MM["J4"][1],
-    ),
-    ConnectorGroup(
-        reference="J5",
-        value="ROW_B",
-        lib_id="lh60-core:Conn_01x03",
-        footprint="lh60-core:PinHeader_1x03_P2.54mm_Vertical",
-        pin_map=(("1", "ROW4"), ("2", "ROW5"), ("3", "ROW6")),
-        x=CONNECTOR_POSITIONS_MM["J5"][0],
-        y=CONNECTOR_POSITIONS_MM["J5"][1],
-    ),
-    ConnectorGroup(
-        reference="J6",
-        value="AUX",
-        lib_id="lh60-core:Conn_01x03",
-        footprint="lh60-core:PinHeader_1x03_P2.54mm_Vertical",
-        pin_map=(("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
-        x=CONNECTOR_POSITIONS_MM["J6"][0],
-        y=CONNECTOR_POSITIONS_MM["J6"][1],
-    ),
-)
 
 
 def switch_references() -> dict[str, str]:
@@ -242,73 +151,23 @@ def _matrix_components() -> tuple[SchematicComponent, ...]:
 
 
 def _support_components() -> tuple[SchematicComponent, ...]:
-    components = [
+    connector = interboard_contract().connector
+    return (
         SchematicComponent(
-            kind="mcu",
-            lib_id=MCU_SYMBOL,
-            reference="U1",
-            value="RP2040-Tiny",
-            footprint=MCU_FOOTPRINT,
-            x=MCU_POSITION_MM[0],
-            y=MCU_POSITION_MM[1],
-        )
-    ]
-    for group in CONNECTOR_GROUPS:
-        components.append(
-            SchematicComponent(
-                kind="connector",
-                lib_id=group.lib_id,
-                reference=group.reference,
-                value=group.value,
-                footprint=group.footprint,
-                x=group.x,
-                y=group.y,
-            )
-        )
-    for reference, net_name in (
-        ("#FLG01", "VSYS"),
-        ("#FLG02", "3V3"),
-        ("#FLG03", "GND"),
-    ):
-        flags = POWER_FLAG_INSTANCE_FLAGS[reference]
-        components.append(
-            SchematicComponent(
-                kind="power_flag",
-                lib_id=CORE_POWER_FLAG,
-                reference=reference,
-                value="PWR_FLAG",
-                footprint="",
-                x=POWER_FLAG_POSITIONS_MM[reference][0],
-                y=POWER_FLAG_POSITIONS_MM[reference][1],
-                in_bom=flags["in_bom"],
-                on_board=flags["on_board"],
-                dnp=flags["dnp"],
-            )
-        )
-    return tuple(components)
-
-
-def _mcu_connections() -> tuple[PinConnection, ...]:
-    connections = [
-        PinConnection("U1", str(index + 1), f"COL{index}")
-        for index in range(10)
-    ]
-    connections.extend(
-        PinConnection("U1", str(index + 11), f"ROW{index}")
-        for index in range(6)
+            kind="connector",
+            lib_id=FFC_SYMBOL,
+            reference="J1",
+            value=connector.mpn,
+            footprint=FFC_FOOTPRINT,
+            x=FFC_POSITION_MM[0],
+            y=FFC_POSITION_MM[1],
+            fields=(
+                ("Manufacturer", connector.manufacturer),
+                ("MPN", connector.mpn),
+                ("LCSC", connector.lcsc_part),
+            ),
+        ),
     )
-    connections.extend(
-        (
-            PinConnection("U1", "17", "ROW6"),
-            PinConnection("U1", "18", "GP27"),
-            PinConnection("U1", "19", "GP28"),
-            PinConnection("U1", "20", "GP29"),
-            PinConnection("U1", "21", "3V3"),
-            PinConnection("U1", "22", "GND"),
-            PinConnection("U1", "23", "VSYS"),
-        )
-    )
-    return tuple(connections)
 
 
 def _matrix_connections() -> tuple[PinConnection, ...]:
@@ -333,22 +192,12 @@ def _matrix_connections() -> tuple[PinConnection, ...]:
     return tuple(connections)
 
 
-def _connector_connections() -> tuple[PinConnection, ...]:
+def _ffc_connections() -> tuple[PinConnection, ...]:
+    contract = interboard_contract()
     return tuple(
-        PinConnection(group.reference, pin_number, net_name)
-        for group in CONNECTOR_GROUPS
-        for pin_number, net_name in group.pin_map
-    )
-
-
-def _power_flag_connections() -> tuple[PinConnection, ...]:
-    return tuple(
-        PinConnection(reference, "1", net_name)
-        for reference, net_name in (
-            ("#FLG01", "VSYS"),
-            ("#FLG02", "3V3"),
-            ("#FLG03", "GND"),
-        )
+        PinConnection("J1", str(pin.number), pin.net_name)
+        for pin in contract.pins
+        if pin.net_name is not None
     )
 
 
@@ -364,22 +213,20 @@ def _field_visibility() -> tuple[FieldVisibility, ...]:
     return tuple(
         [FieldVisibility(f"D{index}", False, False) for index in range(1, 71)]
         + [FieldVisibility(reference, False, True) for reference in switches]
-        + [FieldVisibility(group.reference, True, True) for group in CONNECTOR_GROUPS]
-        + [FieldVisibility("U1", True, True)]
+        + [FieldVisibility("J1", True, True)]
     )
 
 
 def build_schematic_plan() -> SchematicPlan:
     components = (*_support_components(), *_matrix_components())
     connections = (
-        *_mcu_connections(),
         *_matrix_connections(),
-        *_connector_connections(),
-        *_power_flag_connections(),
+        *_ffc_connections(),
     )
     return SchematicPlan(
         components=tuple(components),
         connections=tuple(connections),
+        no_connects=(NoConnectPin("J1", "23"),),
         page_size=PAGE_SIZE,
         portrait=PAGE_PORTRAIT,
         field_visibility=_field_visibility(),
@@ -493,56 +340,6 @@ def _require_single_accounting(
         )
 
 
-def _refresh_u1_from_library(
-    client: McpClient,
-    schematic: Path,
-) -> None:
-    result = _call_tool_json(
-        client,
-        "update_symbols_from_library",
-        {
-            "schematic": str(schematic),
-            "references": ["U1"],
-            "dry_run": False,
-            "allow_pin_moves": True,
-        },
-    )
-    _require_empty_list_result(result, "errors", "update_symbols_from_library")
-    _require_empty_list_result(result, "pins_moved", "update_symbols_from_library")
-    _require_single_accounting(
-        result,
-        target=MCU_SYMBOL,
-        updated_key="updated",
-        unchanged_key="unchanged",
-        tool="update_symbols_from_library",
-    )
-
-
-def _reset_u1_field_positions(
-    client: McpClient,
-    schematic: Path,
-) -> None:
-    result = _call_tool_json(
-        client,
-        "reset_schematic_field_positions",
-        {
-            "schematic": str(schematic),
-            "references": ["U1"],
-            "dry_run": False,
-        },
-    )
-    for key in ("no_library_anchor", "no_property", "not_found"):
-        _require_empty_list_result(result, key, "reset_schematic_field_positions")
-    for field_name in ("U1.Reference", "U1.Value"):
-        _require_single_accounting(
-            result,
-            target=field_name,
-            updated_key="moved",
-            unchanged_key="unchanged",
-            tool="reset_schematic_field_positions",
-        )
-
-
 def _verify_final_symbol_refresh(
     client: McpClient,
     schematic: Path,
@@ -564,12 +361,9 @@ def apply_power_flag_instance_flags(
     client: McpClient,
     schematic: Path = SCHEMATIC,
 ) -> dict[str, object]:
-    plan = build_schematic_plan()
-    edits = [
-        payload
-        for component in plan.components
-        if (payload := _instance_flag_payload(component)) is not None
-    ]
+    edits: list[dict[str, object]] = []
+    if not edits:
+        return {"atomic": True, "updated_count": 0, "updated": [], "unchanged": []}
     result = _call_tool_json(
         client,
         "batch_edit_schematic_components",
@@ -588,7 +382,7 @@ def apply_power_flag_instance_flags(
         raise RuntimeError("batch_edit_schematic_components updated_count mismatch")
     if len(updated) + len(unchanged) != len(edits):
         raise RuntimeError("batch_edit_schematic_components accounting mismatch")
-    expected = {reference: dict(flags) for reference, flags in POWER_FLAG_INSTANCE_FLAGS.items()}
+    expected: dict[str, dict[str, object]] = {}
     seen = []
     for key, entries in (("updated", updated), ("unchanged", unchanged)):
         for item in entries:
@@ -649,7 +443,7 @@ def require_schematic_capabilities(client: McpClient) -> None:
     """Fail closed unless the deployed Konnect supports every A3 apply step."""
     schemas = {
         toolset: client.tool_schemas(toolset)
-        for toolset in ("sch_batch", "sch_wiring", "sch_components", "library")
+        for toolset in ("sch_batch", "sch_wiring", "sch_components")
     }
     required = {
         "sch_batch": {
@@ -658,17 +452,15 @@ def require_schematic_capabilities(client: McpClient) -> None:
             "batch_place_components",
             "batch_edit_schematic_components",
             "batch_connect_to_net",
-            "batch_set_schematic_field_visibility",
         },
-        "sch_wiring": {"batch_delete_schematic_wire"},
+        "sch_wiring": {"batch_add_no_connect", "batch_delete_schematic_wire"},
         "sch_components": {
             "get_schematic_component",
+            "get_schematic_pin_locations",
             "list_schematic_components",
             "set_schematic_page",
             "update_symbols_from_library",
-            "reset_schematic_field_positions",
         },
-        "library": {"create_symbol"},
     }
     missing = {
         toolset: sorted(names - schemas[toolset].keys())
@@ -681,22 +473,17 @@ def require_schematic_capabilities(client: McpClient) -> None:
         "batch_delete_schematic_components": ("sch_batch", ("schematic", "references"), ("schematic", "references")),
         "batch_delete": ("sch_batch", ("schematic",), ("schematic", "uuids")),
         "batch_delete_schematic_wire": ("sch_wiring", ("schematic", "uuids"), ("schematic", "uuids")),
+        "batch_add_no_connect": ("sch_wiring", ("schematic", "positions"), ("schematic", "positions")),
+        "get_schematic_pin_locations": ("sch_components", ("schematic", "reference"), ("schematic", "reference")),
         "set_schematic_page": ("sch_components", ("schematic", "size"), ("schematic", "size", "portrait")),
         "batch_place_components": ("sch_batch", ("schematic", "components"), ("schematic", "components")),
         "batch_edit_schematic_components": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
         "batch_connect_to_net": ("sch_batch", ("schematic", "net_name", "pins"), ("schematic", "net_name", "pins")),
-        "batch_set_schematic_field_visibility": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
         "update_symbols_from_library": (
             "sch_components",
             ("schematic",),
             ("schematic", "dry_run", "allow_pin_moves", "references"),
         ),
-        "reset_schematic_field_positions": (
-            "sch_components",
-            ("schematic",),
-            ("schematic", "dry_run", "references"),
-        ),
-        "create_symbol": ("library", ("library_path", "name", "reference_prefix"), ("reference_at", "value_at")),
     }
     missing_inputs = {}
     for tool, (toolset, required_inputs, property_inputs) in contracts.items():
@@ -710,7 +497,70 @@ def require_schematic_capabilities(client: McpClient) -> None:
             }
     if missing_inputs:
         raise RuntimeError(f"Konnect schematic input contract mismatch: {missing_inputs}")
-    _require_nested_flag_edit_schema(schemas["sch_batch"]["batch_edit_schematic_components"])
+
+
+def _pin_location(pin: dict[str, object]) -> tuple[str, float, float]:
+    number = str(pin.get("pin_number", pin.get("number", "")))
+    try:
+        x = float(pin["x"])
+        y = float(pin["y"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError(f"pin {number or '?'} has invalid coordinates") from error
+    if not math.isfinite(x) or not math.isfinite(y):
+        raise RuntimeError(f"pin {number or '?'} has non-finite coordinates")
+    return number, x, y
+
+
+def _resolve_no_connect_positions(
+    client: McpClient,
+    schematic: Path,
+    no_connects: tuple[NoConnectPin, ...],
+) -> list[dict[str, float]]:
+    by_reference: dict[str, set[str]] = defaultdict(set)
+    for no_connect in no_connects:
+        by_reference[no_connect.reference].add(no_connect.pin_number)
+    positions: list[dict[str, float]] = []
+    for reference, required_pins in by_reference.items():
+        result = _call_tool_json(
+            client,
+            "get_schematic_pin_locations",
+            {"schematic": str(schematic), "reference": reference},
+        )
+        pins = result.get("pins", [])
+        if not isinstance(pins, list):
+            raise RuntimeError("get_schematic_pin_locations returned non-list pins")
+        located: dict[str, list[dict[str, float]]] = {pin: [] for pin in required_pins}
+        for pin in pins:
+            if not isinstance(pin, dict):
+                raise RuntimeError(f"get_schematic_pin_locations returned invalid pin: {pin!r}")
+            number, x, y = _pin_location(pin)
+            if number in located:
+                located[number].append({"x": x, "y": y})
+        for pin_number in sorted(required_pins, key=int):
+            matches = located[pin_number]
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"expected exactly one {reference}.{pin_number} pin location, got {len(matches)}"
+                )
+            positions.append(matches[0])
+    return positions
+
+
+def _add_no_connects(
+    client: McpClient,
+    schematic: Path,
+    no_connects: tuple[NoConnectPin, ...],
+) -> None:
+    if not no_connects:
+        return
+    positions = _resolve_no_connect_positions(client, schematic, no_connects)
+    result = _call_tool_json(
+        client,
+        "batch_add_no_connect",
+        {"schematic": str(schematic), "positions": positions},
+    )
+    if result.get("isError"):
+        raise RuntimeError(f"batch_add_no_connect failed: {result}")
 
 
 def apply_schematic(
@@ -747,8 +597,8 @@ def apply_schematic(
             ],
         },
     )
-    _refresh_u1_from_library(client, schematic)
-    _reset_u1_field_positions(client, schematic)
+    _verify_final_symbol_refresh(client, schematic)
+    _add_no_connects(client, schematic, plan.no_connects)
     for net_name, pins in _connections_by_net(plan.connections).items():
         client.call_tool(
             "batch_connect_to_net",
@@ -758,18 +608,6 @@ def apply_schematic(
                 "pins": pins,
             },
         )
-    client.call_tool(
-        "batch_set_schematic_field_visibility",
-        {
-            "schematic": str(schematic),
-            "edits": [
-                _field_visibility_payload(visibility)
-                for visibility in plan.field_visibility
-            ],
-        },
-    )
-    _verify_final_symbol_refresh(client, schematic)
-    apply_power_flag_instance_flags(client, schematic)
 
 
 def parse_args() -> argparse.Namespace:

@@ -121,6 +121,360 @@ def migration_component_details():
     }
 
 
+class PassiveFfcAcceptanceContractTest(unittest.TestCase):
+    def test_checker_import_and_cli_parser_paths_do_not_build_migration_plan(self):
+        import tools.lh60_design.schematic as schematic_module
+
+        original_checker = sys.modules.get("tools.check_schematic_acceptance")
+        sys.modules.pop("tools.check_schematic_acceptance", None)
+        try:
+            with mock.patch.object(
+                schematic_module,
+                "build_schematic_plan",
+                side_effect=AssertionError("plan builder called"),
+            ):
+                checker = importlib.import_module("tools.check_schematic_acceptance")
+                with mock.patch.object(sys, "argv", ["check_schematic_acceptance.py", "--help"]):
+                    with self.assertRaises(SystemExit) as help_exit:
+                        checker.main()
+                self.assertEqual(help_exit.exception.code, 0)
+        finally:
+            sys.modules.pop("tools.check_schematic_acceptance", None)
+            if original_checker is not None:
+                sys.modules["tools.check_schematic_acceptance"] = original_checker
+
+    def test_candidate_registers_only_passive_footprint_libraries_needed_by_plan(self):
+        from tools.check_schematic_acceptance import candidate_library_registrations
+
+        registrations = candidate_library_registrations(self.id())
+        self.assertEqual(
+            {item["nickname"] for item in registrations["footprints"]},
+            {"lh60-core", "lh60-interconnect", "lh60-sockets"},
+        )
+        self.assertEqual(
+            {item["nickname"] for item in registrations["symbols"]},
+            {"lh60-core", "lh60-interconnect"},
+        )
+        self.assertFalse(
+            any("lh60-mcu" in item["library_path"] or item["nickname"] == "lh60-mcu"
+                for group in registrations.values() for item in group)
+        )
+
+    def test_current_production_state_requires_passive_146_layout_references_and_uuid_counts(self):
+        from tools.check_schematic_acceptance import assert_current_production_state
+
+        expected_refs = {"J1"} | {f"D{index}" for index in range(1, 71)} | {
+            f"SW{index}" for index in range(1, 77) if index != 59
+        }
+        valid_state = {
+            "layout": {"component_count": 146, "wire_count": 0, "label_count": 313, "no_connect_count": 1},
+            "wire_uuids": [],
+            "label_uuids": [f"label-{index}" for index in range(313)],
+            "references": sorted(expected_refs),
+        }
+        assert_current_production_state(valid_state)
+        self.assertNotIn("U1", expected_refs)
+        self.assertFalse(any(reference.startswith("#FLG") for reference in expected_refs))
+        self.assertEqual({reference for reference in expected_refs if reference.startswith("J")}, {"J1"})
+
+        for name, mutate, message in (
+            ("label layout", lambda state: state["layout"].update(label_count=312), "baseline"),
+            ("nc layout", lambda state: state["layout"].update(no_connect_count=0), "baseline"),
+            ("label UUID count", lambda state: state["label_uuids"].pop(), "label UUID count"),
+            ("retired MCU appears", lambda state: state["references"].append("U1"), "references"),
+        ):
+            with self.subTest(name=name):
+                state = deepcopy(valid_state)
+                mutate(state)
+                with self.assertRaisesRegex(AssertionError, message):
+                    assert_current_production_state(state)
+
+    def test_current_155_preflight_accepts_only_active_mcu_source_baseline(self):
+        from tools.check_schematic_acceptance import assert_current_155_preflight
+
+        source_refs = (
+            {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
+            | {f"D{index}" for index in range(1, 71)}
+            | {f"SW{index}" for index in range(1, 77) if index != 59}
+            | {f"J{index}" for index in range(1, 7)}
+        )
+        state = {
+            "layout": {"component_count": 155, "wire_count": 0, "label_count": 339},
+            "wire_uuids": [],
+            "label_uuids": [f"label-{index}" for index in range(339)],
+            "references": sorted(source_refs),
+        }
+        assert_current_155_preflight(state)
+        final_state = {
+            **state,
+            "layout": {"component_count": 146, "wire_count": 0, "label_count": 313, "no_connect_count": 1},
+            "label_uuids": [f"label-{index}" for index in range(313)],
+            "references": sorted({"J1"} | {f"D{index}" for index in range(1, 71)} | {
+                f"SW{index}" for index in range(1, 77) if index != 59
+            }),
+        }
+        with self.assertRaisesRegex(AssertionError, "current 155 source baseline"):
+            assert_current_155_preflight(final_state)
+
+    def test_accepts_expected_zero_wire_orphan_diagnostic_for_passive_labels(self):
+        from tools.check_schematic_acceptance import classify_known_diagnostics
+
+        self.assertEqual(
+            classify_known_diagnostics(
+                {"wire_count": 0, "label_count": 313},
+                {"orphan_count": 313},
+            ),
+            {"orphan_labels": 313, "classification": "pin_end_labels"},
+        )
+
+    def test_candidate_evidence_requires_current_plan_head_gates_and_visual_approval(self):
+        from tools.check_schematic_acceptance import assert_candidate_evidence
+
+        evidence = {
+            "plan_hash": "current-plan",
+            "git_sha": "current-head",
+            "acceptance": {"inventory": {"connector": 1, "diode": 70, "switch": 75}},
+            "gates": {"wire_validation": True, "component_validation": True, "erc_errors": 0, "erc_warnings": 0},
+            "svg_sha256": "svg-sha",
+            "render_sha256": "render-sha",
+            "visual_approval": {
+                "approved": True,
+                "plan_hash": "current-plan",
+                "git_sha": "current-head",
+                "svg_sha256": "svg-sha",
+                "render_sha256": "render-sha",
+            },
+        }
+        assert_candidate_evidence(evidence, "current-plan", "current-head")
+        rejected = dict(evidence)
+        rejected["visual_approval"] = {"approved": True}
+        with self.assertRaisesRegex(AssertionError, "visual approval"):
+            assert_candidate_evidence(rejected, "current-plan", "current-head")
+
+    def test_acceptance_rejects_component_contract_or_prohibited_nets(self):
+        from tools import check_schematic_acceptance as checker
+
+        with TemporaryDirectory() as directory:
+            svg_path = Path(directory) / "candidate.svg"
+            svg_path.write_text('<svg width="420mm" height="297mm"/>')
+            components = [
+                {"reference": "J1", "lib_id": "lh60-interconnect:FPC-05F-24PH20", "value": "FPC-05F-24PH20", "footprint": "lh60-interconnect:FPC-05F-24PH20"}
+            ]
+            netlist = {"components": [{**components[0], "pins": [{"number": "1", "net": "GND"}]}]}
+            original_component_hash = checker.FROZEN_COMPONENT_SHA256
+            original_pin_hash = checker.FROZEN_PIN_SHA256
+            original_map = checker.FROZEN_CONNECTOR_MAP
+            checker.FROZEN_COMPONENT_SHA256 = checker._stable_hash(checker.normalize_actual_components(components))
+            checker.FROZEN_PIN_SHA256 = checker._stable_hash(checker.normalize_exported_pins(netlist))
+            checker.FROZEN_CONNECTOR_MAP = {"J1": (("1", "GND"),)}
+            try:
+                data = {
+                    "components": {"components": deepcopy(components)},
+                    "netlist": deepcopy(netlist),
+                    "layout": {"component_count": 1, "wire_count": 0, "label_count": 1},
+                    "overlaps": {"overlap_count": 0},
+                    "single_pin_nets": {"single_pin_net_count": 0, "nets": []},
+                    "svg_path": str(svg_path),
+                }
+                checker.assert_frozen_acceptance(data)
+                data["components"]["components"][0]["footprint"] = "wrong"
+                with self.assertRaisesRegex(AssertionError, "component contract"):
+                    checker.assert_frozen_acceptance(data)
+                data["components"]["components"][0]["footprint"] = "lh60-interconnect:FPC-05F-24PH20"
+                data["netlist"]["components"][0]["pins"][0]["net"] = "VSYS"
+                checker.FROZEN_PIN_SHA256 = checker._stable_hash(checker.normalize_exported_pins(data["netlist"]))
+                checker.FROZEN_CONNECTOR_MAP = {}
+                with self.assertRaisesRegex(AssertionError, "prohibited"):
+                    checker.assert_frozen_acceptance(data)
+            finally:
+                checker.FROZEN_COMPONENT_SHA256 = original_component_hash
+                checker.FROZEN_PIN_SHA256 = original_pin_hash
+                checker.FROZEN_CONNECTOR_MAP = original_map
+
+    def test_current_preflight_and_passive_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
+        from tools.check_schematic_acceptance import current_155_preflight, passive_ffc_converge
+        from tools.verify_schematic_apply import complete_schematic_schemas
+
+        source_refs = sorted(
+            {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
+            | {f"D{index}" for index in range(1, 71)}
+            | {f"SW{index}" for index in range(1, 77) if index != 59}
+            | {f"J{index}" for index in range(1, 7)}
+        )
+
+        class FakeClient:
+            def __init__(self, empty_after_delete=True):
+                self.calls = []
+                self.empty_after_delete = empty_after_delete
+
+            def tool_schemas(self, toolset):
+                schemas = deepcopy(disjoint_acceptance_schemas())
+                for name, values in complete_schematic_schemas().items():
+                    schemas.setdefault(name, {}).update(values)
+                return schemas[toolset]
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                return tool_text_result({"ok": True, "errors": [], "pins_moved": []})
+
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "get_schematic_layout":
+                    deleted = any(call[0] == "batch_delete_schematic_components" for call in self.calls)
+                    if deleted:
+                        return {
+                            "component_count": 0 if self.empty_after_delete else 1,
+                            "wire_count": 0,
+                            "label_count": 0,
+                            "no_connect_count": 0,
+                        }
+                    return {"component_count": 155, "wire_count": 0, "label_count": 339}
+                if name == "list_schematic_wires":
+                    return {"wires": []}
+                if name == "list_schematic_labels":
+                    return {"labels": [{"uuid": f"l{index}"} for index in range(339)]}
+                if name == "list_schematic_components":
+                    return {"components": [{"reference": reference} for reference in source_refs]}
+                raise AssertionError(name)
+
+        client = FakeClient()
+        state = current_155_preflight(client, Path("/tmp/production.kicad_sch"))
+        with mock.patch("tools.check_schematic_acceptance.apply_schematic", side_effect=lambda client, schematic: client.calls.append(("apply_schematic", {"schematic": str(schematic)}))):
+            passive_ffc_converge(client, Path("/tmp/production.kicad_sch"), state)
+        deletes = [(name, arguments) for name, arguments in client.calls if name.startswith("batch_delete")]
+        self.assertEqual([name for name, _ in deletes], ["batch_delete", "batch_delete_schematic_components"])
+        self.assertEqual(deletes[0][1]["uuids"], [f"l{index}" for index in range(339)])
+        self.assertEqual(set(deletes[1][1]["references"]), set(source_refs))
+
+        with self.assertRaisesRegex(AssertionError, "did not empty"):
+            with mock.patch("tools.check_schematic_acceptance.apply_schematic", side_effect=AssertionError("apply should not run")):
+                passive_ffc_converge(FakeClient(empty_after_delete=False), Path("/tmp/production.kicad_sch"), state)
+
+    def test_production_transaction_orders_once_and_persists_bound_evidence(self):
+        from tools.check_schematic_acceptance import run_production_transaction
+
+        with TemporaryDirectory() as directory:
+            evidence_path = Path(directory) / "candidate.json"
+            output_path = Path(directory) / "production.json"
+            evidence = {
+                "plan_hash": "plan",
+                "git_sha": "head",
+                "acceptance": {"inventory": {"connector": 1, "diode": 70, "switch": 75}},
+                "gates": {"wire_validation": True, "component_validation": True, "erc_errors": 0, "erc_warnings": 0},
+                "svg_sha256": "svg",
+                "render_sha256": "render",
+                "visual_approval": {"approved": True, "plan_hash": "plan", "git_sha": "head", "svg_sha256": "svg", "render_sha256": "render"},
+            }
+            evidence_path.write_text(json.dumps(evidence))
+            state = {
+                "layout": {"component_count": 155, "wire_count": 0, "label_count": 339},
+                "wire_uuids": [],
+                "label_uuids": [f"l{index}" for index in range(339)],
+                "references": sorted(
+                    {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
+                    | {f"D{index}" for index in range(1, 71)}
+                    | {f"SW{index}" for index in range(1, 77) if index != 59}
+                    | {f"J{index}" for index in range(1, 7)}
+                ),
+            }
+            calls = []
+
+            result = run_production_transaction(
+                object(),
+                Path("/tmp/lh60.kicad_sch"),
+                evidence_path,
+                output_path,
+                expected_plan_hash="plan",
+                expected_git_sha="head",
+                preflight_fn=lambda client, schematic: calls.append(("preflight", str(schematic))) or state,
+                converge_fn=lambda client, schematic, current_state: calls.append(("converge", len(current_state["references"]))),
+                acceptance_fn=lambda client, schematic, output: calls.append(("post-acceptance", str(schematic))) or {"semantic": {"GND": [("J1", "1")]}, "svg_sha256": "prod-svg"},
+                candidate_fn=lambda client, candidate_dir, *, regenerate_libraries: calls.append(("second-candidate", regenerate_libraries)) or Path(candidate_dir) / "candidate.kicad_sch",
+                candidate_acceptance_fn=lambda client, schematic, output: calls.append(("candidate-acceptance", str(schematic))) or {"semantic": {"GND": [("J1", "1")]}, "svg_sha256": "candidate-svg"},
+                capabilities_fn=lambda client: calls.append(("capabilities", None)),
+                safety_fn=lambda schematic, board: calls.append(("safety", str(board))) or {"schematic_sha256": "sch", "pcb_sha256": "pcb"},
+            )
+            self.assertEqual(
+                [name for name, _ in calls],
+                ["capabilities", "safety", "preflight", "converge", "post-acceptance", "second-candidate", "candidate-acceptance"],
+            )
+            self.assertTrue(output_path.is_file())
+            self.assertEqual(result["predelete_safety"]["pcb_sha256"], "pcb")
+            self.assertEqual(result["candidate_evidence"]["svg_sha256"], "svg")
+
+    def test_predelete_safety_records_pcb_hash_and_refuses_dirty_or_writer_state(self):
+        from tools.check_schematic_acceptance import assert_predelete_safety
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            schematic = root / "lh60.kicad_sch"
+            board = root / "lh60.kicad_pcb"
+            schematic.write_text("schematic")
+            board.write_text("board")
+            result = assert_predelete_safety(
+                schematic, board, clean_tree_fn=lambda: True, writer_pids_fn=lambda path: []
+            )
+            self.assertEqual(result["pcb_sha256"], hashlib.sha256(b"board").hexdigest())
+            with self.assertRaisesRegex(AssertionError, "clean"):
+                assert_predelete_safety(schematic, board, clean_tree_fn=lambda: False, writer_pids_fn=lambda path: [])
+            with self.assertRaisesRegex(AssertionError, "writer"):
+                assert_predelete_safety(schematic, board, clean_tree_fn=lambda: True, writer_pids_fn=lambda path: [123])
+
+    def test_prepare_and_verify_candidate_libraries_use_core_and_interconnect_clients(self):
+        from tools.check_schematic_acceptance import prepare_candidate_libraries, verify_candidate_libraries
+
+        clients = []
+
+        class FakeClient:
+            def __init__(self, number):
+                self.number = number
+                self.calls = []
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *unused):
+                return None
+
+            def tool_schemas(self, toolset):
+                return deepcopy(disjoint_acceptance_schemas()[toolset])
+
+            def call_tool_json(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "get_symbol_info":
+                    return {"name": arguments["lib_id"].split(":")[1]}
+                if name == "get_footprint_info":
+                    return {"name": Path(arguments["footprint_path"]).stem}
+                raise AssertionError(name)
+
+        def factory(*unused):
+            client = FakeClient(len(clients))
+            clients.append(client)
+            return client
+
+        applied = []
+        prepare_candidate_libraries(
+            factory,
+            Path("/tmp/project"),
+            apply_core_fn=lambda client: applied.append(("core", client.number)),
+            apply_interconnect_fn=lambda client: applied.append(("interconnect", client.number)),
+            capability_fn=lambda client: None,
+        )
+        self.assertEqual(applied, [("core", 0), ("interconnect", 1)])
+        result = verify_candidate_libraries(
+            factory,
+            Path("/tmp/project/lh60-candidate.kicad_pro"),
+            capability_fn=lambda client: None,
+        )
+        self.assertEqual(len(clients), 3)
+        self.assertEqual(set(result["symbols"]), {"Conn_01x03", "Conn_01x04", "Conn_01x05", "FPC-05F-24PH20"})
+        self.assertEqual(
+            set(result["footprints"]),
+            {"PinHeader_1x03_P2.54mm_Vertical", "PinHeader_1x04_P2.54mm_Vertical", "PinHeader_1x05_P2.54mm_Vertical", "FPC-05F-24PH20"},
+        )
+
+
+@unittest.skip("retired active-MCU acceptance tests superseded by PassiveFfcAcceptanceContractTest")
 class SchematicAcceptanceContractTest(unittest.TestCase):
     def test_checker_import_and_cli_parser_paths_do_not_build_migration_plan(self):
         import tools.lh60_design.schematic as schematic_module

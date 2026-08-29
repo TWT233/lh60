@@ -34,20 +34,17 @@ def complete_schematic_schemas():
             "batch_place_components": schema(("schematic", "components"), "schematic", "components"),
             "batch_edit_schematic_components": batch_edit_schema,
             "batch_connect_to_net": schema(("schematic", "net_name", "pins"), "schematic", "net_name", "pins"),
-            "batch_set_schematic_field_visibility": schema(("schematic", "edits"), "schematic", "edits"),
         },
         "sch_wiring": {
             "batch_delete_schematic_wire": schema(("schematic", "uuids"), "schematic", "uuids"),
+            "batch_add_no_connect": schema(("schematic", "positions"), "schematic", "positions"),
         },
         "sch_components": {
             "get_schematic_component": schema(("schematic", "reference"), "schematic", "reference"),
+            "get_schematic_pin_locations": schema(("schematic", "reference"), "schematic", "reference"),
             "list_schematic_components": schema(("schematic",), "schematic"),
             "set_schematic_page": schema(("schematic", "size"), "schematic", "size", "portrait"),
             "update_symbols_from_library": schema(("schematic",), "schematic", "dry_run", "allow_pin_moves", "references"),
-            "reset_schematic_field_positions": schema(("schematic",), "schematic", "dry_run", "references"),
-        },
-        "library": {
-            "create_symbol": schema(("library_path", "name", "reference_prefix"), "library_path", "name", "reference_prefix", "reference_at", "value_at"),
         },
     }
 
@@ -117,39 +114,23 @@ class SchematicApplyContractTest(unittest.TestCase):
             self.assertNotIn("fields", _edit_payload(planned))
             self.assertEqual(_edit_payload(planned)["value"], planned.value)
 
-    def test_power_flags_use_pin_connections_without_visible_custom_net_fields(self):
-        from tools.lh60_design.schematic import (
-            POWER_FLAG_POSITIONS_MM,
-            build_schematic_plan,
-        )
+    def test_ffc_connector_uses_interconnect_fields_without_power_flags(self):
+        from tools.lh60_design.schematic import build_schematic_plan
 
         plan = build_schematic_plan()
-        flags = [
-            component
-            for component in plan.components
-            if component.reference.startswith("#FLG")
-        ]
-        flag_connections = {
-            connection.reference: (connection.pin_number, connection.net_name)
-            for connection in plan.connections
-            if connection.reference.startswith("#FLG")
-        }
+        connectors = [component for component in plan.components if component.kind == "connector"]
 
-        self.assertEqual([flag.fields for flag in flags], [(), (), ()])
+        self.assertEqual([component.reference for component in connectors], ["J1"])
+        self.assertEqual(connectors[0].lib_id, "lh60-interconnect:FPC-05F-24PH20")
+        self.assertEqual(connectors[0].footprint, "lh60-interconnect:FPC-05F-24PH20")
         self.assertEqual(
-            [POWER_FLAG_POSITIONS_MM[flag.reference][1] for flag in flags],
-            [86.36, 106.68, 127.0],
+            dict(connectors[0].fields),
+            {"Manufacturer": "XUNPU", "MPN": "FPC-05F-24PH20", "LCSC": "C2856805"},
         )
-        self.assertEqual(
-            flag_connections,
-            {
-                "#FLG01": ("1", "VSYS"),
-                "#FLG02": ("1", "3V3"),
-                "#FLG03": ("1", "GND"),
-            },
-        )
+        self.assertFalse(any(component.reference.startswith("#FLG") for component in plan.components))
+        self.assertEqual(plan.no_connects, (__import__("tools.lh60_design.schematic", fromlist=["NoConnectPin"]).NoConnectPin("J1", "23"),))
 
-    def test_capability_gate_requires_deployed_tools_and_symbol_anchors(self):
+    def test_capability_gate_requires_deployed_apply_tools(self):
         from tools.lh60_design.schematic import require_schematic_capabilities
 
         class FakeClient:
@@ -157,16 +138,6 @@ class SchematicApplyContractTest(unittest.TestCase):
                 return deepcopy(complete_schematic_schemas()[toolset])
 
         require_schematic_capabilities(FakeClient())
-
-        class MissingAnchor(FakeClient):
-            def tool_schemas(self, toolset):
-                schema = super().tool_schemas(toolset)
-                if toolset == "library":
-                    schema["create_symbol"]["properties"].pop("value_at")
-                return schema
-
-        with self.assertRaisesRegex(RuntimeError, "value_at"):
-            require_schematic_capabilities(MissingAnchor())
 
         class MissingDelete(FakeClient):
             def tool_schemas(self, toolset):
@@ -178,7 +149,7 @@ class SchematicApplyContractTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "batch_delete"):
             require_schematic_capabilities(MissingDelete())
 
-    def test_capability_gate_requires_nested_instance_flag_schema_and_read_tools(self):
+    def test_capability_gate_requires_read_tools(self):
         from tools.lh60_design.schematic import require_schematic_capabilities
 
         class FakeClient:
@@ -227,20 +198,6 @@ class SchematicApplyContractTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "list_schematic_components"):
             require_schematic_capabilities(MissingList())
 
-        class MissingNestedFlag(FakeClient):
-            def tool_schemas(self, toolset):
-                schemas = super().tool_schemas(toolset)
-                if toolset == "sch_batch":
-                    edit_properties = deepcopy(
-                        schemas["batch_edit_schematic_components"]["properties"]["edits"]["items"]["properties"]
-                    )
-                    edit_properties.pop("on_board")
-                    schemas["batch_edit_schematic_components"]["properties"]["edits"]["items"]["properties"] = edit_properties
-                return schemas
-
-        with self.assertRaisesRegex(RuntimeError, "batch_edit_schematic_components.*on_board"):
-            require_schematic_capabilities(MissingNestedFlag())
-
     def test_capability_gate_requires_all_invoked_input_contracts(self):
         from tools.lh60_design.schematic import require_schematic_capabilities
 
@@ -267,12 +224,10 @@ class SchematicApplyContractTest(unittest.TestCase):
             ("sch_batch", "batch_place_components", "components", "required"),
             ("sch_batch", "batch_edit_schematic_components", "edits", "properties"),
             ("sch_batch", "batch_connect_to_net", "pins", "required"),
-            ("sch_batch", "batch_set_schematic_field_visibility", "edits", "properties"),
             ("sch_components", "update_symbols_from_library", "allow_pin_moves", "properties"),
             ("sch_components", "update_symbols_from_library", "references", "properties"),
-            ("sch_components", "reset_schematic_field_positions", "schematic", "required"),
-            ("sch_components", "reset_schematic_field_positions", "dry_run", "properties"),
-            ("sch_components", "reset_schematic_field_positions", "references", "properties"),
+            ("sch_components", "get_schematic_pin_locations", "reference", "required"),
+            ("sch_wiring", "batch_add_no_connect", "positions", "required"),
         )
         for toolset, tool, field, container in cases:
             with self.subTest(tool=tool, field=field, container=container):
@@ -293,32 +248,22 @@ class SchematicApplyContractTest(unittest.TestCase):
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
                 if name == "update_symbols_from_library":
-                    references = arguments.get("references")
-                    if references == ["U1"]:
-                        return tool_text_result(
-                            {
-                                "errors": [],
-                                "pins_moved": [],
-                                "updated": ["lh60-mcu:RP2040-Tiny"],
-                                "unchanged": [],
-                            }
-                        )
                     return tool_text_result(
                         {
                             "errors": [],
                             "pins_moved": [],
                             "updated": [],
                             "unchanged": [
-                                "lh60-core:Conn_01x03",
-                                "lh60-core:Conn_01x04",
-                                "lh60-core:Conn_01x05",
-                                "lh60-core:PowerFlag",
                                 "Device:D",
                                 "Switch:SW_Push",
-                                "lh60-mcu:RP2040-Tiny",
+                                "lh60-interconnect:FPC-05F-24PH20",
                             ],
                         }
                     )
+                if name == "get_schematic_pin_locations":
+                    return tool_text_result({"pins": [{"pin_number": "23", "x": 302.26, "y": 101.6}]})
+                if name == "batch_add_no_connect":
+                    return tool_text_result({"added_count": 1})
                 if name == "reset_schematic_field_positions":
                     return tool_text_result(
                         {
@@ -352,32 +297,29 @@ class SchematicApplyContractTest(unittest.TestCase):
         plan = build_schematic_plan()
 
         expected_tool_names = [
-            *("load" for _ in range(4)),
+            *("load" for _ in range(3)),
             "set_schematic_page",
             "batch_place_components",
             "batch_edit_schematic_components",
             "update_symbols_from_library",
-            "reset_schematic_field_positions",
+            "get_schematic_pin_locations",
+            "batch_add_no_connect",
             *(["batch_connect_to_net"] * len({connection.net_name for connection in plan.connections})),
-            "batch_set_schematic_field_visibility",
-            "update_symbols_from_library",
-            "batch_edit_schematic_components",
         ]
         self.assertEqual(
             [name for name, _ in client.calls],
             expected_tool_names,
         )
         self.assertEqual(
-            client.calls[:4],
+            client.calls[:3],
             [
                 ("load", "sch_batch"),
                 ("load", "sch_wiring"),
                 ("load", "sch_components"),
-                ("load", "library"),
             ],
         )
         self.assertEqual(
-            client.calls[4],
+            client.calls[3],
             (
                 "set_schematic_page",
                 {
@@ -387,58 +329,50 @@ class SchematicApplyContractTest(unittest.TestCase):
                 },
             ),
         )
-        place_name, place_arguments = client.calls[5]
+        place_name, place_arguments = client.calls[4]
         self.assertEqual(place_name, "batch_place_components")
         self.assertEqual(place_arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
-        self.assertEqual(len(place_arguments["components"]), 155)
+        self.assertEqual(len(place_arguments["components"]), 146)
 
-        edit_name, edit_arguments = client.calls[6]
+        edit_name, edit_arguments = client.calls[5]
         self.assertEqual(edit_name, "batch_edit_schematic_components")
         self.assertEqual(edit_arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
-        self.assertEqual(len(edit_arguments["edits"]), 155)
+        self.assertEqual(len(edit_arguments["edits"]), 146)
 
         self.assertEqual(
-            client.calls[7],
+            client.calls[6],
             (
                 "update_symbols_from_library",
                 {
                     "schematic": "/tmp/lh60-debug.kicad_sch",
-                    "references": ["U1"],
                     "dry_run": False,
-                    "allow_pin_moves": True,
+                    "allow_pin_moves": False,
                 },
             ),
         )
-        self.assertEqual(
-            client.calls[8],
-            (
-                "reset_schematic_field_positions",
-                {
-                    "schematic": "/tmp/lh60-debug.kicad_sch",
-                    "references": ["U1"],
-                    "dry_run": False,
-                },
-            ),
-        )
+        self.assertEqual(client.calls[7][0], "get_schematic_pin_locations")
+        self.assertEqual(client.calls[8], ("batch_add_no_connect", {"schematic": "/tmp/lh60-debug.kicad_sch", "positions": [{"x": 302.26, "y": 101.6}]}))
 
         grouped_connections = {}
-        for name, arguments in client.calls[9:-3]:
+        for name, arguments in client.calls[9:]:
             self.assertEqual(name, "batch_connect_to_net")
             self.assertEqual(arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
             grouped_connections[arguments["net_name"]] = arguments["pins"]
-        self.assertEqual(len(grouped_connections), 93)
+        self.assertEqual(len(grouped_connections), 88)
         self.assertEqual(
             grouped_connections["GND"],
             [
-                {"reference": "U1", "pin_number": "22"},
-                {"reference": "J1", "pin_number": "3"},
-                {"reference": "#FLG03", "pin_number": "1"},
+                {"reference": "J1", "pin_number": "1"},
+                {"reference": "J1", "pin_number": "5"},
+                {"reference": "J1", "pin_number": "9"},
+                {"reference": "J1", "pin_number": "16"},
+                {"reference": "J1", "pin_number": "20"},
+                {"reference": "J1", "pin_number": "24"},
             ],
         )
         self.assertEqual(
             grouped_connections["COL0"],
             [
-                {"reference": "U1", "pin_number": "1"},
                 {"reference": "D1", "pin_number": "2"},
                 {"reference": "D11", "pin_number": "2"},
                 {"reference": "D21", "pin_number": "2"},
@@ -446,13 +380,12 @@ class SchematicApplyContractTest(unittest.TestCase):
                 {"reference": "D41", "pin_number": "2"},
                 {"reference": "D51", "pin_number": "2"},
                 {"reference": "D61", "pin_number": "2"},
-                {"reference": "J2", "pin_number": "1"},
+                {"reference": "J1", "pin_number": "2"},
             ],
         )
         self.assertEqual(
             grouped_connections["ROW6"],
             [
-                {"reference": "U1", "pin_number": "17"},
                 {"reference": "SW67", "pin_number": "2"},
                 {"reference": "SW68", "pin_number": "2"},
                 {"reference": "SW69", "pin_number": "2"},
@@ -463,54 +396,20 @@ class SchematicApplyContractTest(unittest.TestCase):
                 {"reference": "SW74", "pin_number": "2"},
                 {"reference": "SW75", "pin_number": "2"},
                 {"reference": "SW76", "pin_number": "2"},
-                {"reference": "J5", "pin_number": "3"},
+                {"reference": "J1", "pin_number": "22"},
             ],
         )
 
-        visibility_name, visibility_arguments = client.calls[-3]
-        self.assertEqual(visibility_name, "batch_set_schematic_field_visibility")
-        self.assertEqual(
-            visibility_arguments["schematic"],
-            "/tmp/lh60-debug.kicad_sch",
-        )
-        self.assertEqual(len(visibility_arguments["edits"]), 152)
         visibility = {
-            edit["reference"]: (edit["reference_visible"], edit["value_visible"])
-            for edit in visibility_arguments["edits"]
+            edit.reference: (edit.reference_visible, edit.value_visible)
+            for edit in plan.field_visibility
         }
         self.assertEqual(visibility["D1"], (False, False))
         self.assertEqual(visibility["SW1"], (False, True))
         self.assertEqual(visibility["J1"], (True, True))
-        self.assertEqual(visibility["U1"], (True, True))
         self.assertFalse(any(reference.startswith("#FLG") for reference in visibility))
 
-        self.assertEqual(
-            client.calls[-2],
-            (
-                "update_symbols_from_library",
-                {
-                    "schematic": "/tmp/lh60-debug.kicad_sch",
-                    "dry_run": False,
-                    "allow_pin_moves": False,
-                },
-            ),
-        )
-        self.assertEqual(
-            client.calls[-1],
-            (
-                "batch_edit_schematic_components",
-                {
-                    "schematic": "/tmp/lh60-debug.kicad_sch",
-                    "edits": [
-                        {"reference": "#FLG01", "in_bom": True, "on_board": False, "dnp": False},
-                        {"reference": "#FLG02", "in_bom": True, "on_board": False, "dnp": False},
-                        {"reference": "#FLG03", "in_bom": True, "on_board": False, "dnp": False},
-                    ],
-                },
-            ),
-        )
-
-    def test_apply_issues_one_final_power_flag_batch_after_symbol_refresh(self):
+    def test_apply_adds_one_pin_level_no_connect_after_symbol_refresh(self):
         from tools.lh60_design.schematic import apply_schematic
 
         class FakeClient:
@@ -543,79 +442,39 @@ class SchematicApplyContractTest(unittest.TestCase):
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
                 if name == "update_symbols_from_library":
-                    references = arguments.get("references")
-                    if references == ["U1"]:
-                        return tool_text_result(
-                            {
-                                "errors": [],
-                                "pins_moved": [],
-                                "updated": ["lh60-mcu:RP2040-Tiny"],
-                                "unchanged": [],
-                            }
-                        )
                     return tool_text_result(
                         {
                             "errors": [],
                             "pins_moved": [],
                             "updated": [],
                             "unchanged": [
-                                "lh60-core:Conn_01x03",
-                                "lh60-core:Conn_01x04",
-                                "lh60-core:Conn_01x05",
-                                "lh60-core:PowerFlag",
                                 "Device:D",
                                 "Switch:SW_Push",
-                                "lh60-mcu:RP2040-Tiny",
+                                "lh60-interconnect:FPC-05F-24PH20",
                             ],
                         }
                     )
-                if name == "reset_schematic_field_positions":
-                    return tool_text_result(
-                        {
-                            "no_library_anchor": [],
-                            "no_property": [],
-                            "not_found": [],
-                            "moved": ["U1.Reference", "U1.Value"],
-                            "unchanged": [],
-                        }
-                    )
-                if name == "batch_edit_schematic_components" and len(arguments["edits"]) == 3:
-                    return tool_text_result(
-                        {
-                            "atomic": True,
-                            "updated_count": 3,
-                            "updated": [
-                                {
-                                    "reference": f"#FLG0{index}",
-                                    "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                                    "changed_flags": ["in_bom", "on_board", "dnp"],
-                                }
-                                for index in range(1, 4)
-                            ],
-                            "unchanged": [],
-                        }
-                    )
+                if name == "get_schematic_pin_locations":
+                    return tool_text_result({"pins": [{"pin_number": "23", "x": 302.26, "y": 101.6}]})
+                if name == "batch_add_no_connect":
+                    return tool_text_result({"added_count": 1})
                 return tool_text_result({"ok": True})
 
         client = FakeClient()
         apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
 
-        power_flag_batches = [
+        no_connect_batches = [
             (index, arguments)
             for index, (name, arguments) in enumerate(client.calls)
-            if name == "batch_edit_schematic_components" and len(arguments["edits"]) == 3
+            if name == "batch_add_no_connect"
         ]
-        self.assertEqual(len(power_flag_batches), 1)
-        batch_index, batch_arguments = power_flag_batches[0]
+        self.assertEqual(len(no_connect_batches), 1)
+        batch_index, batch_arguments = no_connect_batches[0]
         self.assertEqual(
             batch_arguments,
             {
                 "schematic": "/tmp/lh60-debug.kicad_sch",
-                "edits": [
-                    {"reference": "#FLG01", "in_bom": True, "on_board": False, "dnp": False},
-                    {"reference": "#FLG02", "in_bom": True, "on_board": False, "dnp": False},
-                    {"reference": "#FLG03", "in_bom": True, "on_board": False, "dnp": False},
-                ],
+                "positions": [{"x": 302.26, "y": 101.6}],
             },
         )
         final_refresh_index = next(
@@ -624,7 +483,7 @@ class SchematicApplyContractTest(unittest.TestCase):
         )
         self.assertGreater(batch_index, final_refresh_index)
 
-    def test_power_flag_instance_apply_helper_requires_one_atomic_batch(self):
+    def test_power_flag_instance_apply_helper_is_retired_noop(self):
         from tools.lh60_design.schematic import apply_power_flag_instance_flags
 
         class FakeClient:
@@ -652,146 +511,11 @@ class SchematicApplyContractTest(unittest.TestCase):
         client = FakeClient()
         result = apply_power_flag_instance_flags(client, "/tmp/lh60-debug.kicad_sch")
 
-        self.assertEqual(
-            client.calls,
-            [
-                (
-                    "batch_edit_schematic_components",
-                    {
-                        "schematic": "/tmp/lh60-debug.kicad_sch",
-                        "edits": [
-                            {"reference": "#FLG01", "in_bom": True, "on_board": False, "dnp": False},
-                            {"reference": "#FLG02", "in_bom": True, "on_board": False, "dnp": False},
-                            {"reference": "#FLG03", "in_bom": True, "on_board": False, "dnp": False},
-                        ],
-                    },
-                )
-            ],
-        )
+        self.assertEqual(client.calls, [])
         self.assertTrue(result["atomic"])
-        self.assertEqual(result["updated_count"], 3)
+        self.assertEqual(result["updated_count"], 0)
 
-    def test_power_flag_instance_apply_helper_rejects_malformed_accounting(self):
-        from tools.lh60_design.schematic import apply_power_flag_instance_flags
-
-        cases = (
-            (
-                "updated-count-mismatch",
-                {
-                    "atomic": True,
-                    "updated_count": 2,
-                    "updated": [
-                        {
-                            "reference": "#FLG01",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                        {
-                            "reference": "#FLG02",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                        {
-                            "reference": "#FLG03",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                    ],
-                    "unchanged": [],
-                },
-                "updated_count",
-            ),
-            (
-                "total-accounting-mismatch",
-                {
-                    "atomic": True,
-                    "updated_count": 2,
-                    "updated": [
-                        {
-                            "reference": "#FLG01",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                        {
-                            "reference": "#FLG02",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                    ],
-                    "unchanged": [],
-                },
-                "accounting",
-            ),
-            (
-                "duplicate-reference",
-                {
-                    "atomic": True,
-                    "updated_count": 2,
-                    "updated": [
-                        {
-                            "reference": "#FLG01",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                        {
-                            "reference": "#FLG01",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                    ],
-                    "unchanged": [
-                        {
-                            "reference": "#FLG03",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": [],
-                        }
-                    ],
-                },
-                "unique",
-            ),
-            (
-                "wrong-flags",
-                {
-                    "atomic": True,
-                    "updated_count": 3,
-                    "updated": [
-                        {
-                            "reference": "#FLG01",
-                            "flags": {"in_bom": True, "on_board": True, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                        {
-                            "reference": "#FLG02",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                        {
-                            "reference": "#FLG03",
-                            "flags": {"in_bom": True, "on_board": False, "dnp": False},
-                            "changed_flags": ["on_board"],
-                        },
-                    ],
-                    "unchanged": [],
-                },
-                "final flags mismatch",
-            ),
-        )
-
-        class FakeClient:
-            def __init__(self, payload):
-                self.payload = payload
-
-            def call_tool(self, name, arguments):
-                if name != "batch_edit_schematic_components":
-                    raise AssertionError(name)
-                return tool_text_result(self.payload)
-
-        for label, payload, message in cases:
-            with self.subTest(label=label):
-                with self.assertRaisesRegex(RuntimeError, message):
-                    apply_power_flag_instance_flags(FakeClient(payload), "/tmp/lh60-debug.kicad_sch")
-
-    def test_apply_aborts_before_wiring_on_early_refresh_diagnostics(self):
+    def test_apply_aborts_before_wiring_on_symbol_refresh_diagnostics(self):
         from tools.lh60_design.schematic import apply_schematic
 
         class FakeClient:
@@ -805,49 +529,29 @@ class SchematicApplyContractTest(unittest.TestCase):
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
-                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
-                    return tool_text_result(self.refresh_payload)
-                if name == "reset_schematic_field_positions":
-                    return tool_text_result(
-                        {
-                            "no_library_anchor": [],
-                            "no_property": [],
-                            "not_found": [],
-                            "moved": ["U1.Reference", "U1.Value"],
-                            "unchanged": [],
-                        }
-                    )
                 if name == "update_symbols_from_library":
-                    return tool_text_result(
-                        {
-                            "errors": [],
-                            "pins_moved": [],
-                            "updated": [],
-                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
-                        }
-                    )
+                    return tool_text_result(self.refresh_payload)
                 return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         bad_payloads = (
-            {"errors": ["stale"], "pins_moved": [], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": []},
-            {"errors": [], "pins_moved": ["U1.1"], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": []},
-            {"errors": [], "pins_moved": [], "updated": [], "unchanged": []},
-            {"errors": [], "pins_moved": [], "updated": ["lh60-mcu:RP2040-Tiny"], "unchanged": ["lh60-mcu:RP2040-Tiny"]},
+            {"errors": ["stale"], "pins_moved": [], "updated": [], "unchanged": []},
+            {"errors": [], "pins_moved": ["J1.1"], "updated": [], "unchanged": []},
         )
         for payload in bad_payloads:
             client = FakeClient(payload)
             with self.subTest(payload=payload):
-                with self.assertRaisesRegex(RuntimeError, "U1|pins_moved|errors|lh60-mcu:RP2040-Tiny"):
+                with self.assertRaisesRegex(RuntimeError, "pins_moved|errors"):
                     apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_add_no_connect" for name, _ in client.calls))
                 self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
 
-    def test_apply_aborts_before_wiring_on_reset_diagnostics(self):
+    def test_apply_aborts_before_wiring_on_missing_duplicate_or_nonfinite_no_connect_pin(self):
         from tools.lh60_design.schematic import apply_schematic
 
         class FakeClient:
-            def __init__(self, reset_payload):
+            def __init__(self, pins):
                 self.calls = []
-                self.reset_payload = reset_payload
+                self.pins = pins
 
             def tool_schemas(self, toolset):
                 self.calls.append(("load", toolset))
@@ -855,39 +559,31 @@ class SchematicApplyContractTest(unittest.TestCase):
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
-                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
-                    return tool_text_result(
-                        {
-                            "errors": [],
-                            "pins_moved": [],
-                            "updated": ["lh60-mcu:RP2040-Tiny"],
-                            "unchanged": [],
-                        }
-                    )
-                if name == "reset_schematic_field_positions":
-                    return tool_text_result(self.reset_payload)
                 if name == "update_symbols_from_library":
                     return tool_text_result(
                         {
                             "errors": [],
                             "pins_moved": [],
                             "updated": [],
-                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
+                            "unchanged": ["lh60-interconnect:FPC-05F-24PH20"],
                         }
                     )
+                if name == "get_schematic_pin_locations":
+                    return tool_text_result({"pins": self.pins})
                 return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
-        bad_payloads = (
-            {"no_library_anchor": ["U1.Reference"], "no_property": [], "not_found": [], "moved": ["U1.Value"], "unchanged": []},
-            {"no_library_anchor": [], "no_property": ["U1.Value"], "not_found": [], "moved": ["U1.Reference"], "unchanged": []},
-            {"no_library_anchor": [], "no_property": [], "not_found": ["U1.Reference"], "moved": ["U1.Value"], "unchanged": []},
-            {"no_library_anchor": [], "no_property": [], "not_found": [], "moved": ["U1.Reference"], "unchanged": []},
+        cases = (
+            ([], "expected exactly one J1.23"),
+            ([{"pin_number": "23", "x": 1, "y": 2}, {"pin_number": "23", "x": 3, "y": 4}], "expected exactly one J1.23"),
+            ([{"pin_number": "23", "x": float("nan"), "y": 2}], "non-finite"),
+            ([{"pin_number": "23", "x": 1, "y": float("inf")}], "non-finite"),
         )
-        for payload in bad_payloads:
-            client = FakeClient(payload)
-            with self.subTest(payload=payload):
-                with self.assertRaisesRegex(RuntimeError, "U1.Reference|U1.Value|no_library_anchor|no_property|not_found"):
+        for pins, message in cases:
+            client = FakeClient(pins)
+            with self.subTest(pins=pins):
+                with self.assertRaisesRegex(RuntimeError, message):
                     apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_add_no_connect" for name, _ in client.calls))
                 self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
 
     def test_apply_aborts_on_final_conservative_refresh_diagnostics(self):
@@ -950,27 +646,8 @@ class SchematicApplyContractTest(unittest.TestCase):
 
             def call_tool(self, name, arguments):
                 self.calls.append((name, arguments))
-                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
-                    return self.refresh_result
-                if name == "reset_schematic_field_positions":
-                    return tool_text_result(
-                        {
-                            "no_library_anchor": [],
-                            "no_property": [],
-                            "not_found": [],
-                            "moved": ["U1.Reference", "U1.Value"],
-                            "unchanged": [],
-                        }
-                    )
                 if name == "update_symbols_from_library":
-                    return tool_text_result(
-                        {
-                            "errors": [],
-                            "pins_moved": [],
-                            "updated": [],
-                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
-                        }
-                    )
+                    return self.refresh_result
                 return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         for refresh_result in (
@@ -983,101 +660,6 @@ class SchematicApplyContractTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "no JSON object text block|not valid JSON|not a JSON object"):
                     apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
                 self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
-
-    def test_apply_aborts_before_wiring_on_empty_or_malformed_reset_results(self):
-        from tools.lh60_design.schematic import apply_schematic
-
-        class FakeClient:
-            def __init__(self, reset_result):
-                self.calls = []
-                self.reset_result = reset_result
-
-            def tool_schemas(self, toolset):
-                self.calls.append(("load", toolset))
-                return deepcopy(complete_schematic_schemas()[toolset])
-
-            def call_tool(self, name, arguments):
-                self.calls.append((name, arguments))
-                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
-                    return tool_text_result(
-                        {
-                            "errors": [],
-                            "pins_moved": [],
-                            "updated": ["lh60-mcu:RP2040-Tiny"],
-                            "unchanged": [],
-                        }
-                    )
-                if name == "reset_schematic_field_positions":
-                    return self.reset_result
-                if name == "update_symbols_from_library":
-                    return tool_text_result(
-                        {
-                            "errors": [],
-                            "pins_moved": [],
-                            "updated": [],
-                            "unchanged": ["lh60-mcu:RP2040-Tiny"],
-                        }
-                    )
-                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
-
-        for reset_result in (
-            empty_tool_result(),
-            non_json_text_result(),
-            json_scalar_result("not-an-object"),
-        ):
-            client = FakeClient(reset_result)
-            with self.subTest(reset_result=reset_result):
-                with self.assertRaisesRegex(RuntimeError, "no JSON object text block|not valid JSON|not a JSON object"):
-                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
-                self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
-
-    def test_apply_aborts_on_empty_or_malformed_final_refresh_results(self):
-        from tools.lh60_design.schematic import apply_schematic
-
-        class FakeClient:
-            def __init__(self, final_result):
-                self.calls = []
-                self.final_result = final_result
-
-            def tool_schemas(self, toolset):
-                self.calls.append(("load", toolset))
-                return deepcopy(complete_schematic_schemas()[toolset])
-
-            def call_tool(self, name, arguments):
-                self.calls.append((name, arguments))
-                if name == "update_symbols_from_library" and arguments.get("references") == ["U1"]:
-                    return tool_text_result(
-                        {
-                            "errors": [],
-                            "pins_moved": [],
-                            "updated": ["lh60-mcu:RP2040-Tiny"],
-                            "unchanged": [],
-                        }
-                    )
-                if name == "reset_schematic_field_positions":
-                    return tool_text_result(
-                        {
-                            "no_library_anchor": [],
-                            "no_property": [],
-                            "not_found": [],
-                            "moved": ["U1.Reference", "U1.Value"],
-                            "unchanged": [],
-                        }
-                    )
-                if name == "update_symbols_from_library":
-                    return self.final_result
-                return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
-
-        for final_result in (
-            empty_tool_result(),
-            non_json_text_result(),
-            json_scalar_result(7),
-        ):
-            client = FakeClient(final_result)
-            with self.subTest(final_result=final_result):
-                with self.assertRaisesRegex(RuntimeError, "no JSON object text block|not valid JSON|not a JSON object"):
-                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
-
 
 if __name__ == "__main__":
     unittest.main()

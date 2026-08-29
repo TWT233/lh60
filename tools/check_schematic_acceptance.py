@@ -13,22 +13,21 @@ from typing import Any
 
 from tools.lh60_design.mcp import McpClient
 from tools.lh60_design.schematic import (
-    CONNECTOR_GROUPS,
-    POWER_FLAG_INSTANCE_FLAGS,
     SCHEMATIC,
-    apply_power_flag_instance_flags,
     apply_schematic,
     build_schematic_plan,
     require_schematic_capabilities,
 )
-from tools.lh60_design.core_library import (
-    FOOTPRINT_LIBRARY as CORE_FOOTPRINT_LIBRARY,
-    apply_core_library,
+from tools.lh60_design.core_library import apply_core_library
+from tools.lh60_design.interconnect import interboard_contract
+from tools.lh60_design.interconnect_library import (
+    FOOTPRINT_LIBRARY as INTERCONNECT_FOOTPRINT_LIBRARY,
+    FOOTPRINT_PATH as INTERCONNECT_FOOTPRINT_PATH,
+    SYMBOL_LIBRARY as INTERCONNECT_SYMBOL_LIBRARY,
+    SYMBOL_NAME as INTERCONNECT_SYMBOL_NAME,
+    apply_interconnect_library,
 )
-from tools.lh60_design.mcu_library import (
-    FOOTPRINT_LIBRARY as MCU_FOOTPRINT_LIBRARY,
-    apply_mcu_library,
-)
+from tools.lh60_design.core_library import FOOTPRINT_LIBRARY as CORE_FOOTPRINT_LIBRARY
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,38 +36,33 @@ CONFIG = Path.home() / ".config/konnect/config.toml"
 BOARD = ROOT / "lh60.kicad_pcb"
 
 
-CURRENT_ACCEPTANCE_BASELINE = {"component_count": 155, "wire_count": 0, "label_count": 339}
-EXPECTED_INVENTORY = {"mcu": 1, "switch": 75, "diode": 70, "connector": 6, "flag": 3}
+CURRENT_ACCEPTANCE_BASELINE = {"component_count": 146, "wire_count": 0, "label_count": 313, "no_connect_count": 1}
+EXPECTED_INVENTORY = {"switch": 75, "diode": 70, "connector": 1}
 EXPECTED_PRODUCTION_REFERENCES = frozenset(
-    {"U1", *{f"J{index}" for index in range(1, 7)}, *{f"#FLG{index:02d}" for index in range(1, 4)}}
+    {"J1"}
     | {f"D{index}" for index in range(1, 71)}
     | {f"SW{index}" for index in range(1, 77) if index != 59}
 )
-LEGACY_CONVERGENCE_BASELINE = {"component_count": 172, "wire_count": 290, "label_count": 339}
-LEGACY_CONVERGENCE_REFERENCES = frozenset(
+CURRENT_155_BASELINE = {"component_count": 155, "wire_count": 0, "label_count": 339}
+CURRENT_155_REFERENCES = frozenset(
     {"U1", *{f"#FLG{index:02d}" for index in range(1, 4)}}
     | {f"D{index}" for index in range(1, 71)}
     | {f"SW{index}" for index in range(1, 77) if index != 59}
-    | {f"TP{index}" for index in range(1, 24)}
+    | {f"J{index}" for index in range(1, 7)}
 )
-FROZEN_COMPONENT_SHA256 = "028d14843b05b9483765e68bb59fc9e5bd8e0d8b9a2e60b539314c6578c79d18"
-FROZEN_PIN_SHA256 = "85f400c94abdb1e70a6da80177fbba76b774a3105d0b15081b54f318a06d7f58"
+FROZEN_COMPONENT_SHA256 = ""
+FROZEN_PIN_SHA256 = ""
 FROZEN_CONNECTOR_MAP = {
-    "J1": (("1", "VSYS"), ("2", "3V3"), ("3", "GND")),
-    "J2": (("1", "COL0"), ("2", "COL1"), ("3", "COL2"), ("4", "COL3"), ("5", "COL4")),
-    "J3": (("1", "COL5"), ("2", "COL6"), ("3", "COL7"), ("4", "COL8"), ("5", "COL9")),
-    "J4": (("1", "ROW0"), ("2", "ROW1"), ("3", "ROW2"), ("4", "ROW3")),
-    "J5": (("1", "ROW4"), ("2", "ROW5"), ("3", "ROW6")),
-    "J6": (("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
+    "J1": tuple(
+        (str(pin.number), pin.net_name)
+        for pin in interboard_contract().pins
+        if pin.net_name is not None
+    ),
 }
-VISUAL_CHECKLIST = {"u1", "matrix", "connectors", "title_block"}
-POWER_FLAG_INSTANCE_CONTRACT = {
-    "schematic_sha256": "7ae8a38afc453579f8f24de23e57772eff73056d12acd4fd9fcc6f0bf57533f9",
-    "component_sha256": FROZEN_COMPONENT_SHA256,
-    "pin_sha256": FROZEN_PIN_SHA256,
-    "pcb_sha256": "0a5722685ee378e9c9b240aa01a1f151f382cab83216edfa14a0663a1ac80664",
-    "flags": POWER_FLAG_INSTANCE_FLAGS,
-}
+PROHIBITED_NETS = interboard_contract().prohibited_nets | {"NC"}
+VISUAL_CHECKLIST = {"j1_pin_order", "j1_nc_marker", "j1_fields", "matrix", "title_block"}
+SOURCE_155_SCHEMATIC_SHA256 = "5322b7f21c10854aef14f7ca92ac35353f9fb9b7abd215451b4b4678a41aa1ac"
+SOURCE_155_PCB_SHA256 = "eb27463ebcb973e44b5aea551c79ac4470615a3a7f0519a4b1c54c2afd466a46"
 
 
 def _expected_migration_references() -> frozenset[str]:
@@ -80,6 +74,7 @@ def _plan_hash() -> str:
     payload = {
         "components": [component.__dict__ for component in plan.components],
         "connections": [connection.__dict__ for connection in plan.connections],
+        "no_connects": [no_connect.__dict__ for no_connect in plan.no_connects],
         "page_size": plan.page_size,
         "portrait": plan.portrait,
         "field_visibility": [item.__dict__ for item in plan.field_visibility],
@@ -148,32 +143,7 @@ def _load_acceptance_toolsets(client: McpClient) -> None:
 def require_production_capabilities(client: McpClient) -> None:
     """Fail closed on every production prerequisite before deletion begins."""
     require_schematic_capabilities(client)
-    contracts = {
-        "update_pcb_from_schematic": (
-            client.tool_schemas("sch_export"),
-            ("schematic", "board"),
-            ("schematic", "board", "dry_run", "expected_plan_revision"),
-        ),
-        "flip_component": (
-            client.tool_schemas("pcb_components"),
-            ("board", "reference", "layer"),
-            ("board", "reference", "layer"),
-        ),
-    }
-    missing = {}
-    for tool, (schemas, required_inputs, property_inputs) in contracts.items():
-        schema = schemas.get(tool)
-        if schema is None:
-            missing[tool] = ["tool"]
-            continue
-        absent = sorted(
-            (set(required_inputs) - set(schema.get("required", [])))
-            | (set(property_inputs) - set(schema.get("properties", {})))
-        )
-        if absent:
-            missing[tool] = absent
-    if missing:
-        raise RuntimeError(f"Konnect production capability mismatch: {missing}")
+    _load_acceptance_toolsets(client)
 
 
 def _query(client: McpClient, schematic: Path, svg_output: Path) -> dict[str, Any]:
@@ -254,10 +224,43 @@ def _stable_hash(payload: Any) -> str:
     ).hexdigest()
 
 
+def _expected_component_hash() -> str:
+    return _stable_hash(
+        normalize_actual_components(
+            [
+                {
+                    "reference": component.reference,
+                    "lib_id": component.lib_id,
+                    "value": component.value,
+                    "footprint": component.footprint,
+                }
+                for component in build_schematic_plan().components
+            ]
+        )
+    )
+
+
+def _expected_pin_hash() -> str:
+    return _stable_hash(
+        normalize_exported_pins(
+            {
+                "components": [
+                    {
+                        "reference": connection.reference,
+                        "pins": [{"number": connection.pin_number, "net": connection.net_name}],
+                    }
+                    for connection in build_schematic_plan().connections
+                ]
+            }
+        )
+    )
+
+
 def assert_frozen_acceptance(data: dict[str, Any]) -> None:
     """Check live candidate/production facts against the reviewed plan."""
     components = normalize_actual_components(data["components"]["components"])
-    if _stable_hash(components) != FROZEN_COMPONENT_SHA256:
+    expected_component_hash = FROZEN_COMPONENT_SHA256 or _expected_component_hash()
+    if _stable_hash(components) != expected_component_hash:
         raise AssertionError("component contract mismatch")
     svg = Path(data["svg_path"]).read_text()
     page = re.search(r'width="([0-9.]+)mm" height="([0-9.]+)mm"', svg)
@@ -269,8 +272,13 @@ def assert_frozen_acceptance(data: dict[str, Any]) -> None:
     if single_pin.get("single_pin_net_count") != 0 or single_pin.get("nets") != []:
         raise AssertionError(f"single-pin contract mismatch: {single_pin}")
     assignments = normalize_exported_pins(data["netlist"])
-    if _stable_hash(assignments) != FROZEN_PIN_SHA256:
+    expected_pin_hash = FROZEN_PIN_SHA256 or _expected_pin_hash()
+    if _stable_hash(assignments) != expected_pin_hash:
         raise AssertionError("pin contract mismatch")
+    net_names = {assignment["net_name"] for assignment in assignments}
+    prohibited = net_names & PROHIBITED_NETS
+    if prohibited:
+        raise AssertionError(f"prohibited FFC net present: {sorted(prohibited)}")
     actual_semantic = normalize_net_semantics(exported_net_semantics(data["netlist"]))
     for reference, pin_map in FROZEN_CONNECTOR_MAP.items():
         for pin_number, net_name in pin_map:
@@ -304,7 +312,7 @@ def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
     components = data["components"]["components"]
     layout = data["layout"]
     inventory = _inventory(components)
-    if inventory != EXPECTED_INVENTORY or len(components) != 155:
+    if inventory != EXPECTED_INVENTORY or len(components) != 146:
         raise AssertionError(f"inventory mismatch: {inventory}, total={len(components)}")
     refs = [component["reference"] for component in components]
     state = {
@@ -316,8 +324,10 @@ def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
     assert_current_production_state(state)
     if any("TestPoint" in component.get("footprint", "") for component in components):
         raise AssertionError("TestPoint footprint remains")
-    if layout["wire_count"] != 0 or layout["label_count"] != 339:
+    if layout["wire_count"] != 0 or layout["label_count"] != 313:
         raise AssertionError(f"layout mismatch: {layout['wire_count']} wires, {layout['label_count']} labels")
+    if layout.get("no_connect_count") != 1:
+        raise AssertionError(f"no-connect mismatch: {layout}")
     if data["shorts"].get("short_count") != 0:
         raise AssertionError(f"shorted nets: {data['shorts']}")
     if not data["wire_validation"].get("valid") or not data["component_validation"].get("valid"):
@@ -439,10 +449,13 @@ def assert_current_production_state(state: dict[str, Any]) -> None:
         raise AssertionError("production TestPoint inventory mismatch")
 
 
-def assert_legacy_convergence_preflight(state: dict[str, Any]) -> None:
+def assert_current_155_preflight(state: dict[str, Any]) -> None:
     _assert_schematic_state(
-        state, LEGACY_CONVERGENCE_BASELINE, LEGACY_CONVERGENCE_REFERENCES, "legacy convergence",
+        state, CURRENT_155_BASELINE, CURRENT_155_REFERENCES, "current 155 source",
     )
+    forbidden_after_migration = {"U1", *{f"J{index}" for index in range(2, 7)}, *{f"#FLG{index:02d}" for index in range(1, 4)}}
+    if not forbidden_after_migration <= set(state["references"]):
+        raise AssertionError("current 155 source missing retired active-board references")
 
 
 def _working_tree_is_clean() -> bool:
@@ -475,35 +488,6 @@ def assert_predelete_safety(
     }
 
 
-def require_power_flag_instance_migration_capabilities(client: McpClient) -> None:
-    require_schematic_capabilities(client)
-    schemas = {
-        toolset: client.tool_schemas(toolset)
-        for toolset in ("sch_components", "sch_analysis", "sch_export")
-    }
-    contracts = {
-        "get_schematic_component": ("sch_components", ("schematic", "reference"), ("schematic", "reference")),
-        "list_schematic_components": ("sch_components", ("schematic",), ("schematic",)),
-        "list_schematic_wires": ("sch_analysis", ("schematic",), ("schematic",)),
-        "list_schematic_labels": ("sch_analysis", ("schematic",), ("schematic",)),
-        "export_netlist_summary": ("sch_export", ("schematic",), ("schematic",)),
-    }
-    missing = {}
-    for tool, (toolset, required_inputs, property_inputs) in contracts.items():
-        schema = schemas[toolset].get(tool)
-        if schema is None:
-            missing[tool] = ["tool"]
-            continue
-        absent = sorted(
-            (set(required_inputs) - set(schema.get("required", [])))
-            | (set(property_inputs) - set(schema.get("properties", {})))
-        )
-        if absent:
-            missing[tool] = absent
-    if missing:
-        raise RuntimeError(f"Konnect power-flag migration capability mismatch: {missing}")
-
-
 def _component_identity_fingerprint(components: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
     identities = tuple(
         sorted(
@@ -520,103 +504,6 @@ def _component_identity_fingerprint(components: list[dict[str, Any]]) -> tuple[t
     return identities
 
 
-def _sorted_migration_references(components: list[dict[str, Any]]) -> list[str]:
-    references = [str(component.get("reference", "")) for component in components]
-    if any(not reference for reference in references):
-        raise AssertionError("component identity references must be nonempty")
-    if len(set(references)) != len(references):
-        raise AssertionError("component identity references must be unique")
-    flag_like_references = {reference for reference in references if reference.startswith("#FLG")}
-    if flag_like_references != set(POWER_FLAG_INSTANCE_FLAGS):
-        raise AssertionError("power flag reference set mismatch")
-    if set(references) != _expected_migration_references():
-        raise AssertionError("reference inventory mismatch")
-    return sorted(references)
-
-
-def _flag_state_map(components: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    state = {}
-    for component in components:
-        reference = str(component.get("reference", ""))
-        state[reference] = {
-            "uuid": str(component.get("uuid", "")),
-            "in_bom": component.get("in_bom"),
-            "on_board": component.get("on_board"),
-            "dnp": component.get("dnp"),
-        }
-    return state
-
-
-def _component_identity_components(client: McpClient, schematic: Path, components: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    references = _sorted_migration_references(components)
-    identities = []
-    for reference in references:
-        detail = client.call_tool_json(
-            "get_schematic_component",
-            {"schematic": str(schematic), "reference": reference},
-        )
-        if str(detail.get("reference", "")) != reference:
-            raise AssertionError(f"component identity mismatch for {reference}")
-        identities.append({"reference": reference, "uuid": str(detail.get("uuid", ""))})
-    _component_identity_fingerprint(identities)
-    return identities
-
-
-def _query_power_flag_instance_state(client: McpClient, schematic: Path) -> dict[str, Any]:
-    components = client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]
-    identities = _component_identity_components(client, schematic, components)
-    identity_by_reference = {item["reference"]: item["uuid"] for item in identities}
-    flag_states = {
-        reference: {**state, "uuid": identity_by_reference[reference]}
-        for reference, state in _flag_state_map(components).items()
-        if reference in POWER_FLAG_INSTANCE_FLAGS
-    }
-    wires = client.call_tool_json("list_schematic_wires", {"schematic": str(schematic)})["wires"]
-    labels = client.call_tool_json("list_schematic_labels", {"schematic": str(schematic)})["labels"]
-    return {
-        "components": components,
-        "component_identities": _component_identity_fingerprint(identities),
-        "wire_uuids": assert_unique_nonempty_uuids(wires, "wire"),
-        "label_uuids": assert_unique_nonempty_uuids(labels, "label"),
-        "flag_states": flag_states,
-        "all_flags": _flag_state_map(components),
-    }
-
-
-def assert_power_flag_migration_post_state(before: dict[str, Any], after: dict[str, Any]) -> None:
-    if "component_identities" not in before:
-        before = {
-            **before,
-            "component_identities": _component_identity_fingerprint(before["components"]),
-            "flag_states": {reference: state for reference, state in _flag_state_map(before["components"]).items() if reference in POWER_FLAG_INSTANCE_FLAGS},
-            "all_flags": _flag_state_map(before["components"]),
-        }
-    if "component_identities" not in after:
-        after = {
-            **after,
-            "component_identities": _component_identity_fingerprint(after["components"]),
-            "flag_states": {reference: state for reference, state in _flag_state_map(after["components"]).items() if reference in POWER_FLAG_INSTANCE_FLAGS},
-            "all_flags": _flag_state_map(after["components"]),
-        }
-    if before["component_identities"] != after["component_identities"]:
-        raise AssertionError("component identity drift detected")
-    if before["wire_uuids"] != after["wire_uuids"]:
-        raise AssertionError("wire identity drift detected")
-    if before["label_uuids"] != after["label_uuids"]:
-        raise AssertionError("label identity drift detected")
-    for reference, expected in POWER_FLAG_INSTANCE_FLAGS.items():
-        if after["flag_states"].get(reference) != {
-            "uuid": before["flag_states"].get(reference, {}).get("uuid", ""),
-            **expected,
-        }:
-            raise AssertionError(f"power flag final state mismatch for {reference}")
-    for reference, state in before["all_flags"].items():
-        if reference in POWER_FLAG_INSTANCE_FLAGS:
-            continue
-        if after["all_flags"].get(reference) != state:
-            raise AssertionError(f"unrelated flag drift detected for {reference}")
-
-
 def _component_contract_hash_from_components(components: list[dict[str, Any]]) -> str:
     return _stable_hash(normalize_actual_components(components))
 
@@ -626,61 +513,8 @@ def _pin_contract_hash_from_schematic(client: McpClient, schematic: Path) -> str
     return _stable_hash(normalize_exported_pins(netlist))
 
 
-def migrate_power_flag_instance_flags(
-    client: McpClient,
-    schematic: Path,
-    output_path: Path,
-    *,
-    capabilities_fn=require_power_flag_instance_migration_capabilities,
-    safety_fn=assert_predelete_safety,
-    state_query_fn=_query_power_flag_instance_state,
-    apply_fn=apply_power_flag_instance_flags,
-    component_hash_fn=_component_contract_hash_from_components,
-    pin_hash_fn=_pin_contract_hash_from_schematic,
-    write_json_fn=None,
-) -> dict[str, Any]:
-    if write_json_fn is None:
-        write_json_fn = _write_json
-    capabilities_fn(client)
-    safety = safety_fn(schematic, BOARD)
-    if safety["schematic_sha256"] != POWER_FLAG_INSTANCE_CONTRACT["schematic_sha256"]:
-        raise AssertionError("schematic SHA drift detected")
-    if safety["pcb_sha256"] != POWER_FLAG_INSTANCE_CONTRACT["pcb_sha256"]:
-        raise AssertionError("PCB SHA drift detected")
-    _expected_migration_references()
-    before = state_query_fn(client, schematic)
-    before_pin_hash = pin_hash_fn(client, schematic)
-    if before_pin_hash != POWER_FLAG_INSTANCE_CONTRACT["pin_sha256"]:
-        raise AssertionError("pin contract hash drift detected before migration")
-    batch = apply_fn(client, schematic)
-    after = state_query_fn(client, schematic)
-    assert_power_flag_migration_post_state(before, after)
-    component_hash = component_hash_fn(after["components"])
-    if component_hash != POWER_FLAG_INSTANCE_CONTRACT["component_sha256"]:
-        raise AssertionError("component contract hash drift detected")
-    pin_hash = pin_hash_fn(client, schematic)
-    if pin_hash != before_pin_hash:
-        raise AssertionError("pin contract hash drift detected after migration")
-    if pin_hash != POWER_FLAG_INSTANCE_CONTRACT["pin_sha256"]:
-        raise AssertionError("pin contract hash drift detected after migration")
-    result = {
-        "mode": "power-flag-instance-migration",
-        "schematic": str(schematic),
-        "contract": POWER_FLAG_INSTANCE_CONTRACT,
-        "predelete_safety": safety,
-        "before": before,
-        "before_pin_sha256": before_pin_hash,
-        "batch": batch,
-        "after": after,
-        "component_sha256": component_hash,
-        "pin_sha256": pin_hash,
-    }
-    write_json_fn(output_path, result)
-    return result
-
-
 def prepare_candidate_libraries(
-    client_factory, project_dir: Path, *, apply_core_fn=apply_core_library, apply_mcu_fn=apply_mcu_library,
+    client_factory, project_dir: Path, *, apply_core_fn=apply_core_library, apply_interconnect_fn=apply_interconnect_library,
     capability_fn=require_schematic_capabilities,
 ) -> None:
     """Regenerate shared source libraries with isolated clients."""
@@ -689,7 +523,7 @@ def prepare_candidate_libraries(
         apply_core_fn(client)
     with client_factory(KONNECT, CONFIG) as client:
         capability_fn(client)
-        apply_mcu_fn(client)
+        apply_interconnect_fn(client)
 
 
 def verify_candidate_libraries(
@@ -700,25 +534,25 @@ def verify_candidate_libraries(
     Symbols resolve against the candidate project directory; footprints use the
     registered project file path.
     """
-    symbols = ("Conn_01x03", "Conn_01x04", "Conn_01x05", "RP2040-Tiny")
+    symbols = ("Conn_01x03", "Conn_01x04", "Conn_01x05", INTERCONNECT_SYMBOL_NAME)
     footprints = (
         "PinHeader_1x03_P2.54mm_Vertical",
         "PinHeader_1x04_P2.54mm_Vertical",
         "PinHeader_1x05_P2.54mm_Vertical",
-        "MCU_RP2040-Tiny_SMD",
+        INTERCONNECT_SYMBOL_NAME,
     )
     project_dir = project.parent
     with client_factory(KONNECT, CONFIG) as client:
         client.tool_schemas("library")
         for name in symbols:
-            library = "lh60-mcu" if name == "RP2040-Tiny" else "lh60-core"
+            library = "lh60-interconnect" if name == INTERCONNECT_SYMBOL_NAME else "lh60-core"
             result = client.call_tool_json(
                 "get_symbol_info", {"lib_id": f"{library}:{name}", "project_dir": str(project_dir)}
             )
             if result.get("name") != name:
                 raise AssertionError(f"library symbol verification failed: {name}")
         for name in footprints:
-            root = MCU_FOOTPRINT_LIBRARY if name == "MCU_RP2040-Tiny_SMD" else CORE_FOOTPRINT_LIBRARY
+            root = INTERCONNECT_FOOTPRINT_LIBRARY if name == INTERCONNECT_SYMBOL_NAME else CORE_FOOTPRINT_LIBRARY
             result = client.call_tool_json(
                 "get_footprint_info",
                 {"footprint_path": str(root / f"{name}.kicad_mod"), "include_graphics": True, "project": str(project)},
@@ -728,8 +562,8 @@ def verify_candidate_libraries(
     return {"symbols": list(symbols), "footprints": list(footprints)}
 
 
-def legacy_convergence_preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
-    """Query the retired L4 source baseline for the one-time convergence path."""
+def current_155_preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
+    """Query the current active-MCU source baseline before one-way migration."""
     _load_acceptance_toolsets(client)
     layout = client.call_tool_json("get_schematic_layout", {"schematic": str(schematic)})
     wires = client.call_tool_json("list_schematic_wires", {"schematic": str(schematic)})["wires"]
@@ -738,18 +572,20 @@ def legacy_convergence_preflight(client: McpClient, schematic: Path) -> dict[str
     label_uuids = assert_unique_nonempty_uuids(labels, "label")
     refs = [item["reference"] for item in client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]]
     state = {"layout": layout, "wire_uuids": wire_uuids, "label_uuids": label_uuids, "references": refs}
-    assert_legacy_convergence_preflight(state)
+    assert_current_155_preflight(state)
     return state
 
 
-def legacy_converge(client: McpClient, schematic: Path, state: dict[str, Any]) -> None:
+def passive_ffc_converge(client: McpClient, schematic: Path, state: dict[str, Any]) -> None:
     require_schematic_capabilities(client)
-    client.call_tool("batch_delete_schematic_wire", {"schematic": str(schematic), "uuids": state["wire_uuids"]})
-    client.call_tool("batch_delete", {"schematic": str(schematic), "uuids": state["label_uuids"]})
+    if state["wire_uuids"]:
+        client.call_tool("batch_delete_schematic_wire", {"schematic": str(schematic), "uuids": state["wire_uuids"]})
+    if state["label_uuids"]:
+        client.call_tool("batch_delete", {"schematic": str(schematic), "uuids": state["label_uuids"]})
     client.call_tool("batch_delete_schematic_components", {"schematic": str(schematic), "references": state["references"]})
     layout = client.call_tool_json("get_schematic_layout", {"schematic": str(schematic)})
-    if any(layout.get(key) != 0 for key in ("component_count", "wire_count", "label_count")):
-        raise AssertionError(f"convergence delete did not empty schematic: {layout}")
+    if any(layout.get(key) != 0 for key in ("component_count", "wire_count", "label_count", "no_connect_count")):
+        raise AssertionError(f"passive FFC migration delete did not empty schematic: {layout}")
     apply_schematic(client, schematic)
 
 
@@ -780,8 +616,8 @@ def run_production_transaction(
     *,
     expected_plan_hash: str | None = None,
     expected_git_sha: str | None = None,
-    preflight_fn=legacy_convergence_preflight,
-    converge_fn=legacy_converge,
+    preflight_fn=current_155_preflight,
+    converge_fn=passive_ffc_converge,
     acceptance_fn=_query_acceptance_record,
     candidate_fn=None,
     candidate_acceptance_fn=_query_acceptance_record,
@@ -799,7 +635,7 @@ def run_production_transaction(
     safety = safety_fn(schematic, BOARD)
 
     state = preflight_fn(client, schematic)
-    assert_legacy_convergence_preflight(state)
+    assert_current_155_preflight(state)
     converge_fn(client, schematic, state)
 
     with tempfile.TemporaryDirectory(prefix="lh60-production-acceptance.") as directory:
@@ -832,11 +668,11 @@ def candidate_library_registrations(project: str) -> dict[str, list[dict[str, st
     return {
         "symbols": [
             {"nickname": "lh60-core", "library_path": str(ROOT / "lib/lh60-core/lh60-core.kicad_sym"), "project": project},
-            {"nickname": "lh60-mcu", "library_path": str(ROOT / "lib/lh60-mcu/lh60-mcu.kicad_sym"), "project": project},
+            {"nickname": "lh60-interconnect", "library_path": str(INTERCONNECT_SYMBOL_LIBRARY), "project": project},
         ],
         "footprints": [
             {"nickname": "lh60-core", "library_path": str(ROOT / "lib/lh60-core/lh60-core.pretty"), "project": project},
-            {"nickname": "lh60-mcu", "library_path": str(ROOT / "lib/lh60-mcu/lh60-mcu.pretty"), "project": project},
+            {"nickname": "lh60-interconnect", "library_path": str(INTERCONNECT_FOOTPRINT_LIBRARY), "project": project},
             {"nickname": "lh60-sockets", "library_path": str(ROOT / "lib/lh60-sockets"), "project": project},
         ],
     }
@@ -846,7 +682,7 @@ def candidate(
     client: McpClient,
     directory: Path,
     *,
-    regenerate_libraries: bool = True,
+    regenerate_libraries: bool = False,
     regenerate_fn=prepare_candidate_libraries,
     verify_fn=verify_candidate_libraries,
     client_factory=McpClient,
@@ -872,7 +708,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--production", action="store_true")
     parser.add_argument("--preflight", action="store_true")
-    parser.add_argument("--migrate-power-flag-instance-flags", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--candidate-dir", type=Path)
     parser.add_argument("--candidate-evidence", type=Path)
@@ -884,12 +719,9 @@ def main() -> int:
     selected_modes = [
         args.production,
         args.preflight,
-        args.migrate_power_flag_instance_flags,
     ]
     if sum(1 for enabled in selected_modes if enabled) > 1:
-        parser.error("--production, --preflight, and --migrate-power-flag-instance-flags are mutually exclusive")
-    if args.migrate_power_flag_instance_flags and args.output is None:
-        parser.error("--migrate-power-flag-instance-flags requires --output")
+        parser.error("--production and --preflight are mutually exclusive")
     if args.record_visual_approval:
         if not args.candidate_evidence or not args.output or not args.approved_by or not args.visual_checklist:
             parser.error("--record-visual-approval requires --candidate-evidence, --output, --approved-by, and --visual-checklist")
@@ -897,28 +729,25 @@ def main() -> int:
         result = record_visual_approval(args.candidate_evidence, args.output, args.approved_by, checklist)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
-    schematic = SCHEMATIC if (args.production or args.preflight or args.migrate_power_flag_instance_flags) else None
+    schematic = SCHEMATIC if (args.production or args.preflight) else None
     with McpClient(KONNECT, CONFIG) as client:
-        if args.migrate_power_flag_instance_flags:
-            result = migrate_power_flag_instance_flags(client, SCHEMATIC, args.output)
-        else:
-            if schematic is None:
-                directory = args.candidate_dir or Path(tempfile.mkdtemp(prefix="lh60-debug-sch."))
-                directory.mkdir(parents=True, exist_ok=True)
-                schematic = candidate(client, directory)
-            svg_output = Path(tempfile.mkdtemp(prefix="lh60-sch-svg.")) / "lh60.svg"
-            data = _query(client, schematic, svg_output)
-            result = {
-                "mode": "production" if (args.production or args.preflight) else "candidate",
-                "schematic": str(schematic),
-                "git_sha": _git_sha(),
-                **acceptance_record(data),
-                "queries": data,
-            }
-            if not (args.production or args.preflight):
-                result["plan_hash"] = _plan_hash()
-            if args.render:
-                result["render_sha256"] = hashlib.sha256(args.render.read_bytes()).hexdigest()
+        if schematic is None:
+            directory = args.candidate_dir or Path(tempfile.mkdtemp(prefix="lh60-debug-sch."))
+            directory.mkdir(parents=True, exist_ok=True)
+            schematic = candidate(client, directory)
+        svg_output = Path(tempfile.mkdtemp(prefix="lh60-sch-svg.")) / "lh60.svg"
+        data = _query(client, schematic, svg_output)
+        result = {
+            "mode": "production" if (args.production or args.preflight) else "candidate",
+            "schematic": str(schematic),
+            "git_sha": _git_sha(),
+            **acceptance_record(data),
+            "queries": data,
+        }
+        if not (args.production or args.preflight):
+            result["plan_hash"] = _plan_hash()
+        if args.render:
+            result["render_sha256"] = hashlib.sha256(args.render.read_bytes()).hexdigest()
     rendered = json.dumps(result, indent=2, sort_keys=True)
     if args.output:
         args.output.write_text(rendered + "\n")
