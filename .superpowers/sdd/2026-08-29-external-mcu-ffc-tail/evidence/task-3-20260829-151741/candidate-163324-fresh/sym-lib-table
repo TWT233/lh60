@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+
+  (lib (name "lh60-core") (type "KiCad") (uri "${KIPRJMOD}/../../../../../../lib/lh60-core/lh60-core.kicad_sym") (options "") (descr ""))
+  (lib (name "lh60-interconnect") (type "KiCad") (uri "${KIPRJMOD}/../../../../../../lib/lh60-interconnect/lh60-interconnect.kicad_sym") (options "") (descr "")))
