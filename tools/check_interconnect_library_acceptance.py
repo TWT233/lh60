@@ -265,6 +265,31 @@ def _assert_project_registration(client: McpClient) -> None:
     print("registration lh60-interconnect: project-scoped portable URIs confirmed")
 
 
+def _assert_effective_clearance_stack(custom_rules: list[dict[str, object]]) -> None:
+    layer_clearance_rules = [
+        rule
+        for rule in custom_rules
+        if rule.get("constraint") == "clearance" and rule.get("layer") in {"F.Cu", "B.Cu"}
+    ]
+    for rule in layer_clearance_rules:
+        condition = str(rule.get("condition") or "")
+        minimum = float(rule["minimum_mm"])
+        if not condition and minimum > 0.20:
+            raise AssertionError(
+                "conflicting unconditional layer clearance rule defeats C2856805 exception: "
+                f"{rule}"
+            )
+
+    expected_layers = {"F.Cu", "B.Cu"}
+    floor_layers = {
+        str(rule["layer"])
+        for rule in layer_clearance_rules
+        if float(rule["minimum_mm"]) == 0.20 and not str(rule.get("condition") or "")
+    }
+    if floor_layers != expected_layers:
+        raise AssertionError(f"missing 0.20 mm layer floor rules: {layer_clearance_rules}")
+
+
 def _assert_design_rules(client: McpClient) -> None:
     rules = client.call_tool_json("get_design_rules", {"board": str(BOARD)})["rules"]
     expected = {
@@ -277,6 +302,7 @@ def _assert_design_rules(client: McpClient) -> None:
         if rules.get(key) != value:
             raise AssertionError(f"design rule {key} drifted: {rules.get(key)}")
     custom_rules = client.call_tool_json("list_custom_rules", {"board": str(BOARD)})["rules"]
+    _assert_effective_clearance_stack(custom_rules)
     expected_custom_rule = {
         "name": CUSTOM_CLEARANCE_RULE_NAME,
         "constraint": "clearance",

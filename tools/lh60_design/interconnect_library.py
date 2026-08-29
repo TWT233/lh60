@@ -28,6 +28,7 @@ CUSTOM_CLEARANCE_RULE_CONDITION = (
     "B.memberOfFootprint('FPC-05F-24PH20') && "
     "A.Reference == B.Reference)"
 )
+COPPER_LAYERS = ("F.Cu", "B.Cu")
 
 
 @dataclass(frozen=True)
@@ -315,6 +316,28 @@ def _replace_graphics(
     )
 
 
+def _assert_effective_clearance_stack(custom_rules: list[dict[str, object]]) -> None:
+    layer_clearance_rules = [
+        rule
+        for rule in custom_rules
+        if rule.get("constraint") == "clearance" and rule.get("layer") in set(COPPER_LAYERS)
+    ]
+    for rule in layer_clearance_rules:
+        if not str(rule.get("condition") or "") and float(rule["minimum_mm"]) > 0.20:
+            raise RuntimeError(
+                "conflicting unconditional layer clearance rule defeats C2856805 exception: "
+                f"{rule}"
+            )
+
+    floor_layers = {
+        str(rule["layer"])
+        for rule in layer_clearance_rules
+        if float(rule["minimum_mm"]) == 0.20 and not str(rule.get("condition") or "")
+    }
+    if floor_layers != set(COPPER_LAYERS):
+        raise RuntimeError(f"missing 0.20 mm layer floor rules: {layer_clearance_rules}")
+
+
 def apply_interconnect_library(client: McpClient) -> None:
     client.tool_schemas("library")
     client.tool_schemas("verification")
@@ -391,6 +414,16 @@ def apply_interconnect_library(client: McpClient) -> None:
     for key, expected in expected_rules.items():
         if rules.get(key) != expected:
             raise RuntimeError(f"design rule {key} readback mismatch: {rules.get(key)}")
+    for layer in COPPER_LAYERS:
+        client.call_tool(
+            "set_layer_constraints",
+            {
+                "board": str(BOARD),
+                "layer": layer,
+                "min_clearance": 0.20,
+                "min_trace_width": 0.25,
+            },
+        )
     client.call_tool(
         "set_custom_rule",
         {
@@ -411,6 +444,7 @@ def apply_interconnect_library(client: McpClient) -> None:
     }
     if expected_custom_rule not in custom_rules:
         raise RuntimeError("custom clearance rule readback mismatch")
+    _assert_effective_clearance_stack(custom_rules)
 
 
 def parse_args() -> argparse.Namespace:

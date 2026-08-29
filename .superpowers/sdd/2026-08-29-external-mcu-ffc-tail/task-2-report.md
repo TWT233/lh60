@@ -194,3 +194,99 @@ Result:
 - Konnect `create_symbol` supports `datasheet` but does not currently preserve arbitrary library-symbol fields such as `Manufacturer`, `MPN`, or `LCSC`; those are frozen in Python specs/tests and README provenance instead.
 - Konnect `get_footprint_info(include_graphics=true)` does not expose pad geometry or pad layers, so live acceptance supplements it with read-only parsing of the Konnect-written footprint file.
 - Task 0 KiCad coupon proved `A.Reference == B.Reference` is the working same-footprint discriminator for pad-pair custom rules on KiCad 10. `A.Parent.Reference == B.Parent.Reference` was not used because it does not match that pad-pair case.
+
+## Fix Round 1: Effective Rule Stack
+
+### Finding Fixed
+
+Review found that `lh60.kicad_dru` still contained unconditional layer-wide
+`konnect:F.Cu:clearance` and `konnect:B.Cu:clearance` rules at `0.25 mm`.
+Because the exact C2856805 pads are on `F.Cu`, that older layer-wide rule could
+defeat the intended same-footprint `0.20 mm` exception even though Board Setup
+had been lowered to `0.20 mm`.
+
+### Safe Konnect Route
+
+Konnect exposes no delete API for a named custom/layer rule in the deployed
+`verification` toolset. The safe replacement route is the existing
+`set_layer_constraints(board, layer, min_clearance, min_trace_width)` API, which
+upserts the named `konnect:<layer>:clearance` and `konnect:<layer>:track_width`
+rules.
+
+The protected-file changes in this fix round were made by rerunning:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python -m tools.lh60_design.interconnect_library --apply
+```
+
+That apply path made the following Konnect writes:
+
+- `delete_symbol`
+- `create_symbol`
+- `create_footprint`
+- `set_footprint_graphics` on `F.Fab`
+- `set_footprint_graphics` on `F.CrtYd`
+- `set_footprint_graphics` on `F.SilkS`
+- `set_footprint_metadata`
+- `set_footprint_models` with `mode=delete`
+- `register_symbol_library`
+- `register_footprint_library`
+- `set_design_rules`
+- `set_layer_constraints` for `F.Cu` with `min_clearance=0.20`, `min_trace_width=0.25`
+- `set_layer_constraints` for `B.Cu` with `min_clearance=0.20`, `min_trace_width=0.25`
+- `set_custom_rule`
+- `list_custom_rules`
+
+The `.kicad_dru` fix is the intended protected rule change. The
+`lh60-interconnect.kicad_sym` diff is a Konnect reserialization side effect from
+the same apply command.
+
+### Rule Stack After Fix
+
+Live `list_custom_rules` readback now reports:
+
+- `konnect:F.Cu:clearance`: unconditional `clearance`, layer `F.Cu`, `minimum_mm=0.20`
+- `konnect:B.Cu:clearance`: unconditional `clearance`, layer `B.Cu`, `minimum_mm=0.20`
+- `konnect:F.Cu:track_width`: layer `F.Cu`, `minimum_mm=0.25`
+- `konnect:B.Cu:track_width`: layer `B.Cu`, `minimum_mm=0.25`
+- `lh60-interconnect:C2856805-general-clearance`: `clearance`, `minimum_mm=0.25`, condition:
+  `!(A.Type == 'Pad' && B.Type == 'Pad' && A.memberOfFootprint('FPC-05F-24PH20') && B.memberOfFootprint('FPC-05F-24PH20') && A.Reference == B.Reference)`
+
+This implements the intended stack: hard floor `0.20 mm`; `0.25 mm` everywhere
+except distinct pads in the same exact C2856805 footprint.
+
+### Regression And Acceptance Added
+
+- `tools.verify_interconnect_library` now rejects conflicting unconditional
+  layer clearance rules above `0.20 mm`.
+- `tools.verify_interconnect_library` now requires `apply_interconnect_library()`
+  to call `set_layer_constraints` for both `F.Cu` and `B.Cu`.
+- `tools.check_interconnect_library_acceptance` now fails live acceptance if
+  `list_custom_rules` contains an unconditional `F.Cu` or `B.Cu` clearance rule
+  above `0.20 mm`, or if either copper layer lacks a `0.20 mm` layer floor rule.
+
+### Fix Round 1 Verification
+
+- RED:
+  - `PYTHONDONTWRITEBYTECODE=1 python -m unittest -v tools.verify_interconnect_library`
+  - failed because `set_layer_constraints` was not called by `apply_interconnect_library()`
+- GREEN:
+  - `PYTHONDONTWRITEBYTECODE=1 python -m unittest -v tools.verify_interconnect_library`
+  - `13` tests run, `13/13` passed
+- Live acceptance:
+  - `PYTHONDONTWRITEBYTECODE=1 python tools/check_interconnect_library_acceptance.py`
+  - passed, including the new effective-rule-stack assertion
+- Focused interconnect suites:
+  - `PYTHONDONTWRITEBYTECODE=1 python -m unittest -v tools.verify_interconnect_contract tools.verify_interconnect_library`
+  - `25` tests run, `25/25` passed
+- Full Python regression:
+  - `PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tools -p 'verify_*.py' -v`
+  - `246` tests run, `246/246` passed
+- Board DRC/readback:
+  - live `run_drc` completed through Konnect
+  - summary remained the known baseline: `total_violations=530`, `design_rule_violations=163`, `unconnected_items=367`, `errors=457`, `warnings=73`, `schematic_parity=0`, `categories_not_reported=[]`
+- Real KiCad coupon:
+  - plain run failed before semantics because the harness could not find the generated DRC report
+  - rerun with explicit `KICAD_CLI=/home/wangqiyilang/.local/bin/kicad-cli` passed:
+    `cargo test --test e2e_kicad custom_rule_coupon_proves_board_floor_and_same_footprint_exception -- --ignored --nocapture`
+  - result: `1` test run, `1/1` passed
