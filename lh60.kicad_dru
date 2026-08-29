@@ -15,3 +15,7 @@
 (rule "konnect:B.Cu:track_width"
   (constraint track_width (min 0.25mm))
   (layer "B.Cu"))
+
+(rule "lh60-interconnect:C2856805-general-clearance"
+  (constraint clearance (min 0.25mm))
+  (condition "!(A.Type == 'Pad' && B.Type == 'Pad' && A.memberOfFootprint('FPC-05F-24PH20') && B.memberOfFootprint('FPC-05F-24PH20') && A.Reference == B.Reference)"))
