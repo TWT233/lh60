@@ -41,11 +41,20 @@ def create_production_project(client: McpClient, project_dir: Path) -> None:
     project, _, board = _project_paths(project_dir)
     project_exists = _validate_project_state(project_dir)
 
+    core_root = project_dir / "lib" / "lh60-core"
+    core_footprints = core_root / "lh60-core.pretty"
+    core_symbols = core_root / "lh60-core.kicad_sym"
+    interconnect_root = project_dir / "lib" / "lh60-interconnect"
+    interconnect_footprints = interconnect_root / "lh60-interconnect.pretty"
+    interconnect_symbols = interconnect_root / "lh60-interconnect.kicad_sym"
     socket_library = project_dir / "lib" / "lh60-sockets"
-    mcu_root = project_dir / "lib" / "lh60-mcu"
-    mcu_footprints = mcu_root / "lh60-mcu.pretty"
-    mcu_symbols = mcu_root / "lh60-mcu.kicad_sym"
-    required_libraries = (socket_library, mcu_footprints, mcu_symbols)
+    required_libraries = (
+        socket_library,
+        core_footprints,
+        core_symbols,
+        interconnect_footprints,
+        interconnect_symbols,
+    )
     missing = [path for path in required_libraries if not path.exists()]
     if missing:
         missing_text = ", ".join(str(path) for path in missing)
@@ -71,8 +80,8 @@ def create_production_project(client: McpClient, project_dir: Path) -> None:
     client.call_tool(
         "register_footprint_library",
         {
-            "library_path": str(mcu_footprints),
-            "nickname": "lh60-mcu",
+            "library_path": str(core_footprints),
+            "nickname": "lh60-core",
             "project": str(project),
             "scope": "project",
             "replace_existing": True,
@@ -81,8 +90,27 @@ def create_production_project(client: McpClient, project_dir: Path) -> None:
     client.call_tool(
         "register_symbol_library",
         {
-            "library_path": str(mcu_symbols),
-            "nickname": "lh60-mcu",
+            "library_path": str(core_symbols),
+            "nickname": "lh60-core",
+            "project": str(project),
+            "scope": "project",
+        },
+    )
+    client.call_tool(
+        "register_footprint_library",
+        {
+            "library_path": str(interconnect_footprints),
+            "nickname": "lh60-interconnect",
+            "project": str(project),
+            "scope": "project",
+            "replace_existing": True,
+        },
+    )
+    client.call_tool(
+        "register_symbol_library",
+        {
+            "library_path": str(interconnect_symbols),
+            "nickname": "lh60-interconnect",
             "project": str(project),
             "scope": "project",
         },
