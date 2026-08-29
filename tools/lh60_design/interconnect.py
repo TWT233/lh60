@@ -53,6 +53,30 @@ PROHIBITED_NETS = frozenset(
         "GP29",
     }
 )
+EXPECTED_CONNECTOR_IDENTITY = (
+    "XUNPU",
+    "FPC-05F-24PH20",
+    "C2856805",
+    DATASHEET_URL,
+)
+EXPECTED_CABLE_GEOMETRY = (
+    0.5,
+    12.50,
+    0.03,
+    0.30,
+    0.03,
+    3.00,
+    6.00,
+    100.0,
+    150.0,
+)
+
+
+def _expected_matrix_gpio_map() -> tuple[tuple[str, str], ...]:
+    matrix = gpio_map()
+    return tuple((f"COL{index}", gpio) for index, gpio in enumerate(matrix.columns)) + (
+        tuple((f"ROW{index}", gpio) for index, gpio in enumerate(matrix.rows))
+    )
 
 
 @dataclass(frozen=True)
@@ -100,6 +124,16 @@ class InterboardContract:
     def __post_init__(self) -> None:
         if tuple(pin.number for pin in self.pins) != tuple(range(1, PIN_COUNT + 1)):
             raise ValueError("interconnect pins must be exactly 1..24")
+        if tuple(pin.net_name for pin in self.pins) != PIN_NETS:
+            raise ValueError("interconnect pins must match the frozen 24-pin contract, including pin 23 = None")
+        if self.connector != ConnectorIdentity(*EXPECTED_CONNECTOR_IDENTITY):
+            raise ValueError("connector must match the frozen XUNPU FPC-05F-24PH20 identity")
+        if self.cable != CableContract(*EXPECTED_CABLE_GEOMETRY):
+            raise ValueError("cable must match the frozen FFC geometry and unapproved MIF defaults")
+        if self.matrix_gpio_map != _expected_matrix_gpio_map():
+            raise ValueError("matrix_gpio_map must match tools.lh60_design.matrix.gpio_map()")
+        if self.prohibited_nets != PROHIBITED_NETS:
+            raise ValueError("prohibited_nets must match the frozen FFC prohibited-net set")
         if self.signal_nets & self.prohibited_nets:
             raise ValueError("FFC signal set includes a prohibited net")
 
@@ -133,11 +167,6 @@ def reversed_pin_number(pin: int) -> int:
 
 @lru_cache(maxsize=1)
 def interboard_contract() -> InterboardContract:
-    matrix = gpio_map()
-    matrix_gpio_map = tuple(
-        (f"COL{index}", gpio) for index, gpio in enumerate(matrix.columns)
-    ) + tuple((f"ROW{index}", gpio) for index, gpio in enumerate(matrix.rows))
-
     return InterboardContract(
         connector=ConnectorIdentity(
             manufacturer="XUNPU",
@@ -149,7 +178,7 @@ def interboard_contract() -> InterboardContract:
             InterconnectPin(number=index, net_name=net_name)
             for index, net_name in enumerate(PIN_NETS, start=1)
         ),
-        matrix_gpio_map=matrix_gpio_map,
+        matrix_gpio_map=_expected_matrix_gpio_map(),
         prohibited_nets=PROHIBITED_NETS,
         cable=CableContract(
             pitch_mm=0.5,
