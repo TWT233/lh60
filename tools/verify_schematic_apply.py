@@ -33,6 +33,7 @@ def complete_schematic_schemas():
             "batch_delete": schema(("schematic",), "schematic", "references", "uuids"),
             "batch_place_components": schema(("schematic", "components"), "schematic", "components"),
             "batch_edit_schematic_components": batch_edit_schema,
+            "batch_set_schematic_field_visibility": schema(("schematic", "edits"), "schematic", "edits"),
             "batch_connect_to_net": schema(("schematic", "net_name", "pins"), "schematic", "net_name", "pins"),
         },
         "sch_wiring": {
@@ -223,6 +224,8 @@ class SchematicApplyContractTest(unittest.TestCase):
             ("sch_batch", "batch_delete", "uuids", "properties"),
             ("sch_batch", "batch_place_components", "components", "required"),
             ("sch_batch", "batch_edit_schematic_components", "edits", "properties"),
+            ("sch_batch", "batch_set_schematic_field_visibility", "edits", "required"),
+            ("sch_batch", "batch_set_schematic_field_visibility", "edits", "properties"),
             ("sch_batch", "batch_connect_to_net", "pins", "required"),
             ("sch_components", "update_symbols_from_library", "allow_pin_moves", "properties"),
             ("sch_components", "update_symbols_from_library", "references", "properties"),
@@ -264,6 +267,17 @@ class SchematicApplyContractTest(unittest.TestCase):
                     return tool_text_result({"pins": [{"pin_number": "23", "x": 302.26, "y": 101.6}]})
                 if name == "batch_add_no_connect":
                     return tool_text_result({"added_count": 1})
+                if name == "batch_set_schematic_field_visibility":
+                    return tool_text_result(
+                        {
+                            "atomic": True,
+                            "updated": [],
+                            "unchanged": [
+                                edit["reference"]
+                                for edit in arguments["edits"]
+                            ],
+                        }
+                    )
                 if name == "reset_schematic_field_positions":
                     return tool_text_result(
                         {
@@ -302,6 +316,7 @@ class SchematicApplyContractTest(unittest.TestCase):
             "batch_place_components",
             "batch_edit_schematic_components",
             "update_symbols_from_library",
+            "batch_set_schematic_field_visibility",
             "get_schematic_pin_locations",
             "batch_add_no_connect",
             *(["batch_connect_to_net"] * len({connection.net_name for connection in plan.connections})),
@@ -350,11 +365,25 @@ class SchematicApplyContractTest(unittest.TestCase):
                 },
             ),
         )
-        self.assertEqual(client.calls[7][0], "get_schematic_pin_locations")
-        self.assertEqual(client.calls[8], ("batch_add_no_connect", {"schematic": "/tmp/lh60-debug.kicad_sch", "positions": [{"x": 302.26, "y": 101.6}]}))
+        visibility_name, visibility_arguments = client.calls[7]
+        self.assertEqual(visibility_name, "batch_set_schematic_field_visibility")
+        self.assertEqual(visibility_arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
+        self.assertEqual(len(visibility_arguments["edits"]), 146)
+        visibility_payload = {
+            edit["reference"]: (edit["reference_visible"], edit["value_visible"])
+            for edit in visibility_arguments["edits"]
+        }
+        self.assertEqual(visibility_payload["D1"], (False, False))
+        self.assertEqual(visibility_payload["D70"], (False, False))
+        self.assertEqual(visibility_payload["SW1"], (False, True))
+        self.assertEqual(visibility_payload["SW76"], (False, True))
+        self.assertEqual(visibility_payload["J1"], (True, True))
+        self.assertFalse(any(reference.startswith("#FLG") for reference in visibility_payload))
+        self.assertEqual(client.calls[8][0], "get_schematic_pin_locations")
+        self.assertEqual(client.calls[9], ("batch_add_no_connect", {"schematic": "/tmp/lh60-debug.kicad_sch", "positions": [{"x": 302.26, "y": 101.6}]}))
 
         grouped_connections = {}
-        for name, arguments in client.calls[9:]:
+        for name, arguments in client.calls[10:]:
             self.assertEqual(name, "batch_connect_to_net")
             self.assertEqual(arguments["schematic"], "/tmp/lh60-debug.kicad_sch")
             grouped_connections[arguments["net_name"]] = arguments["pins"]
@@ -409,6 +438,51 @@ class SchematicApplyContractTest(unittest.TestCase):
         self.assertEqual(visibility["J1"], (True, True))
         self.assertFalse(any(reference.startswith("#FLG") for reference in visibility))
 
+    def test_apply_aborts_before_no_connects_when_field_visibility_accounting_is_incomplete(self):
+        from tools.lh60_design.schematic import apply_schematic
+
+        class FakeClient:
+            def __init__(self, visibility_payload):
+                self.calls = []
+                self.visibility_payload = visibility_payload
+
+            def tool_schemas(self, toolset):
+                self.calls.append(("load", toolset))
+                return deepcopy(complete_schematic_schemas()[toolset])
+
+            def call_tool(self, name, arguments):
+                self.calls.append((name, arguments))
+                if name == "update_symbols_from_library":
+                    return tool_text_result(
+                        {
+                            "errors": [],
+                            "pins_moved": [],
+                            "updated": [],
+                            "unchanged": [
+                                "Device:D",
+                                "Switch:SW_Push",
+                                "lh60-interconnect:FPC-05F-24PH20",
+                            ],
+                        }
+                    )
+                if name == "batch_set_schematic_field_visibility":
+                    return tool_text_result(self.visibility_payload)
+                return tool_text_result({"ok": True})
+
+        bad_payloads = (
+            {"atomic": False, "updated": [], "unchanged": []},
+            {"atomic": True, "updated": ["D1"], "unchanged": []},
+            {"atomic": True, "updated": ["D1"], "unchanged": ["D1"]},
+            {"atomic": True, "updated": ["UNKNOWN"], "unchanged": []},
+        )
+        for payload in bad_payloads:
+            client = FakeClient(payload)
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(RuntimeError, "batch_set_schematic_field_visibility"):
+                    apply_schematic(client, "/tmp/lh60-debug.kicad_sch")
+                self.assertFalse(any(name == "batch_add_no_connect" for name, _ in client.calls))
+                self.assertFalse(any(name == "batch_connect_to_net" for name, _ in client.calls))
+
     def test_apply_adds_one_pin_level_no_connect_after_symbol_refresh(self):
         from tools.lh60_design.schematic import apply_schematic
 
@@ -458,6 +532,17 @@ class SchematicApplyContractTest(unittest.TestCase):
                     return tool_text_result({"pins": [{"pin_number": "23", "x": 302.26, "y": 101.6}]})
                 if name == "batch_add_no_connect":
                     return tool_text_result({"added_count": 1})
+                if name == "batch_set_schematic_field_visibility":
+                    return tool_text_result(
+                        {
+                            "atomic": True,
+                            "updated": [],
+                            "unchanged": [
+                                edit["reference"]
+                                for edit in arguments["edits"]
+                            ],
+                        }
+                    )
                 return tool_text_result({"ok": True})
 
         client = FakeClient()
@@ -570,6 +655,17 @@ class SchematicApplyContractTest(unittest.TestCase):
                     )
                 if name == "get_schematic_pin_locations":
                     return tool_text_result({"pins": self.pins})
+                if name == "batch_set_schematic_field_visibility":
+                    return tool_text_result(
+                        {
+                            "atomic": True,
+                            "updated": [],
+                            "unchanged": [
+                                edit["reference"]
+                                for edit in arguments["edits"]
+                            ],
+                        }
+                    )
                 return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
 
         cases = (

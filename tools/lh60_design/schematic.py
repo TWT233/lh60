@@ -27,7 +27,7 @@ MATRIX_Y0_MM = 20.32
 MATRIX_X_PITCH_MM = 30.48
 MATRIX_Y_PITCH_MM = 33.02
 SWITCH_Y_OFFSETS_MM = (10.16, 17.78)
-FFC_POSITION_MM = (360.68, 45.72)
+FFC_POSITION_MM = (360.68, 76.2)
 RETIRED_SWITCH_REFERENCES = {
     "r3_rshift_2.75u": "SW59",
 }
@@ -340,6 +340,37 @@ def _require_single_accounting(
         )
 
 
+def _require_complete_reference_accounting(
+    result: dict[str, object],
+    *,
+    references: set[str],
+    tool: str,
+) -> None:
+    if result.get("atomic") is not True:
+        raise RuntimeError(f"{tool} did not complete atomically")
+    seen: list[str] = []
+    for key in ("updated", "unchanged"):
+        values = result.get(key, [])
+        if not isinstance(values, list):
+            raise RuntimeError(f"{tool} returned non-list {key}: {values!r}")
+        for value in values:
+            if isinstance(value, str):
+                reference = value
+            elif isinstance(value, dict):
+                reference = str(value.get("reference", ""))
+            else:
+                raise RuntimeError(f"{tool} returned invalid {key} item: {value!r}")
+            if reference not in references:
+                raise RuntimeError(f"{tool} returned unexpected reference: {reference!r}")
+            seen.append(reference)
+    if len(seen) != len(set(seen)):
+        raise RuntimeError(f"{tool} references must be unique")
+    if set(seen) != references:
+        raise RuntimeError(
+            f"{tool} accounting mismatch: seen={sorted(seen)}, expected={sorted(references)}"
+        )
+
+
 def _verify_final_symbol_refresh(
     client: McpClient,
     schematic: Path,
@@ -355,6 +386,31 @@ def _verify_final_symbol_refresh(
     )
     _require_empty_list_result(result, "errors", "update_symbols_from_library")
     _require_empty_list_result(result, "pins_moved", "update_symbols_from_library")
+
+
+def _apply_field_visibility(
+    client: McpClient,
+    schematic: Path,
+    visibility: tuple[FieldVisibility, ...],
+) -> None:
+    if not visibility:
+        return
+    result = _call_tool_json(
+        client,
+        "batch_set_schematic_field_visibility",
+        {
+            "schematic": str(schematic),
+            "edits": [
+                _field_visibility_payload(item)
+                for item in visibility
+            ],
+        },
+    )
+    _require_complete_reference_accounting(
+        result,
+        references={item.reference for item in visibility},
+        tool="batch_set_schematic_field_visibility",
+    )
 
 
 def apply_power_flag_instance_flags(
@@ -451,6 +507,7 @@ def require_schematic_capabilities(client: McpClient) -> None:
             "batch_delete",
             "batch_place_components",
             "batch_edit_schematic_components",
+            "batch_set_schematic_field_visibility",
             "batch_connect_to_net",
         },
         "sch_wiring": {"batch_add_no_connect", "batch_delete_schematic_wire"},
@@ -478,6 +535,7 @@ def require_schematic_capabilities(client: McpClient) -> None:
         "set_schematic_page": ("sch_components", ("schematic", "size"), ("schematic", "size", "portrait")),
         "batch_place_components": ("sch_batch", ("schematic", "components"), ("schematic", "components")),
         "batch_edit_schematic_components": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
+        "batch_set_schematic_field_visibility": ("sch_batch", ("schematic", "edits"), ("schematic", "edits")),
         "batch_connect_to_net": ("sch_batch", ("schematic", "net_name", "pins"), ("schematic", "net_name", "pins")),
         "update_symbols_from_library": (
             "sch_components",
@@ -598,6 +656,7 @@ def apply_schematic(
         },
     )
     _verify_final_symbol_refresh(client, schematic)
+    _apply_field_visibility(client, schematic, plan.field_visibility)
     _add_no_connects(client, schematic, plan.no_connects)
     for net_name, pins in _connections_by_net(plan.connections).items():
         client.call_tool(

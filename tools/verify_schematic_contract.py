@@ -12,7 +12,7 @@ class SchematicPlanContractTest(unittest.TestCase):
         "MATRIX_X_PITCH_MM": 30.48,
         "MATRIX_Y_PITCH_MM": 33.02,
         "SWITCH_Y_OFFSETS_MM": (10.16, 17.78),
-        "FFC_POSITION_MM": (360.68, 45.72),
+        "FFC_POSITION_MM": (360.68, 76.2),
     }
     EXPECTED_FFC_PIN_MAP = (
         ("1", "GND"),
@@ -272,6 +272,8 @@ class SchematicPlanContractTest(unittest.TestCase):
         )
         self.assertEqual(FFC_POSITION_MM, self.EXPECTED_MATRIX_LAYOUT["FFC_POSITION_MM"])
         self.assertEqual((components["J1"].x, components["J1"].y), self.EXPECTED_MATRIX_LAYOUT["FFC_POSITION_MM"])
+        self.assertGreaterEqual(components["J1"].y, 76.2)
+        self.assertGreater(components["J1"].x, MATRIX_X0_MM + 10 * MATRIX_X_PITCH_MM)
         self.assertGreaterEqual(SWITCH_Y_OFFSETS_MM[0], 0.0)
         self.assertTrue(
             all(
