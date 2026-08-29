@@ -122,6 +122,10 @@ def classify_known_diagnostics(layout: dict[str, Any], orphans: dict[str, Any]) 
     )
 
 
+def _count_no_connect_markers(schematic: Path) -> int:
+    return len(re.findall(r"\(\s*no_connect\b", schematic.read_text()))
+
+
 def _load_acceptance_toolsets(client: McpClient) -> None:
     schemas = {
         toolset: client.tool_schemas(toolset)
@@ -178,10 +182,13 @@ def require_production_capabilities(client: McpClient) -> None:
 def _query(client: McpClient, schematic: Path, svg_output: Path) -> dict[str, Any]:
     _load_acceptance_toolsets(client)
     args = {"schematic": str(schematic)}
+    layout = client.call_tool_json("get_schematic_layout", args)
+    if "no_connect_count" not in layout:
+        layout["no_connect_count"] = _count_no_connect_markers(schematic)
     data = {
         "components": client.call_tool_json("list_schematic_components", args),
         "netlist": client.call_tool_json("export_netlist_summary", args),
-        "layout": client.call_tool_json("get_schematic_layout", args),
+        "layout": layout,
         "wires": client.call_tool_json("list_schematic_wires", args),
         "labels": client.call_tool_json("list_schematic_labels", args),
         "overlaps": client.call_tool_json("check_schematic_overlaps", args),

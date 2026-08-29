@@ -292,6 +292,53 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
                 checker.FROZEN_PIN_SHA256 = original_pin_hash
                 checker.FROZEN_CONNECTOR_MAP = original_map
 
+    def test_query_backfills_no_connect_count_from_schematic_when_layout_omits_it(self):
+        from tools import check_schematic_acceptance as checker
+
+        with TemporaryDirectory() as directory:
+            schematic = Path(directory) / "candidate.kicad_sch"
+            schematic.write_text(
+                '(kicad_sch\n'
+                '  (no_connect\n'
+                '    (at 354.33 -10.16)\n'
+                '    (uuid "68e6c02a-e426-486c-af83-4820c6fba6f7")\n'
+                '  )\n'
+                ')\n'
+            )
+            svg_path = Path(directory) / "candidate.svg"
+            svg_path.write_text('<svg width="420mm" height="297mm"/>')
+
+            class FakeClient:
+                def tool_schemas(self, toolset):
+                    return deepcopy(disjoint_acceptance_schemas()[toolset])
+
+                def call_tool_json(self, name, arguments):
+                    if name == "list_schematic_components":
+                        return {"components": []}
+                    if name == "export_netlist_summary":
+                        return {"components": []}
+                    if name == "get_schematic_layout":
+                        return {"component_count": 0, "wire_count": 0, "label_count": 0}
+                    if name in {
+                        "list_schematic_wires",
+                        "list_schematic_labels",
+                        "check_schematic_overlaps",
+                        "find_orphan_items",
+                        "find_shorted_nets",
+                        "find_single_pin_nets",
+                    }:
+                        return {"wires": [], "labels": [], "overlap_count": 0, "orphan_count": 0, "short_count": 0, "single_pin_net_count": 0, "nets": []}
+                    if name in {"validate_wire_connections", "validate_component_connections"}:
+                        return {"valid": True}
+                    if name == "run_erc":
+                        return {"errors": 0, "warnings": 0}
+                    if name == "export_schematic_svg":
+                        return {"output": str(svg_path)}
+                    raise AssertionError(name)
+
+            data = checker._query(FakeClient(), schematic, svg_path)
+            self.assertEqual(data["layout"]["no_connect_count"], 1)
+
     def test_current_preflight_and_passive_converge_use_exact_payloads_and_refuse_nonempty_delete(self):
         from tools.check_schematic_acceptance import current_155_preflight, passive_ffc_converge
         from tools.verify_schematic_apply import complete_schematic_schemas
