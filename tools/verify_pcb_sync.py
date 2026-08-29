@@ -265,6 +265,50 @@ def connector_pad_payload(reference, *, hierarchical=True):
     }
 
 
+def passive_ffc_pad_payload(*, mechanical_layers=None, pad23_net="unconnected-(J1-Pad23)"):
+    mechanical_layers = (
+        ["B.Cu", "B.Mask", "B.Paste"]
+        if mechanical_layers is None
+        else mechanical_layers
+    )
+    pads = []
+    for pin in interboard_contract().pins:
+        if pin.number == 23:
+            net = pad23_net
+        elif pin.net_name is None:
+            net = None
+        else:
+            net = f"/{pin.net_name}"
+        pads.append(
+            {
+                "number": str(pin.number),
+                "net": net,
+                "layers": ["B.Cu", "B.Mask", "B.Paste"],
+                "x": 250.0 + pin.number,
+                "y": 10.0,
+            }
+        )
+    pads.extend(
+        [
+            {
+                "number": "",
+                "net": "",
+                "layers": mechanical_layers,
+                "x": 267.8,
+                "y": 7.68,
+            },
+            {
+                "number": "",
+                "net": "unconnected-(J1-PadMP2)",
+                "layers": mechanical_layers,
+                "x": 284.2,
+                "y": 7.68,
+            },
+        ]
+    )
+    return {"reference": "J1", "pad_count": 26, "pads": pads}
+
+
 def empty_trace_payload(net_name):
     _ = net_name
     return {"count": 0, "traces": []}
@@ -654,6 +698,47 @@ class PassivePcbSyncTest(unittest.TestCase):
         schemas["pcb_components"].pop("set_component_placements")
         with self.assertRaisesRegex(RuntimeError, "set_component_placements"):
             require_passive_capabilities(FakeClient(schemas))
+
+    def test_passive_connector_pads_accept_26_physical_pads_and_j1_pad23_sentinel(self):
+        from tools.passive_pcb_sync import require_passive_connector_pads
+
+        client = FakeClient()
+        client.queue_json("get_component_pads", passive_ffc_pad_payload())
+
+        evidence = require_passive_connector_pads(client, Path("/tmp/candidate.kicad_pcb"))
+
+        self.assertEqual(evidence["physical_pad_count"], 26)
+        self.assertEqual(evidence["electrical_pad_count"], 24)
+        self.assertEqual(evidence["mechanical_land_count"], 2)
+        pad23 = next(pad for pad in evidence["pads"] if pad["number"] == "23")
+        self.assertIsNone(pad23["net"])
+        self.assertEqual(
+            {tuple(land["layers"]) for land in evidence["mechanical_lands"]},
+            {("B.Cu", "B.Mask", "B.Paste")},
+        )
+
+    def test_passive_connector_pads_reject_duplicate_electrical_numbers(self):
+        from tools.passive_pcb_sync import require_passive_connector_pads
+
+        payload = passive_ffc_pad_payload()
+        payload["pads"][1]["number"] = "1"
+        client = FakeClient()
+        client.queue_json("get_component_pads", payload)
+
+        with self.assertRaisesRegex(RuntimeError, "electrical pad count|duplicate"):
+            require_passive_connector_pads(client, Path("/tmp/candidate.kicad_pcb"))
+
+    def test_passive_connector_pads_reject_wrong_mechanical_layers(self):
+        from tools.passive_pcb_sync import require_passive_connector_pads
+
+        client = FakeClient()
+        client.queue_json(
+            "get_component_pads",
+            passive_ffc_pad_payload(mechanical_layers=["F.Cu", "F.Mask", "F.Paste"]),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "mechanical land layers"):
+            require_passive_connector_pads(client, Path("/tmp/candidate.kicad_pcb"))
 
     def test_phase_b_refuses_without_phase_a_evidence(self):
         from tools.passive_pcb_sync import run_closed_pose_phase

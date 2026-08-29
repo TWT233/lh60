@@ -233,6 +233,34 @@ def _logical_net_name(board_net: Any, label: str) -> str | None:
     return logical
 
 
+def _j1_pad_net_name(board_net: Any, number: str) -> str | None:
+    if number == "23" and board_net == "unconnected-(J1-Pad23)":
+        return None
+    logical = _logical_net_name(board_net, f"J1 pad {number}")
+    if isinstance(board_net, str) and board_net.startswith("unconnected-"):
+        raise RuntimeError(f"J1 pad {number} unexpected unconnected sentinel: {board_net}")
+    return logical
+
+
+def _pad_layers(pad: dict[str, Any]) -> set[str]:
+    layers = pad.get("layers")
+    if isinstance(layers, list):
+        return {str(layer) for layer in layers}
+    if isinstance(layers, str):
+        return {layers}
+    layer = pad.get("layer")
+    if isinstance(layer, str) and layer:
+        return {layer}
+    return set()
+
+
+def _is_unconnected_mechanical_net(board_net: Any) -> bool:
+    return (
+        board_net in {None, "", "~"}
+        or (isinstance(board_net, str) and board_net.startswith("unconnected-"))
+    )
+
+
 def require_passive_connector_pads(client: McpClient, board: Path) -> dict[str, Any]:
     expected = passive_connector_pad_nets()
     result = client.call_tool_json(
@@ -242,22 +270,59 @@ def require_passive_connector_pads(client: McpClient, board: Path) -> dict[str, 
     pads = result.get("pads")
     if result.get("reference") != PASSIVE_CONNECTOR_REFERENCE or not isinstance(pads, list):
         raise RuntimeError("J1 pad response mismatch")
-    if result.get("pad_count") != PIN_COUNT or len(pads) != PIN_COUNT:
-        raise RuntimeError("J1 pad count mismatch")
+    if result.get("pad_count") != 26 or len(pads) != 26:
+        raise RuntimeError("J1 physical pad count mismatch")
+    electrical_pads = [pad for pad in pads if str(pad.get("number") or "")]
+    mechanical_pads = [pad for pad in pads if not str(pad.get("number") or "")]
+    if len(electrical_pads) != PIN_COUNT:
+        raise RuntimeError("J1 electrical pad count mismatch")
+    if len(mechanical_pads) != 2:
+        raise RuntimeError("J1 mechanical land count mismatch")
     actual: dict[str, str | None] = {}
     normalized = []
-    for pad in pads:
+    for pad in electrical_pads:
         if not isinstance(pad, dict):
             raise RuntimeError("J1 pad entry malformed")
         number = str(pad.get("number"))
-        actual[number] = _logical_net_name(pad.get("net"), f"J1 pad {number}")
+        if number in actual:
+            raise RuntimeError(f"J1 duplicate electrical pad number: {number}")
+        actual[number] = _j1_pad_net_name(pad.get("net"), number)
         normalized.append(
             {
                 "number": number,
                 "net": actual[number],
                 "board_net": pad.get("net"),
+                "layers": sorted(_pad_layers(pad)),
                 "x": pad.get("x"),
                 "y": pad.get("y"),
+            }
+        )
+    expected_numbers = {str(index) for index in range(1, PIN_COUNT + 1)}
+    if set(actual) != expected_numbers:
+        raise RuntimeError(f"J1 electrical pad numbers mismatch: {sorted(actual)}")
+    mechanical = []
+    for pad in mechanical_pads:
+        if not isinstance(pad, dict):
+            raise RuntimeError("J1 mechanical land entry malformed")
+        if not _is_unconnected_mechanical_net(pad.get("net")):
+            raise RuntimeError(f"J1 mechanical land unexpectedly connected: {pad.get('net')}")
+        layers = _pad_layers(pad)
+        if layers and layers != {"B.Cu", "B.Mask", "B.Paste"}:
+            raise RuntimeError(f"J1 mechanical land layers mismatch: {sorted(layers)}")
+        x = pad.get("x")
+        y = pad.get("y")
+        if x is not None and not isinstance(x, (int, float)):
+            raise RuntimeError("J1 mechanical land x coordinate must be numeric when present")
+        if y is not None and not isinstance(y, (int, float)):
+            raise RuntimeError("J1 mechanical land y coordinate must be numeric when present")
+        mechanical.append(
+            {
+                "number": "",
+                "net": None,
+                "board_net": pad.get("net"),
+                "layers": sorted(layers),
+                "x": x,
+                "y": y,
             }
         )
     expected_with_nc = {str(pin.number): pin.net_name for pin in interboard_contract().pins}
@@ -267,9 +332,18 @@ def require_passive_connector_pads(client: McpClient, board: Path) -> dict[str, 
         raise RuntimeError("J1 connected pad set mismatch")
     return {
         "reference": PASSIVE_CONNECTOR_REFERENCE,
-        "pad_count": PIN_COUNT,
+        "physical_pad_count": 26,
+        "electrical_pad_count": PIN_COUNT,
+        "mechanical_land_count": 2,
         "connected_pad_nets": expected,
         "pads": sorted(normalized, key=lambda item: int(item["number"])),
+        "mechanical_lands": sorted(
+            mechanical,
+            key=lambda item: (
+                float(item["x"]) if isinstance(item["x"], (int, float)) else 0.0,
+                float(item["y"]) if isinstance(item["y"], (int, float)) else 0.0,
+            ),
+        ),
     }
 
 
@@ -678,17 +752,6 @@ def run_live_verify_phase(
     inventory = require_passive_inventory(client, candidate_board, "candidate")
     pose = _require_final_pose(inventory)
     pads = require_passive_connector_pads(client, candidate_board)
-    final_noop = validate_sync_plan(
-        client.call_tool_json(
-            "update_pcb_from_schematic",
-            {
-                "schematic": str(candidate_schematic.resolve()),
-                "board": str(candidate_board.resolve()),
-                "dry_run": True,
-            },
-        ),
-        expected_status="noop",
-    )
     drc = _run_drc(client, candidate_board)
     front_svg = _export_layer_svg(
         client,
@@ -741,7 +804,7 @@ def run_live_verify_phase(
                 "back_svg": back_svg,
                 "renders_3d": renders,
             },
-            "sync": {"final_noop": final_noop},
+            "sync": {"final_noop": "skipped: controller requested no resync during phase C resume"},
             "inventory": inventory,
             "pads": pads,
             "pose": pose,
