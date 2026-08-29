@@ -624,6 +624,8 @@ def passive_ffc_converge(client: McpClient, schematic: Path, state: dict[str, An
         client.call_tool("delete_schematic_net_label", {"schematic": str(schematic), **selector})
     client.call_tool("batch_delete_schematic_components", {"schematic": str(schematic), "references": state["references"]})
     layout = client.call_tool_json("get_schematic_layout", {"schematic": str(schematic)})
+    if "no_connect_count" not in layout:
+        layout["no_connect_count"] = _count_no_connect_markers(schematic)
     if any(layout.get(key) != 0 for key in ("component_count", "wire_count", "label_count", "no_connect_count")):
         raise AssertionError(f"passive FFC migration delete did not empty schematic: {layout}")
     apply_schematic(client, schematic)

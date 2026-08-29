@@ -412,12 +412,14 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
                 if name == "get_schematic_layout":
                     deleted = any(call[0] == "batch_delete_schematic_components" for call in self.calls)
                     if deleted:
-                        return {
-                            "component_count": 0 if self.empty_after_delete else 1,
+                        layout = {
+                            "component_count": 1 if self.empty_after_delete is False else 0,
                             "wire_count": 0,
                             "label_count": 0,
-                            "no_connect_count": 0,
                         }
+                        if self.empty_after_delete is not None:
+                            layout["no_connect_count"] = 0
+                        return layout
                     return {"component_count": 155, "wire_count": 0, "label_count": 339}
                 if name == "list_schematic_wires":
                     return {"wires": []}
@@ -445,6 +447,11 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "did not empty"):
             with mock.patch("tools.check_schematic_acceptance.apply_schematic", side_effect=AssertionError("apply should not run")):
                 passive_ffc_converge(FakeClient(empty_after_delete=False), Path("/tmp/production.kicad_sch"), state)
+
+        no_connect_omitted = FakeClient(empty_after_delete=None)
+        with mock.patch("tools.check_schematic_acceptance._count_no_connect_markers", return_value=0):
+            with mock.patch("tools.check_schematic_acceptance.apply_schematic", side_effect=lambda client, schematic: client.calls.append(("apply_schematic", {"schematic": str(schematic)}))):
+                passive_ffc_converge(no_connect_omitted, Path("/tmp/production.kicad_sch"), state)
 
     def test_production_transaction_orders_once_and_persists_bound_evidence(self):
         from tools.check_schematic_acceptance import run_production_transaction
