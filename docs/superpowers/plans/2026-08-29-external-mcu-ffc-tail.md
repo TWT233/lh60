@@ -881,7 +881,7 @@ The checker may be implemented before hardware arrives, but fixtures must be exp
 
 - [ ] **Step 2: Write failing checker tests**
 
-The valid fixture names integration/main/tail/MIF/cable/firmware/instrument identities and records pass/fail plus raw-evidence SHA-256 for: all 24 continuity paths; six GND and NC checks; unpowered 1-to-24 fault fixture; USB-only power/backfeed/inrush; all 75 sockets and 70 logical nodes; row/column/aggressor/multi-key SI; zero-error soak; ESD; seating/locks/marking/pinch/pull/vibration/intermittency; and separate mating-life samples.
+The valid fixture names integration/main/tail/MIF/cable/firmware/instrument identities and records pass/fail plus raw-evidence SHA-256 for: all 24 continuity paths; six GND and NC checks; unpowered 1-to-24 fault fixture; USB-only power/backfeed/inrush; all 75 sockets and 70 logical nodes; row/column/aggressor/multi-key SI; zero-error soak; IEC 61000-4-2 ESD; seating/locks/marking/pinch/pull/vibration/intermittency; and separate mating-life samples.
 
 Mutated fixtures must reject absent thresholds, missing socket/channel IDs, wrong cable length, stale hashes, `waived`/`provisional`, failed checks, or a production unit reused as a life-test sample.
 
