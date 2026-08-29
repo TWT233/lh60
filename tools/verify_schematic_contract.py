@@ -1,4 +1,5 @@
 import unittest
+from collections import Counter
 from pathlib import Path
 from unittest import mock
 
@@ -11,71 +12,33 @@ class SchematicPlanContractTest(unittest.TestCase):
         "MATRIX_X_PITCH_MM": 30.48,
         "MATRIX_Y_PITCH_MM": 33.02,
         "SWITCH_Y_OFFSETS_MM": (10.16, 17.78),
-        "MCU_POSITION_MM": (350.52, 45.72),
-        "CONNECTOR_POSITIONS_MM": {
-            "J1": (330.20, 96.52),
-            "J2": (330.20, 134.62),
-            "J3": (330.20, 177.80),
-            "J4": (373.38, 134.62),
-            "J5": (373.38, 175.26),
-            "J6": (373.38, 215.90),
-        },
-        "POWER_FLAG_POSITIONS_MM": {
-            "#FLG01": (381.00, 86.36),
-            "#FLG02": (381.00, 106.68),
-            "#FLG03": (381.00, 127.00),
-        },
+        "FFC_POSITION_MM": (360.68, 76.2),
     }
-    EXPECTED_CONNECTORS = {
-        "J1": (
-            "PWR",
-            "lh60-core:Conn_01x03",
-            "lh60-core:PinHeader_1x03_P2.54mm_Vertical",
-            (("1", "VSYS"), ("2", "3V3"), ("3", "GND")),
-        ),
-        "J2": (
-            "COL_A",
-            "lh60-core:Conn_01x05",
-            "lh60-core:PinHeader_1x05_P2.54mm_Vertical",
-            (
-                ("1", "COL0"),
-                ("2", "COL1"),
-                ("3", "COL2"),
-                ("4", "COL3"),
-                ("5", "COL4"),
-            ),
-        ),
-        "J3": (
-            "COL_B",
-            "lh60-core:Conn_01x05",
-            "lh60-core:PinHeader_1x05_P2.54mm_Vertical",
-            (
-                ("1", "COL5"),
-                ("2", "COL6"),
-                ("3", "COL7"),
-                ("4", "COL8"),
-                ("5", "COL9"),
-            ),
-        ),
-        "J4": (
-            "ROW_A",
-            "lh60-core:Conn_01x04",
-            "lh60-core:PinHeader_1x04_P2.54mm_Vertical",
-            (("1", "ROW0"), ("2", "ROW1"), ("3", "ROW2"), ("4", "ROW3")),
-        ),
-        "J5": (
-            "ROW_B",
-            "lh60-core:Conn_01x03",
-            "lh60-core:PinHeader_1x03_P2.54mm_Vertical",
-            (("1", "ROW4"), ("2", "ROW5"), ("3", "ROW6")),
-        ),
-        "J6": (
-            "AUX",
-            "lh60-core:Conn_01x03",
-            "lh60-core:PinHeader_1x03_P2.54mm_Vertical",
-            (("1", "GP27"), ("2", "GP28"), ("3", "GP29")),
-        ),
-    }
+    EXPECTED_FFC_PIN_MAP = (
+        ("1", "GND"),
+        ("2", "COL0"),
+        ("3", "COL1"),
+        ("4", "COL2"),
+        ("5", "GND"),
+        ("6", "COL3"),
+        ("7", "COL4"),
+        ("8", "COL5"),
+        ("9", "GND"),
+        ("10", "COL6"),
+        ("11", "COL7"),
+        ("12", "COL8"),
+        ("13", "COL9"),
+        ("14", "ROW0"),
+        ("15", "ROW1"),
+        ("16", "GND"),
+        ("17", "ROW2"),
+        ("18", "ROW3"),
+        ("19", "ROW4"),
+        ("20", "GND"),
+        ("21", "ROW5"),
+        ("22", "ROW6"),
+        ("24", "GND"),
+    )
 
     def plan(self):
         from tools.lh60_design.schematic import build_schematic_plan
@@ -99,19 +62,22 @@ class SchematicPlanContractTest(unittest.TestCase):
 
     def test_inventory_matches_the_frozen_design(self):
         plan = self.plan()
-        by_kind = {}
-        for component in plan.components:
-            by_kind.setdefault(component.kind, []).append(component)
+        by_kind = Counter(component.kind for component in plan.components)
 
-        self.assertEqual(len(by_kind["mcu"]), 1)
-        self.assertEqual(len(by_kind["switch"]), 75)
-        self.assertEqual(len(by_kind["diode"]), 70)
-        self.assertEqual(len(by_kind["connector"]), 6)
-        self.assertEqual(len(by_kind["power_flag"]), 3)
-        self.assertEqual(len(plan.components), 155)
+        self.assertEqual(
+            by_kind,
+            Counter({"switch": 75, "diode": 70, "connector": 1}),
+        )
+        self.assertEqual([c.reference for c in plan.components if c.kind == "connector"], ["J1"])
+        self.assertFalse(any(c.kind in {"mcu", "power_flag"} for c in plan.components))
+        self.assertEqual(len(plan.components), 146)
         self.assertEqual(
             len({component.reference for component in plan.components}),
-            155,
+            146,
+        )
+        self.assertEqual(
+            plan.no_connects,
+            (__import__("tools.lh60_design.schematic", fromlist=["NoConnectPin"]).NoConnectPin("J1", "23"),),
         )
         self.assertNotIn(
             "SW59",
@@ -124,46 +90,25 @@ class SchematicPlanContractTest(unittest.TestCase):
             )
         )
         self.assertEqual(
-            {component.lib_id for component in by_kind["switch"]},
+            {component.lib_id for component in plan.components if component.kind == "switch"},
             {"Switch:SW_Push"},
         )
         self.assertEqual(
-            {component.lib_id for component in by_kind["diode"]},
+            {component.lib_id for component in plan.components if component.kind == "diode"},
             {"Device:D"},
         )
         self.assertEqual(
-            {component.lib_id for component in by_kind["connector"]},
-            {"lh60-core:Conn_01x03", "lh60-core:Conn_01x04", "lh60-core:Conn_01x05"},
+            {component.lib_id for component in plan.components if component.kind == "connector"},
+            {"lh60-interconnect:FPC-05F-24PH20"},
         )
 
-    def test_only_power_flags_define_explicit_instance_flag_overrides(self):
-        from tools.lh60_design.schematic import POWER_FLAG_INSTANCE_FLAGS
-
+    def test_no_components_define_explicit_instance_flag_overrides(self):
         plan = self.plan()
-        flagged = {}
-        unflagged_references = []
         for component in plan.components:
-            flags = (component.in_bom, component.on_board, component.dnp)
-            if flags != (None, None, None):
-                flagged[component.reference] = {
-                    "in_bom": component.in_bom,
-                    "on_board": component.on_board,
-                    "dnp": component.dnp,
-                }
-            else:
-                unflagged_references.append(component.reference)
-
-        self.assertEqual(
-            POWER_FLAG_INSTANCE_FLAGS,
-            {
-                "#FLG01": {"in_bom": True, "on_board": False, "dnp": False},
-                "#FLG02": {"in_bom": True, "on_board": False, "dnp": False},
-                "#FLG03": {"in_bom": True, "on_board": False, "dnp": False},
-            },
-        )
-        self.assertEqual(flagged, POWER_FLAG_INSTANCE_FLAGS)
-        self.assertEqual(len(unflagged_references), 152)
-        self.assertFalse(any(reference.startswith("#FLG") for reference in unflagged_references))
+            self.assertEqual(
+                (component.in_bom, component.on_board, component.dnp),
+                (None, None, None),
+            )
 
     def test_every_physical_key_has_one_traceable_switch(self):
         from tools.lh60_design.layout import physical_keys
@@ -232,40 +177,16 @@ class SchematicPlanContractTest(unittest.TestCase):
                     node.row_net,
                 )
 
-    def test_mcu_gpio_and_power_contract_is_complete(self):
+    def test_no_mcu_gpio_power_or_spare_contract_remains_on_root_board(self):
         plan = self.plan()
-        pin_nets = {
-            (connection.reference, connection.pin_number): connection.net_name
-            for connection in plan.connections
-        }
-        expected = {
-            **{str(index + 1): f"COL{index}" for index in range(10)},
-            **{
-                str(index + 11): f"ROW{index}"
-                for index in range(6)
-            },
-            "17": "ROW6",
-            "18": "GP27",
-            "19": "GP28",
-            "20": "GP29",
-            "21": "3V3",
-            "22": "GND",
-            "23": "VSYS",
-        }
+        prohibited = {"VSYS", "3V3", "D+", "D-", "VBUS", "RUN", "BOOTSEL", "SWDIO", "SWCLK", "GP27", "GP28", "GP29", "NC"}
+        self.assertFalse(any(component.reference == "U1" for component in plan.components))
+        self.assertFalse(any(connection.reference == "U1" for connection in plan.connections))
+        self.assertFalse({connection.net_name for connection in plan.connections} & prohibited)
 
-        self.assertEqual(
-            {
-                pin_number: pin_nets[("U1", pin_number)]
-                for pin_number in expected
-            },
-            expected,
-        )
-        self.assertEqual(
-            {pin_number for reference, pin_number in pin_nets if reference == "U1"},
-            set(expected),
-        )
+    def test_single_ffc_connector_covers_only_matrix_ground_and_explicit_nc(self):
+        from tools.lh60_design.interconnect import interboard_contract
 
-    def test_connector_groups_cover_power_matrix_and_spare_gpio(self):
         plan = self.plan()
         connectors = {
             component.reference: component
@@ -277,19 +198,22 @@ class SchematicPlanContractTest(unittest.TestCase):
             for connection in plan.connections
         }
 
-        self.assertEqual(set(connectors), set(self.EXPECTED_CONNECTORS))
-        for reference, (
-            value,
-            lib_id,
-            footprint,
-            pin_map,
-        ) in self.EXPECTED_CONNECTORS.items():
-            component = connectors[reference]
-            self.assertEqual(component.value, value)
-            self.assertEqual(component.lib_id, lib_id)
-            self.assertEqual(component.footprint, footprint)
-            for pin_number, net_name in pin_map:
-                self.assertEqual(pin_nets[(reference, pin_number)], net_name)
+        self.assertEqual(set(connectors), {"J1"})
+        component = connectors["J1"]
+        self.assertEqual(component.value, "FPC-05F-24PH20")
+        self.assertEqual(component.lib_id, "lh60-interconnect:FPC-05F-24PH20")
+        self.assertEqual(component.footprint, "lh60-interconnect:FPC-05F-24PH20")
+        self.assertEqual(
+            dict(component.fields),
+            {"Manufacturer": "XUNPU", "MPN": "FPC-05F-24PH20", "LCSC": "C2856805"},
+        )
+        self.assertEqual(
+            tuple((pin.number, pin.net_name) for pin in interboard_contract().pins if not pin.is_no_connect),
+            tuple((int(pin_number), net_name) for pin_number, net_name in self.EXPECTED_FFC_PIN_MAP),
+        )
+        for pin_number, net_name in self.EXPECTED_FFC_PIN_MAP:
+            self.assertEqual(pin_nets[("J1", pin_number)], net_name)
+        self.assertNotIn(("J1", "23"), pin_nets)
 
         self.assertEqual(
             [
@@ -298,21 +222,19 @@ class SchematicPlanContractTest(unittest.TestCase):
                 if connection.reference.startswith("J")
                 and connection.net_name == "GND"
             ],
-            [("J1", "3")],
+            [("J1", "1"), ("J1", "5"), ("J1", "9"), ("J1", "16"), ("J1", "20"), ("J1", "24")],
         )
 
     def test_page_layout_grid_and_switch_bands_are_frozen(self):
         from tools.lh60_design.matrix import logical_nodes
         from tools.lh60_design.schematic import (
-            CONNECTOR_POSITIONS_MM,
-            MCU_POSITION_MM,
+            FFC_POSITION_MM,
             MATRIX_X0_MM,
             MATRIX_X_PITCH_MM,
             MATRIX_Y0_MM,
             MATRIX_Y_PITCH_MM,
             PAGE_PORTRAIT,
             PAGE_SIZE,
-            POWER_FLAG_POSITIONS_MM,
             SWITCH_Y_OFFSETS_MM,
         )
 
@@ -348,26 +270,10 @@ class SchematicPlanContractTest(unittest.TestCase):
             SWITCH_Y_OFFSETS_MM,
             self.EXPECTED_MATRIX_LAYOUT["SWITCH_Y_OFFSETS_MM"],
         )
-        self.assertEqual(
-            MCU_POSITION_MM,
-            self.EXPECTED_MATRIX_LAYOUT["MCU_POSITION_MM"],
-        )
-        self.assertEqual(
-            CONNECTOR_POSITIONS_MM,
-            self.EXPECTED_MATRIX_LAYOUT["CONNECTOR_POSITIONS_MM"],
-        )
-        self.assertEqual(
-            POWER_FLAG_POSITIONS_MM,
-            self.EXPECTED_MATRIX_LAYOUT["POWER_FLAG_POSITIONS_MM"],
-        )
-        self.assertEqual(
-            (components["U1"].x, components["U1"].y),
-            self.EXPECTED_MATRIX_LAYOUT["MCU_POSITION_MM"],
-        )
-        for reference, position in self.EXPECTED_MATRIX_LAYOUT["CONNECTOR_POSITIONS_MM"].items():
-            self.assertEqual((components[reference].x, components[reference].y), position)
-        for reference, position in self.EXPECTED_MATRIX_LAYOUT["POWER_FLAG_POSITIONS_MM"].items():
-            self.assertEqual((components[reference].x, components[reference].y), position)
+        self.assertEqual(FFC_POSITION_MM, self.EXPECTED_MATRIX_LAYOUT["FFC_POSITION_MM"])
+        self.assertEqual((components["J1"].x, components["J1"].y), self.EXPECTED_MATRIX_LAYOUT["FFC_POSITION_MM"])
+        self.assertGreaterEqual(components["J1"].y, 76.2)
+        self.assertGreater(components["J1"].x, MATRIX_X0_MM + 10 * MATRIX_X_PITCH_MM)
         self.assertGreaterEqual(SWITCH_Y_OFFSETS_MM[0], 0.0)
         self.assertTrue(
             all(
@@ -422,13 +328,12 @@ class SchematicPlanContractTest(unittest.TestCase):
         expected = {
             **{f"D{index}": (False, False) for index in range(1, 71)},
             **{reference: (False, True) for reference in expected_switches},
-            **{f"J{index}": (True, True) for index in range(1, 7)},
-            "U1": (True, True),
+            "J1": (True, True),
         }
 
         self.assertEqual(expected_switches, {f"SW{index}" for index in range(1, 77)} - {"SW59"})
         self.assertEqual(set(states), set(expected))
-        self.assertEqual(len(states), 152)
+        self.assertEqual(len(states), 146)
         self.assertFalse(any(reference.startswith("#FLG") for reference in states))
         self.assertEqual(states, expected)
 
@@ -447,7 +352,7 @@ class SchematicPlanContractTest(unittest.TestCase):
         ]
 
         self.assertEqual(len(assignments), len(set(assignments)))
-        expected_pin_count = 23 + 75 * 2 + 70 * 2 + 23 + 3
+        expected_pin_count = 75 * 2 + 70 * 2 + 23
         self.assertEqual(len(assignments), expected_pin_count)
         self.assertEqual(
             {connection.net_name for connection in plan.connections}
@@ -455,11 +360,6 @@ class SchematicPlanContractTest(unittest.TestCase):
             {
                 *(f"COL{index}" for index in range(10)),
                 *(f"ROW{index}" for index in range(7)),
-                "GP27",
-                "GP28",
-                "GP29",
-                "VSYS",
-                "3V3",
                 "GND",
             },
         )
