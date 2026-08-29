@@ -3,6 +3,14 @@ import shutil
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from unittest import mock
+
+
+def schema(required, *properties):
+    return {
+        "required": list(required),
+        "properties": {name: {} for name in properties},
+    }
 
 
 @contextmanager
@@ -26,12 +34,74 @@ def mcp_client():
 class ProjectContractTest(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[1]
     PROJECT_DIR = Path("/tmp/lh60-project-contract")
+    CUSTOM_CLEARANCE_RULE_NAME = "lh60-interconnect:C2856805-general-clearance"
+    CUSTOM_CLEARANCE_RULE_CONDITION = (
+        "!(A.Type == 'Pad' && B.Type == 'Pad' && "
+        "A.memberOfFootprint('FPC-05F-24PH20') && "
+        "B.memberOfFootprint('FPC-05F-24PH20') && "
+        "A.Reference == B.Reference)"
+    )
 
     def setUp(self):
         shutil.rmtree(self.PROJECT_DIR, ignore_errors=True)
 
     def tearDown(self):
         shutil.rmtree(self.PROJECT_DIR, ignore_errors=True)
+
+    def verification_schemas(self):
+        return {
+            "set_design_rules": schema(
+                ("board",),
+                "board",
+                "min_clearance",
+                "min_trace_width",
+                "min_hole_to_hole",
+                "min_via_drill",
+                "min_via_size",
+            ),
+            "set_layer_constraints": schema(
+                ("board", "layer"),
+                "board",
+                "layer",
+                "min_clearance",
+                "min_trace_width",
+            ),
+            "set_custom_rule": schema(
+                ("board", "name", "constraint", "minimum_mm", "condition"),
+                "board",
+                "name",
+                "constraint",
+                "minimum_mm",
+                "condition",
+                "layer",
+            ),
+            "list_custom_rules": schema(("board",), "board"),
+        }
+
+    def require_verification_capabilities(self, schemas):
+        contracts = {
+            "set_design_rules": (("board",), ("board", "min_clearance", "min_trace_width", "min_hole_to_hole", "min_via_drill", "min_via_size")),
+            "set_layer_constraints": (("board", "layer"), ("board", "layer", "min_clearance", "min_trace_width")),
+            "set_custom_rule": (("board", "name", "constraint", "minimum_mm", "condition"), ("board", "name", "constraint", "minimum_mm", "condition", "layer")),
+            "list_custom_rules": (("board",), ("board",)),
+        }
+        for tool, (required_inputs, property_inputs) in contracts.items():
+            if tool not in schemas:
+                raise RuntimeError(f"Konnect project capability mismatch: missing {tool}")
+            actual_required = sorted(schemas[tool].get("required", []))
+            if actual_required != sorted(required_inputs):
+                raise RuntimeError(
+                    f"Konnect project capability mismatch: {tool} required inputs differ: "
+                    f"expected={sorted(required_inputs)}, actual={actual_required}"
+                )
+            missing_properties = sorted(
+                set(property_inputs) - set(schemas[tool].get("properties", {}))
+            )
+            if missing_properties:
+                raise RuntimeError(
+                    f"Konnect project capability mismatch: {tool} properties missing: "
+                    f"{missing_properties}"
+                )
 
     def generate(self):
         from tools.lh60_design.project import create_production_project
@@ -51,6 +121,8 @@ class ProjectContractTest(unittest.TestCase):
         interconnect_footprints.mkdir(parents=True, exist_ok=True)
         with mcp_client() as client:
             client.tool_schemas("library")
+            verification_schemas = client.tool_schemas("verification")
+            self.require_verification_capabilities(verification_schemas)
             fixture_socket = socket_library / "Gateron-LP-Hotswap-Socket-1U.kicad_mod"
             if not fixture_socket.exists():
                 client.call_tool(
@@ -209,6 +281,10 @@ class ProjectContractTest(unittest.TestCase):
                 "get_design_rules",
                 {"board": str(board)},
             )
+            custom_rules = client.call_tool_json(
+                "list_custom_rules",
+                {"board": str(board)},
+            )["rules"]
             extents = client.call_tool(
                 "get_board_extents",
                 {"board": str(board)},
@@ -223,12 +299,22 @@ class ProjectContractTest(unittest.TestCase):
         self.assertEqual(
             rule_values,
             {
-                "min_clearance": 0.25,
+                "min_clearance": 0.20,
                 "min_trace_width": 0.25,
                 "min_via_drill": 0.3,
                 "min_via_size": 0.7,
                 "min_hole_to_hole": 0.45,
             },
+        )
+        self.assertIn(
+            {
+                "name": self.CUSTOM_CLEARANCE_RULE_NAME,
+                "constraint": "clearance",
+                "minimum_mm": 0.25,
+                "condition": self.CUSTOM_CLEARANCE_RULE_CONDITION,
+                "layer": None,
+            },
+            custom_rules,
         )
         self.assertIn("lh60.kicad_sch", json.dumps(info))
         self.assertIn("lh60.kicad_pcb", json.dumps(info))
@@ -244,10 +330,72 @@ class ProjectContractTest(unittest.TestCase):
         for layer in ("F.Cu", "B.Cu"):
             self.assertIn(f'(rule "konnect:{layer}:clearance"', custom_rules)
             self.assertIn(f'(rule "konnect:{layer}:track_width"', custom_rules)
+            self.assertIn(f'(layer "{layer}")', custom_rules)
+            self.assertIn("(constraint clearance (min 0.2mm))", custom_rules)
+            self.assertIn("(constraint track_width (min 0.25mm))", custom_rules)
+        self.assertIn(f'(rule "{self.CUSTOM_CLEARANCE_RULE_NAME}"', custom_rules)
+        self.assertIn(self.CUSTOM_CLEARANCE_RULE_CONDITION, custom_rules)
+        self.assertIn("(constraint clearance (min 0.25mm))", custom_rules)
         self.assertNotIn("(footprint ", board_text)
         self.assertNotIn("(segment ", board_text)
         self.assertNotIn("(zone ", board_text)
         self.assertNotIn("lh60-mcu", board_text)
+
+    def test_generator_rejects_missing_custom_rule_capabilities(self):
+        from tools.lh60_design.project import create_production_project
+
+        self.PROJECT_DIR.mkdir(parents=True, exist_ok=True)
+        library_root = self.PROJECT_DIR / "lib"
+        (library_root / "lh60-sockets").mkdir(parents=True, exist_ok=True)
+        (library_root / "lh60-core" / "lh60-core.pretty").mkdir(parents=True, exist_ok=True)
+        (library_root / "lh60-interconnect" / "lh60-interconnect.pretty").mkdir(parents=True, exist_ok=True)
+        (library_root / "lh60-core" / "lh60-core.kicad_sym").write_text("")
+        (library_root / "lh60-interconnect" / "lh60-interconnect.kicad_sym").write_text("")
+
+        class RecordingClient:
+            def __init__(self, schemas):
+                self.schemas = schemas
+
+            def tool_schemas(self, toolset):
+                if toolset == "verification":
+                    return self.schemas
+                return {}
+
+            def call_tool(self, *_args, **_kwargs):
+                return {}
+
+        schemas = self.verification_schemas()
+        schemas.pop("set_custom_rule")
+        with self.assertRaisesRegex(RuntimeError, "missing set_custom_rule"):
+            create_production_project(RecordingClient(schemas), self.PROJECT_DIR)
+
+    def test_generator_rejects_custom_rule_schema_drift(self):
+        from tools.lh60_design.project import create_production_project
+
+        self.PROJECT_DIR.mkdir(parents=True, exist_ok=True)
+        library_root = self.PROJECT_DIR / "lib"
+        (library_root / "lh60-sockets").mkdir(parents=True, exist_ok=True)
+        (library_root / "lh60-core" / "lh60-core.pretty").mkdir(parents=True, exist_ok=True)
+        (library_root / "lh60-interconnect" / "lh60-interconnect.pretty").mkdir(parents=True, exist_ok=True)
+        (library_root / "lh60-core" / "lh60-core.kicad_sym").write_text("")
+        (library_root / "lh60-interconnect" / "lh60-interconnect.kicad_sym").write_text("")
+
+        class RecordingClient:
+            def __init__(self, schemas):
+                self.schemas = schemas
+
+            def tool_schemas(self, toolset):
+                if toolset == "verification":
+                    return self.schemas
+                return {}
+
+            def call_tool(self, *_args, **_kwargs):
+                return {}
+
+        schemas = self.verification_schemas()
+        schemas["set_custom_rule"]["required"].remove("condition")
+        with self.assertRaisesRegex(RuntimeError, "set_custom_rule required inputs differ"):
+            create_production_project(RecordingClient(schemas), self.PROJECT_DIR)
 
     def test_generator_is_idempotent_for_a_complete_project(self):
         self.generate()
