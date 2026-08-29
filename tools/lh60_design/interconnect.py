@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 
-from tools.lh60_design.matrix import gpio_map
-
 
 PIN_COUNT = 24
 DATASHEET_URL = (
@@ -72,13 +70,6 @@ EXPECTED_CABLE_GEOMETRY = (
 )
 
 
-def _expected_matrix_gpio_map() -> tuple[tuple[str, str], ...]:
-    matrix = gpio_map()
-    return tuple((f"COL{index}", gpio) for index, gpio in enumerate(matrix.columns)) + (
-        tuple((f"ROW{index}", gpio) for index, gpio in enumerate(matrix.rows))
-    )
-
-
 @dataclass(frozen=True)
 class InterconnectPin:
     number: int
@@ -108,16 +99,12 @@ class CableContract:
     stiffener_length_mm: float
     target_max_length_mm: float
     design_max_length_mm: float
-    approved_mif_revision: str | None = None
-    cable_mpn: str | None = None
-    contact_orientation: str | None = None
 
 
 @dataclass(frozen=True)
 class InterboardContract:
     connector: ConnectorIdentity
     pins: tuple[InterconnectPin, ...]
-    matrix_gpio_map: tuple[tuple[str, str], ...]
     prohibited_nets: frozenset[str]
     cable: CableContract
 
@@ -129,9 +116,7 @@ class InterboardContract:
         if self.connector != ConnectorIdentity(*EXPECTED_CONNECTOR_IDENTITY):
             raise ValueError("connector must match the frozen XUNPU FPC-05F-24PH20 identity")
         if self.cable != CableContract(*EXPECTED_CABLE_GEOMETRY):
-            raise ValueError("cable must match the frozen FFC geometry and unapproved MIF defaults")
-        if self.matrix_gpio_map != _expected_matrix_gpio_map():
-            raise ValueError("matrix_gpio_map must match tools.lh60_design.matrix.gpio_map()")
+            raise ValueError("cable must match the frozen keyboard-side FFC geometry")
         if self.prohibited_nets != PROHIBITED_NETS:
             raise ValueError("prohibited_nets must match the frozen FFC prohibited-net set")
         if self.signal_nets & self.prohibited_nets:
@@ -178,7 +163,6 @@ def interboard_contract() -> InterboardContract:
             InterconnectPin(number=index, net_name=net_name)
             for index, net_name in enumerate(PIN_NETS, start=1)
         ),
-        matrix_gpio_map=_expected_matrix_gpio_map(),
         prohibited_nets=PROHIBITED_NETS,
         cable=CableContract(
             pitch_mm=0.5,

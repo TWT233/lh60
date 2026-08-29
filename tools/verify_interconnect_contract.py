@@ -28,25 +28,6 @@ class InterboardContractTest(unittest.TestCase):
         (23, None),
         (24, "GND"),
     )
-    EXPECTED_GPIO_MAP = (
-        ("COL0", "GP0"),
-        ("COL1", "GP1"),
-        ("COL2", "GP2"),
-        ("COL3", "GP3"),
-        ("COL4", "GP4"),
-        ("COL5", "GP5"),
-        ("COL6", "GP6"),
-        ("COL7", "GP7"),
-        ("COL8", "GP8"),
-        ("COL9", "GP9"),
-        ("ROW0", "GP10"),
-        ("ROW1", "GP11"),
-        ("ROW2", "GP12"),
-        ("ROW3", "GP13"),
-        ("ROW4", "GP14"),
-        ("ROW5", "GP15"),
-        ("ROW6", "GP26"),
-    )
     EXPECTED_PROHIBITED_NETS = frozenset(
         {
             "VSYS",
@@ -106,13 +87,13 @@ class InterboardContractTest(unittest.TestCase):
             )
         self.assertFalse(hasattr(contract, "powered_reversal_is_safe"))
 
-    def test_mif_state_starts_unapproved(self):
+    def test_cable_contract_keeps_only_keyboard_side_geometry_fields(self):
         from tools.lh60_design.interconnect import interboard_contract
 
         cable = interboard_contract().cable
-        self.assertIsNone(cable.approved_mif_revision)
-        self.assertIsNone(cable.cable_mpn)
-        self.assertIsNone(cable.contact_orientation)
+        self.assertFalse(hasattr(cable, "approved_mif_revision"))
+        self.assertFalse(hasattr(cable, "cable_mpn"))
+        self.assertFalse(hasattr(cable, "contact_orientation"))
 
     def test_strict_pin_numbering_and_pin_lookup(self):
         from tools.lh60_design.interconnect import interboard_contract
@@ -156,12 +137,12 @@ class InterboardContractTest(unittest.TestCase):
         self.assertNotIn("NC", contract.signal_nets)
         self.assertFalse(any(pin.net_name == "NC" for pin in contract.pins))
 
-    def test_exact_prohibited_nets_and_gpio_map(self):
+    def test_exact_prohibited_nets_without_mcu_mapping_contract(self):
         from tools.lh60_design.interconnect import interboard_contract
 
         contract = interboard_contract()
         self.assertEqual(contract.prohibited_nets, self.EXPECTED_PROHIBITED_NETS)
-        self.assertEqual(contract.matrix_gpio_map, self.EXPECTED_GPIO_MAP)
+        self.assertFalse(hasattr(contract, "matrix_gpio_map"))
 
     def test_cable_geometry_is_frozen(self):
         from tools.lh60_design.interconnect import interboard_contract
@@ -185,6 +166,20 @@ class InterboardContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "1..24"):
             reversed_pin_number(25)
 
+    def test_contract_types_do_not_expose_legacy_tail_or_mcu_fields(self):
+        interconnect = self.contract_module()
+
+        self.assertNotIn("matrix_gpio_map", interconnect.InterboardContract.__dataclass_fields__)
+        self.assertNotIn(
+            "approved_mif_revision",
+            interconnect.CableContract.__dataclass_fields__,
+        )
+        self.assertNotIn("cable_mpn", interconnect.CableContract.__dataclass_fields__)
+        self.assertNotIn(
+            "contact_orientation",
+            interconnect.CableContract.__dataclass_fields__,
+        )
+
     def test_constructor_rejects_pin_23_as_electrical_nc_net(self):
         interconnect = self.contract_module()
         pins = tuple(
@@ -204,7 +199,6 @@ class InterboardContractTest(unittest.TestCase):
                     datasheet_url=interconnect.DATASHEET_URL,
                 ),
                 pins=pins,
-                matrix_gpio_map=self.EXPECTED_GPIO_MAP,
                 prohibited_nets=self.EXPECTED_PROHIBITED_NETS,
                 cable=interconnect.CableContract(
                     pitch_mm=0.5,
@@ -218,6 +212,36 @@ class InterboardContractTest(unittest.TestCase):
                     design_max_length_mm=150.0,
                 ),
             )
+
+    def test_constructor_accepts_passive_contract_without_legacy_mcu_mapping(self):
+        interconnect = self.contract_module()
+
+        contract = interconnect.InterboardContract(
+            connector=interconnect.ConnectorIdentity(
+                manufacturer="XUNPU",
+                mpn="FPC-05F-24PH20",
+                lcsc_part="C2856805",
+                datasheet_url=interconnect.DATASHEET_URL,
+            ),
+            pins=tuple(
+                interconnect.InterconnectPin(number=number, net_name=net_name)
+                for number, net_name in self.EXPECTED_PIN_MAP
+            ),
+            prohibited_nets=self.EXPECTED_PROHIBITED_NETS,
+            cable=interconnect.CableContract(
+                pitch_mm=0.5,
+                mating_width_mm=12.50,
+                mating_width_tolerance_mm=0.03,
+                mating_thickness_mm=0.30,
+                mating_thickness_tolerance_mm=0.03,
+                exposed_conductor_min_mm=3.00,
+                stiffener_length_mm=6.00,
+                target_max_length_mm=100.0,
+                design_max_length_mm=150.0,
+            ),
+        )
+
+        self.assertEqual(contract.no_connect_pins, frozenset({23}))
 
     def test_constructor_rejects_wrong_connector_identity(self):
         interconnect = self.contract_module()
@@ -234,7 +258,6 @@ class InterboardContractTest(unittest.TestCase):
                     interconnect.InterconnectPin(number=number, net_name=net_name)
                     for number, net_name in self.EXPECTED_PIN_MAP
                 ),
-                matrix_gpio_map=self.EXPECTED_GPIO_MAP,
                 prohibited_nets=self.EXPECTED_PROHIBITED_NETS,
                 cable=interconnect.CableContract(
                     pitch_mm=0.5,
@@ -264,7 +287,6 @@ class InterboardContractTest(unittest.TestCase):
                     interconnect.InterconnectPin(number=number, net_name=net_name)
                     for number, net_name in self.EXPECTED_PIN_MAP
                 ),
-                matrix_gpio_map=self.EXPECTED_GPIO_MAP,
                 prohibited_nets=self.EXPECTED_PROHIBITED_NETS,
                 cable=interconnect.CableContract(
                     pitch_mm=0.5,
@@ -278,38 +300,6 @@ class InterboardContractTest(unittest.TestCase):
                     design_max_length_mm=150.0,
                 ),
             )
-
-    def test_constructor_rejects_wrong_matrix_gpio_map(self):
-        interconnect = self.contract_module()
-        wrong_gpio_map = self.EXPECTED_GPIO_MAP[:-1] + (("ROW6", "GP27"),)
-
-        with self.assertRaisesRegex(ValueError, "matrix_gpio_map"):
-            interconnect.InterboardContract(
-                connector=interconnect.ConnectorIdentity(
-                    manufacturer="XUNPU",
-                    mpn="FPC-05F-24PH20",
-                    lcsc_part="C2856805",
-                    datasheet_url=interconnect.DATASHEET_URL,
-                ),
-                pins=tuple(
-                    interconnect.InterconnectPin(number=number, net_name=net_name)
-                    for number, net_name in self.EXPECTED_PIN_MAP
-                ),
-                matrix_gpio_map=wrong_gpio_map,
-                prohibited_nets=self.EXPECTED_PROHIBITED_NETS,
-                cable=interconnect.CableContract(
-                    pitch_mm=0.5,
-                    mating_width_mm=12.50,
-                    mating_width_tolerance_mm=0.03,
-                    mating_thickness_mm=0.30,
-                    mating_thickness_tolerance_mm=0.03,
-                    exposed_conductor_min_mm=3.00,
-                    stiffener_length_mm=6.00,
-                    target_max_length_mm=100.0,
-                    design_max_length_mm=150.0,
-                ),
-            )
-
 
 if __name__ == "__main__":
     unittest.main()
