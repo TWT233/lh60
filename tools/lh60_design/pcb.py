@@ -7,6 +7,8 @@ import json
 import math
 from pathlib import Path
 
+from tools.lh60_design.interconnect import interboard_contract
+from tools.lh60_design.interconnect_library import interconnect_footprint_spec
 from tools.lh60_design.layout import physical_keys
 from tools.lh60_design.mcp import McpClient
 from tools.lh60_design.project import BOARD_HEIGHT_MM, BOARD_WIDTH_MM
@@ -19,6 +21,10 @@ REGION_REPORTS = ROOT / "docs" / "regions"
 LEGACY_CONNECTOR_BASELINE = (
     ROOT / "docs" / "reports" / "2026-08-18-debug-connectors-baseline.json"
 )
+PASSIVE_CONNECTOR_REFERENCE = "J1"
+PASSIVE_CONNECTOR_FOOTPRINT = "lh60-interconnect:FPC-05F-24PH20"
+PASSIVE_CONNECTOR_VALUE = "FPC-05F-24PH20"
+PASSIVE_LEGACY_REMOVALS = ("U1", "J2", "J3", "J4", "J5", "J6")
 LEGACY_CONNECTOR_REFERENCES = ("J1", "J2", "J3", "J4", "J5", "J6")
 CONNECTOR_PIN_COUNTS = {"J1": 3, "J2": 5, "J3": 5, "J4": 4, "J5": 3, "J6": 3}
 CANDIDATE_OFFSETS_MM = (
@@ -42,6 +48,8 @@ CANDIDATE_OFFSETS_MM = (
 )
 CANDIDATE_ROTATIONS_DEG = (0.0, 90.0, 180.0, 270.0)
 BOARD_ACCESS_MARGIN_MM = 0.5
+FFC_STIFFENER_INSERTION_MM = 6.0
+FFC_FIRST_BEND_CLEARANCE_MM = 6.0
 REVIEWED_PLACEMENT_OVERRIDE_REASON = (
     "The planned 408-candidate legacy-centroid search was exhausted: "
     "all candidates were outside production board access bounds because "
@@ -142,6 +150,141 @@ class ConnectorPlacement:
 
 
 @dataclass(frozen=True)
+class PassiveFfcPlacement:
+    reference: str
+    x_mm: float
+    y_mm: float
+    rotation_deg: float
+    layer: str = "B.Cu"
+    mouth_edge: str = "bottom"
+    stiffener_insertion_mm: float = FFC_STIFFENER_INSERTION_MM
+    first_bend_clearance_mm: float = FFC_FIRST_BEND_CLEARANCE_MM
+    copper_to_edge_mm: float = BOARD_ACCESS_MARGIN_MM
+
+    def __post_init__(self) -> None:
+        if self.reference != PASSIVE_CONNECTOR_REFERENCE:
+            raise ValueError("passive FFC placement reference must be J1")
+        if self.layer != "B.Cu":
+            raise ValueError("passive FFC placement layer must be B.Cu")
+        if self.rotation_deg not in (0.0, 90.0, 180.0, 270.0):
+            raise ValueError("passive FFC placement rotation must be a quarter turn")
+        if self.mouth_edge not in {"top", "bottom", "left", "right"}:
+            raise ValueError("passive FFC mouth edge is invalid")
+        if not all(
+            math.isfinite(value)
+            for value in (
+                self.x_mm,
+                self.y_mm,
+                self.rotation_deg,
+                self.stiffener_insertion_mm,
+                self.first_bend_clearance_mm,
+                self.copper_to_edge_mm,
+            )
+        ):
+            raise ValueError("passive FFC placement values must be finite")
+        if self.stiffener_insertion_mm != FFC_STIFFENER_INSERTION_MM:
+            raise ValueError("passive FFC stiffener insertion must be exactly 6 mm")
+        if self.first_bend_clearance_mm < self.stiffener_insertion_mm:
+            raise ValueError("passive FFC first bend must start outside stiffener zone")
+        if self.copper_to_edge_mm < BOARD_ACCESS_MARGIN_MM:
+            raise ValueError("passive FFC copper-to-edge must be at least 0.50 mm")
+
+    @property
+    def mouth_direction(self) -> str:
+        return {
+            "bottom": "south",
+            "top": "north",
+            "left": "west",
+            "right": "east",
+        }[self.mouth_edge]
+
+    def _rotated_rect(self, rect: AxisAlignedRect) -> AxisAlignedRect:
+        angle = int(self.rotation_deg) % 360
+        points = (
+            (rect.min_x, rect.min_y),
+            (rect.min_x, rect.max_y),
+            (rect.max_x, rect.min_y),
+            (rect.max_x, rect.max_y),
+        )
+        transformed = []
+        for x, y in points:
+            if angle == 0:
+                tx, ty = x, y
+            elif angle == 90:
+                tx, ty = -y, x
+            elif angle == 180:
+                tx, ty = -x, -y
+            else:
+                tx, ty = y, -x
+            transformed.append((self.x_mm + tx, self.y_mm + ty))
+        xs = [point[0] for point in transformed]
+        ys = [point[1] for point in transformed]
+        return AxisAlignedRect(min(xs), min(ys), max(xs), max(ys))
+
+    def body_envelope(self) -> AxisAlignedRect:
+        spec = interconnect_footprint_spec()
+        return self._rotated_rect(
+            AxisAlignedRect(
+                spec.fab_min_x,
+                spec.fab_min_y,
+                spec.fab_max_x,
+                spec.fab_max_y,
+            )
+        )
+
+    def courtyard_envelope(self) -> AxisAlignedRect:
+        spec = interconnect_footprint_spec()
+        return self._rotated_rect(
+            AxisAlignedRect(
+                spec.fab_min_x - spec.courtyard_clearance_mm,
+                -0.875,
+                spec.fab_max_x + spec.courtyard_clearance_mm,
+                spec.fab_max_y + spec.courtyard_clearance_mm,
+            )
+        )
+
+    def access_envelope(self) -> AxisAlignedRect:
+        courtyard = self.courtyard_envelope()
+        if self.mouth_edge == "bottom":
+            return AxisAlignedRect(
+                courtyard.min_x,
+                max(BOARD_ACCESS_MARGIN_MM, courtyard.min_y - self.stiffener_insertion_mm),
+                courtyard.max_x,
+                courtyard.max_y,
+            )
+        if self.mouth_edge == "top":
+            return AxisAlignedRect(
+                courtyard.min_x,
+                courtyard.min_y,
+                courtyard.max_x,
+                min(BOARD_HEIGHT_MM - BOARD_ACCESS_MARGIN_MM, courtyard.max_y + self.stiffener_insertion_mm),
+            )
+        if self.mouth_edge == "left":
+            return AxisAlignedRect(
+                max(BOARD_ACCESS_MARGIN_MM, courtyard.min_x - self.stiffener_insertion_mm),
+                courtyard.min_y,
+                courtyard.max_x,
+                courtyard.max_y,
+            )
+        return AxisAlignedRect(
+            courtyard.min_x,
+            courtyard.min_y,
+            min(BOARD_WIDTH_MM - BOARD_ACCESS_MARGIN_MM, courtyard.max_x + self.stiffener_insertion_mm),
+            courtyard.max_y,
+        )
+
+
+@dataclass(frozen=True)
+class PassiveFfcCandidateAudit:
+    placement: PassiveFfcPlacement
+    rejection_reasons: tuple[str, ...]
+
+    @property
+    def viable(self) -> bool:
+        return not self.rejection_reasons
+
+
+@dataclass(frozen=True)
 class LegacyConnectorCandidate:
     """One pose from the superseded bounded legacy-centroid search."""
 
@@ -207,6 +350,13 @@ FROZEN_CONNECTOR_PLACEMENTS = (
     ConnectorPlacement("J4", 4, 3.0, 49.5, 0.0),
     ConnectorPlacement("J5", 3, 3.0, 55.5, 180.0),
     ConnectorPlacement("J6", 3, 282.5, 42.0, 180.0),
+)
+
+PASSIVE_FFC_CANDIDATES = (
+    PassiveFfcPlacement("J1", 276.0, 7.0, 0.0, mouth_edge="bottom"),
+    PassiveFfcPlacement("J1", 276.0, 88.0, 180.0, mouth_edge="top"),
+    PassiveFfcPlacement("J1", 9.0, 48.0, 270.0, mouth_edge="left"),
+    PassiveFfcPlacement("J1", 276.0, 48.0, 90.0, mouth_edge="right"),
 )
 
 
@@ -299,6 +449,102 @@ def audit_legacy_connector_search(
 
 def frozen_connector_placements() -> tuple[ConnectorPlacement, ...]:
     return FROZEN_CONNECTOR_PLACEMENTS
+
+
+def passive_board_references() -> frozenset[str]:
+    return frozenset(
+        {f"D{index}" for index in range(1, 71)}
+        | {f"SW{index}" for index in range(1, 59)}
+        | {f"SW{index}" for index in range(60, 77)}
+        | {PASSIVE_CONNECTOR_REFERENCE}
+    )
+
+
+def passive_connector_pad_nets() -> dict[str, str]:
+    return {
+        str(pin.number): pin.net_name
+        for pin in interboard_contract().pins
+        if pin.net_name is not None
+    }
+
+
+def audit_passive_ffc_candidates(
+    candidates: tuple[PassiveFfcPlacement, ...] = PASSIVE_FFC_CANDIDATES,
+) -> tuple[PassiveFfcCandidateAudit, ...]:
+    audits = []
+    for candidate in candidates:
+        reasons = []
+        if candidate.courtyard_envelope().distance_to(candidate.access_envelope()) > 0:
+            reasons.append("access_envelope_detached")
+        for label, envelope in (
+            ("body", candidate.body_envelope()),
+            ("courtyard", candidate.courtyard_envelope()),
+            ("access", candidate.access_envelope()),
+        ):
+            reasons.extend(f"{label}_{reason}" for reason in _board_access_rejection_reasons(envelope))
+        if candidate.copper_to_edge_mm < BOARD_ACCESS_MARGIN_MM:
+            reasons.append("copper_to_edge")
+        if candidate.first_bend_clearance_mm < candidate.stiffener_insertion_mm:
+            reasons.append("first_bend_inside_stiffener")
+        audits.append(PassiveFfcCandidateAudit(candidate, tuple(reasons)))
+    return tuple(audits)
+
+
+def selected_passive_ffc_candidate() -> PassiveFfcPlacement:
+    for audit in audit_passive_ffc_candidates():
+        if audit.viable:
+            return audit.placement
+    raise RuntimeError("no passive FFC placement candidate passed the bounded search")
+
+
+def apply_passive_ffc_placement(
+    client: McpClient,
+    board: Path | str = BOARD,
+) -> tuple[dict[str, object], ...]:
+    board_path = str(board)
+    schemas = client.tool_schemas("pcb_components")
+    if "flip_component" not in schemas:
+        raise RuntimeError("Konnect pcb_components is missing required tool: flip_component")
+    if "set_component_placements" not in schemas:
+        raise RuntimeError("Konnect pcb_components is missing required tool: set_component_placements")
+
+    placement = selected_passive_ffc_candidate()
+    flip_result = client.call_tool_json(
+        "flip_component",
+        {
+            "board": board_path,
+            "reference": placement.reference,
+            "layer": placement.layer,
+        },
+    )
+    if flip_result.get("reference") not in {None, placement.reference}:
+        raise RuntimeError("passive FFC flip reference mismatch")
+    if flip_result.get("layer") not in {None, placement.layer}:
+        raise RuntimeError("passive FFC flip layer mismatch")
+    requested = [
+        {
+            "reference": placement.reference,
+            "x": placement.x_mm,
+            "y": placement.y_mm,
+            "rotation": placement.rotation_deg,
+        }
+    ]
+    result = client.call_tool_json(
+        "set_component_placements",
+        {"board": board_path, "placements": requested},
+    )
+    placements = result.get("placements")
+    if not isinstance(placements, list) or len(placements) != 1:
+        raise RuntimeError("passive FFC placement evidence must contain one item")
+    item = placements[0]
+    if not isinstance(item, dict) or item.get("reference") != "J1":
+        raise RuntimeError("passive FFC placement reference mismatch")
+    for field, expected in requested[0].items():
+        if field == "reference":
+            continue
+        if not _matches_finite_numeric_evidence(item.get(field), expected):
+            raise RuntimeError(f"passive FFC placement {field} mismatch")
+    return ({**requested[0], "layer": placement.layer, "flip": flip_result},)
 
 
 def _balanced_block(source: str, start: int) -> tuple[int, int]:

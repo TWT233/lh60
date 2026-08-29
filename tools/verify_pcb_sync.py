@@ -6,7 +6,18 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest import mock
 
+from tools.lh60_design.interconnect import interboard_contract
 from tools.lh60_design.mcp import McpClient
+from tools.lh60_design.pcb import (
+    PASSIVE_CONNECTOR_FOOTPRINT,
+    PASSIVE_CONNECTOR_VALUE,
+    PASSIVE_LEGACY_REMOVALS,
+    apply_passive_ffc_placement,
+    audit_passive_ffc_candidates,
+    passive_board_references,
+    passive_connector_pad_nets as design_passive_connector_pad_nets,
+    selected_passive_ffc_candidate,
+)
 
 
 def schema(required, *properties):
@@ -22,12 +33,20 @@ def complete_pcb_sync_schemas():
             "get_component_list": schema(("board",), "board"),
             "get_component_pads": schema(("board", "reference"), "board", "reference"),
             "delete_component": schema(("board", "reference"), "board", "reference"),
+            "flip_component": schema(
+                ("board", "reference", "layer"), "board", "reference", "layer"
+            ),
+            "set_component_placements": schema(
+                ("board", "placements"),
+                "board",
+                "placements",
+            ),
+            "list_board_footprint_graphics": schema(
+                ("board", "reference"), "board", "reference", "layer"
+            ),
         },
         "pcb_board": {
             "get_board_info": schema(("board",), "board"),
-        },
-        "pcb_routing": {
-            "query_traces": schema(("board",), "board", "net_name", "layer"),
         },
         "sch_export": {
             "update_pcb_from_schematic": schema(
@@ -37,20 +56,18 @@ def complete_pcb_sync_schemas():
                 "dry_run",
                 "expected_plan_revision",
             ),
-            "rebind_pcb_schematic_identities": schema(
-                ("schematic", "board", "references"),
-                "schematic",
-                "board",
-                "references",
-                "dry_run",
-                "expected_plan_revision",
-            ),
-        },
-        "manufacturing": {
-            "validate_for_manufacturing": schema(("board",), "board"),
         },
         "verification": {
+            "launch_kicad_ui": schema(
+                (),
+                "project",
+                "timeout_seconds",
+                "wait_ready",
+            ),
             "run_drc": schema(("board",), "board", "limit", "severity"),
+        },
+        "pcb_export": {
+            "export_svg": schema(("board", "output"), "board", "output", "layers", "black_and_white"),
         },
         "project": {
             "save_project": {"required": [], "properties": {}},
@@ -70,233 +87,27 @@ def empty_result():
     return {"content": []}
 
 
-def shared_refs():
-    refs = {"U1"}
+def matrix_refs():
+    refs = set()
     refs.update({f"D{index}" for index in range(1, 71)})
     refs.update({f"SW{index}" for index in range(1, 59)})
     refs.update({f"SW{index}" for index in range(60, 77)})
     return refs
 
 
-REBIND_REFS = tuple(sorted(shared_refs()))
-
-
-def _rebind_component_contracts():
-    from tools.lh60_design.schematic import build_schematic_plan
-
-    plan = build_schematic_plan()
-    components = {component.reference: component for component in plan.components}
-    pad_nets = {reference: {} for reference in REBIND_REFS}
-    for connection in plan.connections:
-        if connection.reference in pad_nets:
-            pad_nets[connection.reference][connection.pin_number] = connection.net_name
-    return {
-        reference: {
-            "value": components[reference].value,
-            "footprint_id": components[reference].footprint,
-            "dnp": components[reference].dnp is True,
-            "pad_nets": dict(sorted(pad_nets[reference].items())),
-        }
-        for reference in REBIND_REFS
-    }
-
-
-def _rebind_uuid(index, namespace):
-    return f"{index:08x}-0000-4000-8000-{namespace:012x}"
-
-
-def rebind_change(reference):
-    index = REBIND_REFS.index(reference) + 1
-    contract = _rebind_component_contracts()[reference]
-    return {
-        "reference": reference,
-        "kiid": _rebind_uuid(index, 1),
-        "old_symbol_path": f"/{_rebind_uuid(index, 2)}",
-        "new_symbol_path": f"/{_rebind_uuid(index, 3)}",
-        **contract,
-        "preserve": {
-            "position": {"x": float(index), "y": float(index) / 2.0},
-            "rotation": 0.0,
-            "layer": "F.Cu",
-            "locked": False,
-        },
-    }
-
-
-def rebind_plan_payload(
-    *,
-    status,
-    revision,
-    requested,
-    eligible,
-    planned,
-    applied,
-    conflicts,
-    diagnostics=None,
-    changes=None,
-    undo=None,
-):
-    return {
-        "status": status,
-        "plan_revision": revision,
-        "coverage": {
-            "source": "saved_schematic_hierarchy",
-            "hierarchy_files": 1,
-            "transport": "live_kicad_ipc",
-            "atomicity": "single_kicad_undo_commit",
-            "requested": requested,
-            "eligible": eligible,
-            "planned": planned,
-            "applied": applied,
-            "conflicts": conflicts,
-        },
-        "changes": (
-            changes
-            if changes is not None
-            else [] if status == "noop" else [rebind_change(reference) for reference in REBIND_REFS]
-        ),
-        "diagnostics": [] if diagnostics is None else diagnostics,
-        "undo": undo,
-    }
-
-
-def queue_rebind_triplet(client, *, dry=None, apply=None, noop=None):
-    client.queue_json(
-        "rebind_pcb_schematic_identities",
-        dry
-        or rebind_plan_payload(
-            status="ready", revision="rebind-rev", requested=146, eligible=146,
-            planned=146, applied=0, conflicts=0,
-        ),
-        apply
-        or rebind_plan_payload(
-            status="applied", revision="rebind-rev", requested=146, eligible=146,
-            planned=146, applied=146, conflicts=0, undo="Ctrl-Z reverses the identity rebind.",
-        ),
-        noop
-        or rebind_plan_payload(
-            status="noop", revision="rebind-noop", requested=146, eligible=0,
-            planned=0, applied=0, conflicts=0,
-        ),
-    )
-
-
-def queue_rebind_readback(
-    client,
-    *,
-    references=None,
-    pad_overrides=None,
-    trace_overrides=None,
-):
-    client.queue_json(
-        "get_component_list",
-        component_list_payload(old_board_refs() if references is None else references),
-    )
-    pad_overrides = pad_overrides or {}
-    for reference in sorted(tp_refs(), key=lambda item: int(item[2:])):
-        client.queue_json(
-            "get_component_pads",
-            pad_overrides.get(reference, pad_payload(reference)),
-        )
-    client.queue_json("get_component_list", component_list_payload(old_board_refs()))
-    trace_overrides = trace_overrides or {}
-    for net_name in TP_NETS.values():
-        board_net = f"/{net_name}"
-        client.queue_json(
-            "query_traces",
-            trace_overrides.get(net_name, trace_overrides.get(board_net, empty_trace_payload(board_net))),
-        )
-
-
-def queue_rebind_stage(client):
-    queue_rebind_triplet(client)
-    queue_rebind_readback(client)
-
-
-def queue_pre_save_gates(client, *, references=None, connector_positions=None):
-    connector_positions = (
-        staged_connector_positions()
-        if connector_positions is None
-        else connector_positions
-    )
-    client.queue_json(
-        "get_component_list",
-        component_list_payload(
-            final_board_refs() if references is None else references,
-            connector_positions=connector_positions,
-        ),
-    )
-    for reference in ("J1", "J2", "J3", "J4", "J5", "J6"):
-        client.queue_json("get_component_pads", connector_pad_payload(reference))
-    client.queue_json(
-        "update_pcb_from_schematic",
-        sync_plan_payload(
-            status="noop", revision="rev-pre-save-noop", board_only_planned=0,
-            board_only_applied=0, skipped_applied=0, added_applied=0,
-        ),
-    )
-    client.queue_json(
-        "get_component_list",
-        component_list_payload(
-            final_board_refs(),
-            connector_positions=connector_positions,
-        ),
-    )
-    for net_name in TP_NETS.values():
-        client.queue_json("query_traces", empty_trace_payload(net_name))
-    client.queue_json(
-        "get_component_list",
-        component_list_payload(
-            final_board_refs(),
-            connector_positions=connector_positions,
-        ),
-    )
-
-
-def pre_save_gate_failure_inventory(
-    *,
-    layer_by_reference=None,
-    x_by_reference=None,
-    y_by_reference=None,
-):
-    payload = component_list_payload(
-        final_board_refs(),
-        connector_positions=staged_connector_positions(),
-    )
-    layer_by_reference = {} if layer_by_reference is None else layer_by_reference
-    x_by_reference = {} if x_by_reference is None else x_by_reference
-    y_by_reference = {} if y_by_reference is None else y_by_reference
-    for component in payload["components"]:
-        reference = component["reference"]
-        if reference in layer_by_reference:
-            component["layer"] = layer_by_reference[reference]
-        if reference in x_by_reference:
-            component["x"] = x_by_reference[reference]
-        if reference in y_by_reference:
-            component["y"] = y_by_reference[reference]
-    return payload
-
-
-def tp_refs():
-    return {f"TP{index}" for index in range(1, 24)}
-
-
 def old_board_refs():
-    return shared_refs() | tp_refs()
+    return matrix_refs() | {"U1", "J1", "J2", "J3", "J4", "J5", "J6"}
 
 
 def final_board_refs():
-    return shared_refs() | {f"J{index}" for index in range(1, 7)}
+    return matrix_refs() | {"J1"}
 
 
-def staged_connector_positions():
+def passive_connector_pad_nets():
     return {
-        "J1": (310.0, 90.0),
-        "J2": (310.0, 120.0),
-        "J3": (310.0, 150.0),
-        "J4": (340.0, 120.0),
-        "J5": (340.0, 150.0),
-        "J6": (340.0, 180.0),
+        str(pin.number): pin.net_name
+        for pin in interboard_contract().pins
+        if pin.net_name is not None
     }
 
 
@@ -757,6 +568,249 @@ class ExactOwnershipClient:
         }
 
 
+class PassivePcbSyncTest(unittest.TestCase):
+    def test_passive_reference_set_and_connector_contract_are_frozen(self):
+        refs = passive_board_references()
+
+        self.assertEqual(len(refs), 146)
+        self.assertEqual(len([ref for ref in refs if ref.startswith("SW")]), 75)
+        self.assertEqual(len([ref for ref in refs if ref.startswith("D")]), 70)
+        self.assertIn("J1", refs)
+        self.assertFalse(set(PASSIVE_LEGACY_REMOVALS) & refs)
+        self.assertEqual(PASSIVE_CONNECTOR_VALUE, "FPC-05F-24PH20")
+        self.assertEqual(PASSIVE_CONNECTOR_FOOTPRINT, "lh60-interconnect:FPC-05F-24PH20")
+        self.assertEqual(
+            design_passive_connector_pad_nets(),
+            {
+                str(pin.number): pin.net_name
+                for pin in interboard_contract().pins
+                if pin.net_name is not None
+            },
+        )
+        self.assertNotIn("23", design_passive_connector_pad_nets())
+
+    def test_bounded_candidate_search_selects_first_accessible_edge_pose(self):
+        audits = audit_passive_ffc_candidates()
+
+        self.assertEqual(len(audits), 4)
+        self.assertTrue(all(audit.viable for audit in audits))
+        selected = selected_passive_ffc_candidate()
+        self.assertEqual(selected.mouth_edge, "bottom")
+        self.assertEqual(selected.mouth_direction, "south")
+        self.assertEqual(selected.stiffener_insertion_mm, 6.0)
+        self.assertEqual(selected.first_bend_clearance_mm, 6.0)
+        self.assertEqual(selected.copper_to_edge_mm, 0.5)
+        envelope = selected.access_envelope()
+        self.assertGreaterEqual(envelope.min_x, 0.5)
+        self.assertGreaterEqual(envelope.min_y, 0.5)
+        self.assertLessEqual(envelope.max_x, 285.25)
+        self.assertLessEqual(envelope.max_y, 94.75)
+
+    def test_apply_passive_ffc_placement_flips_to_back_and_uses_current_batch_schema(self):
+        client = FakeClient()
+        client.queue_json("flip_component", {"reference": "J1", "layer": "B.Cu"})
+        client.queue_json(
+            "set_component_placements",
+            {
+                "placements": [
+                    {
+                        "reference": "J1",
+                        "x": 276.0,
+                        "y": 7.0,
+                        "rotation": 0.0,
+                    }
+                ]
+            },
+        )
+
+        evidence = apply_passive_ffc_placement(client, Path("/tmp/candidate.kicad_pcb"))
+
+        self.assertEqual(
+            [call[0] for call in client.calls],
+            ["load", "flip_component", "set_component_placements"],
+        )
+        self.assertEqual(client.calls[1][1]["layer"], "B.Cu")
+        self.assertEqual(
+            client.calls[2][1],
+            {
+                "board": "/tmp/candidate.kicad_pcb",
+                "placements": [{"reference": "J1", "x": 276.0, "y": 7.0, "rotation": 0.0}],
+            },
+        )
+        self.assertEqual(evidence[0]["layer"], "B.Cu")
+
+    def test_passive_candidate_generation_refuses_production_apply_without_approval(self):
+        from tools.passive_pcb_sync import apply_production_requires_approval
+
+        with self.assertRaisesRegex(RuntimeError, "approval artifact"):
+            apply_production_requires_approval(None)
+
+    def test_passive_candidate_capability_gate_matches_deployed_tool_names(self):
+        from tools.passive_pcb_sync import require_passive_capabilities
+
+        require_passive_capabilities(FakeClient())
+
+        schemas = complete_pcb_sync_schemas()
+        schemas["pcb_components"].pop("set_component_placements")
+        with self.assertRaisesRegex(RuntimeError, "set_component_placements"):
+            require_passive_capabilities(FakeClient(schemas))
+
+    def test_phase_b_refuses_without_phase_a_evidence(self):
+        from tools.passive_pcb_sync import run_closed_pose_phase
+
+        with TemporaryDirectory() as temporary:
+            candidate_dir = Path(temporary)
+            (candidate_dir / "lh60.kicad_sch").write_text("schematic\n")
+            (candidate_dir / "lh60.kicad_pcb").write_text("board\n")
+            (candidate_dir / "lh60.kicad_pro").write_text("project\n")
+
+            with self.assertRaisesRegex(RuntimeError, "requires live-sync evidence"):
+                run_closed_pose_phase(
+                    FakeClient(),
+                    candidate_dir=candidate_dir,
+                    report=candidate_dir / "phase-b.json",
+                    prior_report=candidate_dir / "phase-a.json",
+                )
+
+    def test_phase_b_refuses_when_candidate_hash_differs_from_phase_a(self):
+        from tools.passive_pcb_sync import run_closed_pose_phase, sha256
+
+        with TemporaryDirectory() as temporary:
+            candidate_dir = Path(temporary)
+            candidate_board = candidate_dir / "lh60.kicad_pcb"
+            (candidate_dir / "lh60.kicad_sch").write_text("schematic\n")
+            candidate_board.write_text("changed-board\n")
+            (candidate_dir / "lh60.kicad_pro").write_text("project\n")
+            phase_a = candidate_dir / "phase-a.json"
+            phase_a.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "phase": "live-sync",
+                        "candidate": {
+                            "board": str(candidate_board),
+                            "board_hash_after": sha256(candidate_board) + "-stale",
+                        },
+                    }
+                )
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "candidate board hash mismatch"):
+                run_closed_pose_phase(
+                    FakeClient(),
+                    candidate_dir=candidate_dir,
+                    report=candidate_dir / "phase-b.json",
+                    prior_report=phase_a,
+                )
+
+    def test_phase_b_reports_board_open_refusal_from_flip_component(self):
+        from tools.passive_pcb_sync import run_closed_pose_phase, sha256
+
+        with TemporaryDirectory() as temporary:
+            candidate_dir = Path(temporary)
+            candidate_board = candidate_dir / "lh60.kicad_pcb"
+            (candidate_dir / "lh60.kicad_sch").write_text("schematic\n")
+            candidate_board.write_text("board\n")
+            (candidate_dir / "lh60.kicad_pro").write_text("project\n")
+            phase_a = candidate_dir / "phase-a.json"
+            phase_a.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "phase": "live-sync",
+                        "candidate": {
+                            "board": str(candidate_board),
+                            "board_hash_after": sha256(candidate_board),
+                        },
+                    }
+                )
+            )
+            client = FakeClient()
+            client.queue_raw(
+                "flip_component",
+                RuntimeError(
+                    "flip_component failed: KiCAD currently holds this board open"
+                ),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "closed-pose phase requires PCB editor closed"):
+                run_closed_pose_phase(
+                    client,
+                    candidate_dir=candidate_dir,
+                    report=candidate_dir / "phase-b.json",
+                    prior_report=phase_a,
+                )
+
+    def test_phase_a_stops_before_closed_board_pose(self):
+        from tools.passive_pcb_sync import run_live_sync_phase
+
+        with TemporaryDirectory() as temporary:
+            candidate_dir = Path(temporary)
+            board = candidate_dir / "prod.kicad_pcb"
+            schematic = candidate_dir / "prod.kicad_sch"
+            for filename in ("lh60.kicad_pro", "lh60.kicad_sch", "lh60.kicad_pcb"):
+                (candidate_dir / filename).write_text(f"{filename}\n")
+            board.write_text("production-board\n")
+            schematic.write_text("production-schematic\n")
+            client = FakeClient()
+            conflicts = [
+                {"code": "reference_identity_conflict", "reference": reference}
+                for reference in sorted(old_board_refs())
+            ]
+            client.queue_json("get_component_list", component_list_payload(old_board_refs()))
+            for reference in sorted(old_board_refs()):
+                client.queue_json("delete_component", {"deleted": reference})
+            client.queue_json(
+                "update_pcb_from_schematic",
+                sync_plan_payload(
+                    status="conflict",
+                    revision="rev-conflict",
+                    board_only_planned=152,
+                    board_only_applied=0,
+                    skipped_applied=0,
+                    added_applied=0,
+                    diagnostics=conflicts,
+                ),
+                sync_plan_payload(
+                    status="ready",
+                    revision="rev-ready",
+                    board_only_planned=0,
+                    board_only_applied=0,
+                    skipped_applied=0,
+                    added_applied=0,
+                ),
+                sync_plan_payload(
+                    status="applied",
+                    revision="rev-ready",
+                    board_only_planned=0,
+                    board_only_applied=0,
+                    skipped_applied=0,
+                    added_applied=146,
+                ),
+            )
+            client.queue_json(
+                "set_component_placements",
+                {"placements": [{"reference": ref} for ref in sorted(matrix_refs())]},
+            )
+            client.queue_json("save_project", {"saved": True})
+            client.queue_json("get_component_list", component_list_payload(final_board_refs()))
+            with mock.patch("tools.passive_pcb_sync.require_production_unchanged", return_value={}):
+                result = run_live_sync_phase(
+                    client,
+                    candidate_dir=candidate_dir,
+                    report=candidate_dir / "phase-a.json",
+                    schematic=schematic,
+                    board=board,
+                    use_existing_candidate=True,
+                )
+
+            self.assertEqual(result["phase"], "live-sync")
+            self.assertEqual(result["status"], "NEEDS_CONTEXT")
+            self.assertIn("close PCB editor", result["next_action"])
+            self.assertNotIn("flip_component", [call[0] for call in client.calls])
+
+
+@unittest.skip("superseded six-debug-header sync tests retained for historical audit only")
 class PcbSyncContractTest(unittest.TestCase):
     def setUp(self):
         import tools.sync_debug_connectors as pcb_sync
