@@ -270,10 +270,20 @@ class SchematicApplyContractTest(unittest.TestCase):
                 if name == "batch_set_schematic_field_visibility":
                     return tool_text_result(
                         {
-                            "atomic": True,
-                            "updated": [],
-                            "unchanged": [
-                                edit["reference"]
+                            "updated_count": 0,
+                            "unchanged_count": len(arguments["edits"]),
+                            "results": [
+                                {
+                                    "reference": edit["reference"],
+                                    "reference_visible": {
+                                        "old": edit["reference_visible"],
+                                        "new": edit["reference_visible"],
+                                    },
+                                    "value_visible": {
+                                        "old": edit["value_visible"],
+                                        "new": edit["value_visible"],
+                                    },
+                                }
                                 for edit in arguments["edits"]
                             ],
                         }
@@ -470,10 +480,30 @@ class SchematicApplyContractTest(unittest.TestCase):
                 return tool_text_result({"ok": True})
 
         bad_payloads = (
-            {"atomic": False, "updated": [], "unchanged": []},
-            {"atomic": True, "updated": ["D1"], "unchanged": []},
-            {"atomic": True, "updated": ["D1"], "unchanged": ["D1"]},
-            {"atomic": True, "updated": ["UNKNOWN"], "unchanged": []},
+            {"updated_count": 0, "unchanged_count": 0, "results": []},
+            {"updated_count": 0, "unchanged_count": 1, "results": [{"reference": "D1"}]},
+            {
+                "updated_count": 0,
+                "unchanged_count": 1,
+                "results": [
+                    {
+                        "reference": "D1",
+                        "reference_visible": {"old": False, "new": True},
+                        "value_visible": {"old": False, "new": False},
+                    }
+                ],
+            },
+            {
+                "updated_count": 0,
+                "unchanged_count": 1,
+                "results": [
+                    {
+                        "reference": "UNKNOWN",
+                        "reference_visible": {"old": False, "new": False},
+                        "value_visible": {"old": False, "new": False},
+                    }
+                ],
+            },
         )
         for payload in bad_payloads:
             client = FakeClient(payload)
@@ -535,10 +565,20 @@ class SchematicApplyContractTest(unittest.TestCase):
                 if name == "batch_set_schematic_field_visibility":
                     return tool_text_result(
                         {
-                            "atomic": True,
-                            "updated": [],
-                            "unchanged": [
-                                edit["reference"]
+                            "updated_count": 0,
+                            "unchanged_count": len(arguments["edits"]),
+                            "results": [
+                                {
+                                    "reference": edit["reference"],
+                                    "reference_visible": {
+                                        "old": edit["reference_visible"],
+                                        "new": edit["reference_visible"],
+                                    },
+                                    "value_visible": {
+                                        "old": edit["value_visible"],
+                                        "new": edit["value_visible"],
+                                    },
+                                }
                                 for edit in arguments["edits"]
                             ],
                         }
@@ -658,10 +698,20 @@ class SchematicApplyContractTest(unittest.TestCase):
                 if name == "batch_set_schematic_field_visibility":
                     return tool_text_result(
                         {
-                            "atomic": True,
-                            "updated": [],
-                            "unchanged": [
-                                edit["reference"]
+                            "updated_count": 0,
+                            "unchanged_count": len(arguments["edits"]),
+                            "results": [
+                                {
+                                    "reference": edit["reference"],
+                                    "reference_visible": {
+                                        "old": edit["reference_visible"],
+                                        "new": edit["reference_visible"],
+                                    },
+                                    "value_visible": {
+                                        "old": edit["value_visible"],
+                                        "new": edit["value_visible"],
+                                    },
+                                }
                                 for edit in arguments["edits"]
                             ],
                         }

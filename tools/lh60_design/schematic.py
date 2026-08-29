@@ -340,35 +340,48 @@ def _require_single_accounting(
         )
 
 
-def _require_complete_reference_accounting(
+def _require_field_visibility_accounting(
     result: dict[str, object],
     *,
-    references: set[str],
+    expected: dict[str, tuple[bool, bool]],
     tool: str,
 ) -> None:
-    if result.get("atomic") is not True:
-        raise RuntimeError(f"{tool} did not complete atomically")
+    results = result.get("results")
+    if not isinstance(results, list):
+        raise RuntimeError(f"{tool} returned non-list results: {results!r}")
     seen: list[str] = []
-    for key in ("updated", "unchanged"):
-        values = result.get(key, [])
-        if not isinstance(values, list):
-            raise RuntimeError(f"{tool} returned non-list {key}: {values!r}")
-        for value in values:
-            if isinstance(value, str):
-                reference = value
-            elif isinstance(value, dict):
-                reference = str(value.get("reference", ""))
-            else:
-                raise RuntimeError(f"{tool} returned invalid {key} item: {value!r}")
-            if reference not in references:
-                raise RuntimeError(f"{tool} returned unexpected reference: {reference!r}")
-            seen.append(reference)
+    changed_count = 0
+    for item in results:
+        if not isinstance(item, dict):
+            raise RuntimeError(f"{tool} returned invalid result item: {item!r}")
+        reference = str(item.get("reference", ""))
+        if reference not in expected:
+            raise RuntimeError(f"{tool} returned unexpected reference: {reference!r}")
+        reference_visible, value_visible = expected[reference]
+        for field, expected_value in (
+            ("reference_visible", reference_visible),
+            ("value_visible", value_visible),
+        ):
+            value = item.get(field)
+            if not isinstance(value, dict) or value.get("new") is not expected_value:
+                raise RuntimeError(f"{tool} final {field} mismatch for {reference}")
+            if value.get("old") is not expected_value:
+                changed_count += 1
+        seen.append(reference)
     if len(seen) != len(set(seen)):
         raise RuntimeError(f"{tool} references must be unique")
-    if set(seen) != references:
+    if set(seen) != set(expected):
         raise RuntimeError(
-            f"{tool} accounting mismatch: seen={sorted(seen)}, expected={sorted(references)}"
+            f"{tool} accounting mismatch: seen={sorted(seen)}, expected={sorted(expected)}"
         )
+    unchanged_count = result.get("unchanged_count")
+    updated_count = result.get("updated_count")
+    if not isinstance(unchanged_count, int) or not isinstance(updated_count, int):
+        raise RuntimeError(f"{tool} accounting counts must be integers")
+    if unchanged_count + updated_count != len(expected):
+        raise RuntimeError(f"{tool} accounting count mismatch")
+    if (updated_count > 0) != (changed_count > 0):
+        raise RuntimeError(f"{tool} changed-field accounting mismatch")
 
 
 def _verify_final_symbol_refresh(
@@ -406,9 +419,12 @@ def _apply_field_visibility(
             ],
         },
     )
-    _require_complete_reference_accounting(
+    _require_field_visibility_accounting(
         result,
-        references={item.reference for item in visibility},
+        expected={
+            item.reference: (item.reference_visible, item.value_visible)
+            for item in visibility
+        },
         tool="batch_set_schematic_field_visibility",
     )
 
