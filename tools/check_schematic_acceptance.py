@@ -95,6 +95,24 @@ def assert_unique_nonempty_uuids(items: list[dict[str, Any]], item_name: str) ->
     return uuids
 
 
+def exact_label_selectors(labels: list[dict[str, Any]]) -> list[dict[str, str | float]]:
+    selectors: list[dict[str, str | float]] = []
+    for label in labels:
+        net = str(label.get("net", ""))
+        try:
+            x = float(label["x"])
+            y = float(label["y"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise AssertionError(f"label delete selector is incomplete: {label}") from error
+        if not net:
+            raise AssertionError(f"label delete selector has no net: {label}")
+        selectors.append({"net": net, "x": x, "y": y})
+    identities = {(selector["net"], selector["x"], selector["y"]) for selector in selectors}
+    if len(identities) != len(selectors):
+        raise AssertionError("label delete selectors must be unique")
+    return selectors
+
+
 def classify_known_diagnostics(layout: dict[str, Any], orphans: dict[str, Any]) -> dict[str, Any]:
     count = int(orphans.get("orphan_count", -1))
     if layout["wire_count"] == 0 and count == layout["label_count"]:
@@ -144,6 +162,17 @@ def require_production_capabilities(client: McpClient) -> None:
     """Fail closed on every production prerequisite before deletion begins."""
     require_schematic_capabilities(client)
     _load_acceptance_toolsets(client)
+    schema = client.tool_schemas("sch_wiring").get("delete_schematic_net_label")
+    if schema is None:
+        raise RuntimeError("missing Konnect production tool: delete_schematic_net_label")
+    missing_required = {"schematic", "net", "x", "y"} - set(schema.get("required", []))
+    missing_properties = {"schematic", "net", "x", "y"} - set(schema.get("properties", {}))
+    if missing_required or missing_properties:
+        raise RuntimeError(
+            "Konnect production input contract mismatch: "
+            f"delete_schematic_net_label required={sorted(missing_required)} "
+            f"properties={sorted(missing_properties)}"
+        )
 
 
 def _query(client: McpClient, schematic: Path, svg_output: Path) -> dict[str, Any]:
@@ -318,7 +347,7 @@ def _assert_acceptance(data: dict[str, Any]) -> dict[str, Any]:
     state = {
         "layout": layout,
         "wire_uuids": assert_unique_nonempty_uuids(data["wires"]["wires"], "wire"),
-        "label_uuids": assert_unique_nonempty_uuids(data["labels"]["labels"], "label"),
+        "label_selectors": data["labels"]["labels"],
         "references": refs,
     }
     assert_current_production_state(state)
@@ -434,9 +463,11 @@ def _assert_schematic_state(
     layout = state["layout"]
     if {key: layout.get(key) for key in baseline} != baseline:
         raise AssertionError(f"{description} baseline mismatch: {layout}")
-    for name, expected_count in (("wire", baseline["wire_count"]), ("label", baseline["label_count"])):
-        if len(state[f"{name}_uuids"]) != expected_count:
-            raise AssertionError(f"{description} {name} UUID count mismatch")
+    if len(state["wire_uuids"]) != baseline["wire_count"]:
+        raise AssertionError(f"{description} wire UUID count mismatch")
+    label_items = state.get("label_selectors", state.get("label_uuids", []))
+    if len(label_items) != baseline["label_count"]:
+        raise AssertionError(f"{description} label count mismatch")
     if len(state["references"]) != len(references) or set(state["references"]) != references:
         raise AssertionError(f"{description} references mismatch")
 
@@ -569,9 +600,9 @@ def current_155_preflight(client: McpClient, schematic: Path) -> dict[str, Any]:
     wires = client.call_tool_json("list_schematic_wires", {"schematic": str(schematic)})["wires"]
     labels = client.call_tool_json("list_schematic_labels", {"schematic": str(schematic)})["labels"]
     wire_uuids = assert_unique_nonempty_uuids(wires, "wire")
-    label_uuids = assert_unique_nonempty_uuids(labels, "label")
+    label_selectors = exact_label_selectors(labels)
     refs = [item["reference"] for item in client.call_tool_json("list_schematic_components", {"schematic": str(schematic)})["components"]]
-    state = {"layout": layout, "wire_uuids": wire_uuids, "label_uuids": label_uuids, "references": refs}
+    state = {"layout": layout, "wire_uuids": wire_uuids, "label_selectors": label_selectors, "references": refs}
     assert_current_155_preflight(state)
     return state
 
@@ -580,8 +611,8 @@ def passive_ffc_converge(client: McpClient, schematic: Path, state: dict[str, An
     require_schematic_capabilities(client)
     if state["wire_uuids"]:
         client.call_tool("batch_delete_schematic_wire", {"schematic": str(schematic), "uuids": state["wire_uuids"]})
-    if state["label_uuids"]:
-        client.call_tool("batch_delete", {"schematic": str(schematic), "uuids": state["label_uuids"]})
+    for selector in state["label_selectors"]:
+        client.call_tool("delete_schematic_net_label", {"schematic": str(schematic), **selector})
     client.call_tool("batch_delete_schematic_components", {"schematic": str(schematic), "references": state["references"]})
     layout = client.call_tool_json("get_schematic_layout", {"schematic": str(schematic)})
     if any(layout.get(key) != 0 for key in ("component_count", "wire_count", "label_count", "no_connect_count")):

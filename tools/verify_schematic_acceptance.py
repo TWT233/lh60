@@ -25,6 +25,7 @@ def disjoint_acceptance_schemas():
         },
         "sch_wiring": {
             "batch_delete_schematic_wire": schema(("schematic", "uuids"), "schematic", "uuids"),
+            "delete_schematic_net_label": schema(("schematic", "net", "x", "y"), "schematic", "net", "x", "y"),
         },
         "sch_analysis": {
             name: schema(("schematic",), "schematic")
@@ -160,7 +161,7 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
                 for group in registrations.values() for item in group)
         )
 
-    def test_current_production_state_requires_passive_146_layout_references_and_uuid_counts(self):
+    def test_current_production_state_requires_passive_146_layout_references_and_label_counts(self):
         from tools.check_schematic_acceptance import assert_current_production_state
 
         expected_refs = {"J1"} | {f"D{index}" for index in range(1, 71)} | {
@@ -169,7 +170,7 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
         valid_state = {
             "layout": {"component_count": 146, "wire_count": 0, "label_count": 313, "no_connect_count": 1},
             "wire_uuids": [],
-            "label_uuids": [f"label-{index}" for index in range(313)],
+            "label_selectors": [{"net": f"N{index}", "x": float(index), "y": 0.0} for index in range(313)],
             "references": sorted(expected_refs),
         }
         assert_current_production_state(valid_state)
@@ -180,7 +181,7 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
         for name, mutate, message in (
             ("label layout", lambda state: state["layout"].update(label_count=312), "baseline"),
             ("nc layout", lambda state: state["layout"].update(no_connect_count=0), "baseline"),
-            ("label UUID count", lambda state: state["label_uuids"].pop(), "label UUID count"),
+            ("label selector count", lambda state: state["label_selectors"].pop(), "label count"),
             ("retired MCU appears", lambda state: state["references"].append("U1"), "references"),
         ):
             with self.subTest(name=name):
@@ -201,14 +202,14 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
         state = {
             "layout": {"component_count": 155, "wire_count": 0, "label_count": 339},
             "wire_uuids": [],
-            "label_uuids": [f"label-{index}" for index in range(339)],
+            "label_selectors": [{"net": f"N{index}", "x": float(index), "y": 0.0} for index in range(339)],
             "references": sorted(source_refs),
         }
         assert_current_155_preflight(state)
         final_state = {
             **state,
             "layout": {"component_count": 146, "wire_count": 0, "label_count": 313, "no_connect_count": 1},
-            "label_uuids": [f"label-{index}" for index in range(313)],
+            "label_selectors": [{"net": f"N{index}", "x": float(index), "y": 0.0} for index in range(313)],
             "references": sorted({"J1"} | {f"D{index}" for index in range(1, 71)} | {
                 f"SW{index}" for index in range(1, 77) if index != 59
             }),
@@ -332,7 +333,7 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
                 if name == "list_schematic_wires":
                     return {"wires": []}
                 if name == "list_schematic_labels":
-                    return {"labels": [{"uuid": f"l{index}"} for index in range(339)]}
+                    return {"labels": [{"net": f"N{index}", "x": float(index), "y": 0.0} for index in range(339)]}
                 if name == "list_schematic_components":
                     return {"components": [{"reference": reference} for reference in source_refs]}
                 raise AssertionError(name)
@@ -341,10 +342,16 @@ class PassiveFfcAcceptanceContractTest(unittest.TestCase):
         state = current_155_preflight(client, Path("/tmp/production.kicad_sch"))
         with mock.patch("tools.check_schematic_acceptance.apply_schematic", side_effect=lambda client, schematic: client.calls.append(("apply_schematic", {"schematic": str(schematic)}))):
             passive_ffc_converge(client, Path("/tmp/production.kicad_sch"), state)
-        deletes = [(name, arguments) for name, arguments in client.calls if name.startswith("batch_delete")]
-        self.assertEqual([name for name, _ in deletes], ["batch_delete", "batch_delete_schematic_components"])
-        self.assertEqual(deletes[0][1]["uuids"], [f"l{index}" for index in range(339)])
-        self.assertEqual(set(deletes[1][1]["references"]), set(source_refs))
+        label_deletes = [(name, arguments) for name, arguments in client.calls if name == "delete_schematic_net_label"]
+        component_deletes = [(name, arguments) for name, arguments in client.calls if name == "batch_delete_schematic_components"]
+        self.assertEqual(len(label_deletes), 339)
+        self.assertEqual(
+            label_deletes[0],
+            ("delete_schematic_net_label", {"schematic": "/tmp/production.kicad_sch", "net": "N0", "x": 0.0, "y": 0.0}),
+        )
+        self.assertEqual(label_deletes[-1][1]["net"], "N338")
+        self.assertEqual(len(component_deletes), 1)
+        self.assertEqual(set(component_deletes[0][1]["references"]), set(source_refs))
 
         with self.assertRaisesRegex(AssertionError, "did not empty"):
             with mock.patch("tools.check_schematic_acceptance.apply_schematic", side_effect=AssertionError("apply should not run")):
