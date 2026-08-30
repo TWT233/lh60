@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -134,6 +135,34 @@ def candidate_audits_payload() -> list[dict[str, Any]]:
             }
         )
     return payload
+
+
+def selected_candidate_payload() -> dict[str, Any] | None:
+    for audit in audit_passive_ffc_candidates():
+        if audit.viable:
+            return vars(audit.placement)
+    return None
+
+
+def bounded_search_payload() -> dict[str, Any]:
+    audits = candidate_audits_payload()
+    selected = selected_candidate_payload()
+    return {
+        "audits": audits,
+        "candidate_count": len(audits),
+        "viable_count": sum(1 for audit in audits if audit["viable"]),
+        "selected": selected,
+        "status": "selected" if selected is not None else "no_viable_candidate",
+    }
+
+
+def next_action_for_bounded_search(search: dict[str, Any]) -> str:
+    if search["selected"] is None:
+        return (
+            "bounded search has no viable J1 pose; review mechanical constraints "
+            "or add a new approved candidate family before phase closed-pose"
+        )
+    return "close PCB editor on this candidate, then run phase closed-pose"
 
 
 def copy_candidate_project(candidate_dir: Path) -> tuple[Path, Path, Path]:
@@ -444,6 +473,70 @@ def _run_drc(client: McpClient, board: Path) -> dict[str, Any]:
     return result
 
 
+J1_PHYSICAL_DRC_RULES = frozenset(
+    {
+        "shorting_items",
+        "clearance",
+        "hole_clearance",
+        "courtyards_overlap",
+        "pth_inside_courtyard",
+        "npth_inside_courtyard",
+        "solder_mask_bridge",
+    }
+)
+
+
+def _drc_item_descriptions(violation: dict[str, Any]) -> tuple[str, ...]:
+    descriptions = []
+    items = violation.get("items")
+    if isinstance(items, list):
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_description = item.get("description")
+            if isinstance(item_description, str):
+                descriptions.append(item_description)
+    return tuple(descriptions)
+
+
+def _drc_violation_involves_j1(violation: dict[str, Any]) -> bool:
+    return any(
+        re.search(r"\b(?:of\s+)?J1\b", description)
+        for description in _drc_item_descriptions(violation)
+    )
+
+
+def require_no_j1_physical_drc_violations(drc: dict[str, Any]) -> dict[str, Any]:
+    violations = drc.get("violations")
+    if not isinstance(violations, list):
+        raise RuntimeError("DRC evidence is missing violations")
+    blocked = []
+    for violation in violations:
+        if not isinstance(violation, dict):
+            raise RuntimeError("DRC violation entry malformed")
+        rule = violation.get("rule")
+        if rule not in J1_PHYSICAL_DRC_RULES:
+            continue
+        if not _drc_violation_involves_j1(violation):
+            continue
+        blocked.append(
+            {
+                "rule": rule,
+                "severity": violation.get("severity"),
+                "description": violation.get("description"),
+                "items": list(_drc_item_descriptions(violation)),
+            }
+        )
+    if blocked:
+        raise RuntimeError(
+            f"J1 physical DRC violations block phase C: {len(blocked)} findings"
+        )
+    return {
+        "j1_physical_violation_count": 0,
+        "blocked_rules": sorted(J1_PHYSICAL_DRC_RULES),
+    }
+
+
 def _write_report(report: Path, result: dict[str, Any]) -> None:
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
@@ -588,13 +681,11 @@ def run_live_sync_phase(
         schematic=schematic,
         board=board,
     )
+    search = bounded_search_payload()
     result.update(
         {
-            "next_action": "close PCB editor on this candidate, then run phase closed-pose",
-            "bounded_search": {
-                "audits": candidate_audits_payload(),
-                "selected": vars(selected_passive_ffc_candidate()),
-            },
+            "next_action": next_action_for_bounded_search(search),
+            "bounded_search": search,
             "sync": {
                 "first_dry_run": first_dry_run,
                 "identity_conflicts": identity_conflicts,
@@ -648,14 +739,12 @@ def run_closed_pose_phase(
         schematic=schematic,
         board=board,
     )
+    search = bounded_search_payload()
     result.update(
         {
             "prior_phase": {"path": str(prior_report.resolve()), "phase": "live-sync"},
             "next_action": "reopen this same candidate in PCB editor, then run phase live-verify",
-            "bounded_search": {
-                "audits": candidate_audits_payload(),
-                "selected": vars(selected_passive_ffc_candidate()),
-            },
+            "bounded_search": search,
             "placement": list(placement),
             "approval": {
                 "required_before_production_mutation": True,
@@ -753,6 +842,7 @@ def run_live_verify_phase(
     pose = _require_final_pose(inventory)
     pads = require_passive_connector_pads(client, candidate_board)
     drc = _run_drc(client, candidate_board)
+    j1_physical_drc_gate = require_no_j1_physical_drc_violations(drc)
     front_svg = _export_layer_svg(
         client,
         candidate_board,
@@ -809,6 +899,7 @@ def run_live_verify_phase(
             "pads": pads,
             "pose": pose,
             "drc": drc,
+            "j1_physical_drc_gate": j1_physical_drc_gate,
             "approval": {
                 "required_before_production_mutation": True,
                 "status": "candidate_ready",

@@ -333,6 +333,31 @@ def drc_payload(*, truncated=False, categories_not_reported=None):
     }
 
 
+def drc_with_j1_violation(rule="shorting_items"):
+    payload = drc_payload()
+    payload.update(
+        {
+            "total_violations": 1,
+            "design_rule_violations": 1,
+            "errors": 1,
+            "shown": 1,
+            "filtered_count": 1,
+            "violations": [
+                {
+                    "rule": rule,
+                    "severity": "error",
+                    "description": f"regression fixture for {rule}",
+                    "items": [
+                        {"description": "Pad 1 [/GND] of J1 on B.Cu"},
+                        {"description": "PTH pad 1 [/KEY_13] of SW14"},
+                    ],
+                }
+            ],
+        }
+    )
+    return payload
+
+
 def sync_change(reference, x, y):
     return {
         "kind": "add",
@@ -633,55 +658,76 @@ class PassivePcbSyncTest(unittest.TestCase):
         )
         self.assertNotIn("23", design_passive_connector_pad_nets())
 
-    def test_bounded_candidate_search_selects_first_accessible_edge_pose(self):
+    def test_bounded_candidate_search_fails_closed_when_access_envelopes_collide(self):
         audits = audit_passive_ffc_candidates()
 
-        self.assertEqual(len(audits), 4)
-        self.assertTrue(all(audit.viable for audit in audits))
-        selected = selected_passive_ffc_candidate()
-        self.assertEqual(selected.mouth_edge, "bottom")
-        self.assertEqual(selected.mouth_direction, "south")
-        self.assertEqual(selected.stiffener_insertion_mm, 6.0)
-        self.assertEqual(selected.first_bend_clearance_mm, 6.0)
-        self.assertEqual(selected.copper_to_edge_mm, 0.5)
-        envelope = selected.access_envelope()
+        self.assertGreaterEqual(len(audits), 4)
+        self.assertFalse(any(audit.viable for audit in audits))
+        first = audits[0]
+        self.assertEqual(first.placement.x_mm, 276.0)
+        self.assertEqual(first.placement.y_mm, 7.0)
+        self.assertFalse(first.viable)
+        self.assertTrue(
+            any(reason.startswith("courtyard_collision_SW") for reason in first.rejection_reasons),
+            first.rejection_reasons,
+        )
+        self.assertTrue(
+            any(reason.startswith("access_collision_SW") for reason in first.rejection_reasons),
+            first.rejection_reasons,
+        )
+        top_edge = audits[1]
+        self.assertEqual(top_edge.placement.mouth_edge, "top")
+        self.assertEqual(top_edge.placement.mouth_direction, "north")
+        self.assertEqual(top_edge.placement.stiffener_insertion_mm, 6.0)
+        self.assertEqual(top_edge.placement.first_bend_clearance_mm, 6.0)
+        self.assertEqual(top_edge.placement.copper_to_edge_mm, 0.5)
+        envelope = top_edge.placement.access_envelope()
         self.assertGreaterEqual(envelope.min_x, 0.5)
         self.assertGreaterEqual(envelope.min_y, 0.5)
         self.assertLessEqual(envelope.max_x, 285.25)
         self.assertLessEqual(envelope.max_y, 94.75)
+        with self.assertRaisesRegex(RuntimeError, "no passive FFC placement candidate"):
+            selected_passive_ffc_candidate()
 
-    def test_apply_passive_ffc_placement_flips_to_back_and_uses_current_batch_schema(self):
-        client = FakeClient()
-        client.queue_json("flip_component", {"reference": "J1", "layer": "B.Cu"})
-        client.queue_json(
-            "set_component_placements",
-            {
-                "placements": [
-                    {
-                        "reference": "J1",
-                        "x": 276.0,
-                        "y": 7.0,
-                        "rotation": 0.0,
-                    }
-                ]
-            },
+    def test_passive_candidate_audit_rejects_access_envelope_socket_collision(self):
+        from tools.lh60_design.pcb import PassiveFfcPlacement
+
+        candidate = PassiveFfcPlacement("J1", 28.575, 7.425, 0.0)
+
+        audit = audit_passive_ffc_candidates((candidate,))[0]
+
+        self.assertFalse(audit.viable)
+        self.assertTrue(
+            any(reason.startswith("access_collision_SW") for reason in audit.rejection_reasons),
+            audit.rejection_reasons,
         )
 
-        evidence = apply_passive_ffc_placement(client, Path("/tmp/candidate.kicad_pcb"))
+    def test_passive_ffc_bcu_rotation_zero_uses_live_flipped_courtyard_geometry(self):
+        from tools.lh60_design.pcb import PassiveFfcPlacement
+
+        placement = PassiveFfcPlacement("J1", 276.0, 7.0, 0.0)
+
+        self.assertEqual(placement.mouth_edge, "top")
+        self.assertEqual(placement.mouth_direction, "north")
+        courtyard = placement.courtyard_envelope()
+        self.assertAlmostEqual(courtyard.min_x, 267.31, places=2)
+        self.assertAlmostEqual(courtyard.max_x, 284.69, places=2)
+        self.assertAlmostEqual(courtyard.min_y, 0.95, places=2)
+        self.assertAlmostEqual(courtyard.max_y, 7.875, places=3)
+        access = placement.access_envelope()
+        self.assertEqual(access.min_y, 0.5)
+        self.assertEqual(access.max_y, courtyard.max_y)
+
+    def test_apply_passive_ffc_placement_fails_closed_without_viable_candidate(self):
+        client = FakeClient()
+
+        with self.assertRaisesRegex(RuntimeError, "no passive FFC placement candidate"):
+            apply_passive_ffc_placement(client, Path("/tmp/candidate.kicad_pcb"))
 
         self.assertEqual(
             [call[0] for call in client.calls],
-            ["load", "flip_component", "set_component_placements"],
+            ["load"],
         )
-        self.assertEqual(client.calls[1][1]["layer"], "B.Cu")
-        self.assertEqual(
-            client.calls[2][1],
-            {
-                "board": "/tmp/candidate.kicad_pcb",
-                "placements": [{"reference": "J1", "x": 276.0, "y": 7.0, "rotation": 0.0}],
-            },
-        )
-        self.assertEqual(evidence[0]["layer"], "B.Cu")
 
     def test_passive_candidate_generation_refuses_production_apply_without_approval(self):
         from tools.passive_pcb_sync import apply_production_requires_approval
@@ -740,6 +786,85 @@ class PassivePcbSyncTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "mechanical land layers"):
             require_passive_connector_pads(client, Path("/tmp/candidate.kicad_pcb"))
 
+    def test_drc_gate_rejects_j1_physical_violations(self):
+        from tools.passive_pcb_sync import require_no_j1_physical_drc_violations
+
+        for rule in (
+            "shorting_items",
+            "clearance",
+            "hole_clearance",
+            "courtyards_overlap",
+            "pth_inside_courtyard",
+            "npth_inside_courtyard",
+            "solder_mask_bridge",
+        ):
+            with self.subTest(rule=rule):
+                with self.assertRaisesRegex(RuntimeError, "J1 physical DRC violations"):
+                    require_no_j1_physical_drc_violations(drc_with_j1_violation(rule))
+
+    def test_drc_gate_allows_global_unconnected_items(self):
+        from tools.passive_pcb_sync import require_no_j1_physical_drc_violations
+
+        payload = drc_payload()
+        payload.update(
+            {
+                "total_violations": 1,
+                "unconnected_items": 1,
+                "shown": 1,
+                "filtered_count": 1,
+                "violations": [
+                    {
+                        "rule": "unconnected_items",
+                        "severity": "error",
+                        "description": "Pad 1 of SW1 is unconnected",
+                        "items": [{"description": "Pad 1 of SW1"}],
+                    }
+                ],
+            }
+        )
+
+        evidence = require_no_j1_physical_drc_violations(payload)
+
+        self.assertEqual(evidence["j1_physical_violation_count"], 0)
+
+    def test_drc_gate_allows_unrelated_physical_violations(self):
+        from tools.passive_pcb_sync import require_no_j1_physical_drc_violations
+
+        payload = drc_payload()
+        payload.update(
+            {
+                "total_violations": 2,
+                "design_rule_violations": 2,
+                "errors": 2,
+                "shown": 2,
+                "filtered_count": 2,
+                "violations": [
+                    {
+                        "rule": "hole_clearance",
+                        "severity": "error",
+                        "description": "legacy keyboard mechanical hole clearance",
+                        "items": [
+                            {"description": "Pad 1 [/KEY_21] of D22 on F.Cu"},
+                            {"description": "NPTH pad of SW71"},
+                        ],
+                    },
+                    {
+                        "rule": "courtyards_overlap",
+                        "severity": "error",
+                        "description": "legacy keyboard courtyard overlap",
+                        "items": [
+                            {"description": "Footprint SW10 on B.Cu"},
+                            {"description": "Footprint D10 on F.Cu"},
+                        ],
+                    },
+                ],
+            }
+        )
+
+        evidence = require_no_j1_physical_drc_violations(payload)
+
+        self.assertEqual(evidence["j1_physical_violation_count"], 0)
+
     def test_phase_b_refuses_without_phase_a_evidence(self):
         from tools.passive_pcb_sync import run_closed_pose_phase
 
@@ -788,7 +913,7 @@ class PassivePcbSyncTest(unittest.TestCase):
                     prior_report=phase_a,
                 )
 
-    def test_phase_b_reports_board_open_refusal_from_flip_component(self):
+    def test_phase_b_fails_closed_before_flip_when_no_candidate_is_viable(self):
         from tools.passive_pcb_sync import run_closed_pose_phase, sha256
 
         with TemporaryDirectory() as temporary:
@@ -811,20 +936,15 @@ class PassivePcbSyncTest(unittest.TestCase):
                 )
             )
             client = FakeClient()
-            client.queue_raw(
-                "flip_component",
-                RuntimeError(
-                    "flip_component failed: KiCAD currently holds this board open"
-                ),
-            )
 
-            with self.assertRaisesRegex(RuntimeError, "closed-pose phase requires PCB editor closed"):
+            with self.assertRaisesRegex(RuntimeError, "no passive FFC placement candidate"):
                 run_closed_pose_phase(
                     client,
                     candidate_dir=candidate_dir,
                     report=candidate_dir / "phase-b.json",
                     prior_report=phase_a,
                 )
+            self.assertNotIn("flip_component", [call[0] for call in client.calls])
 
     def test_phase_a_stops_before_closed_board_pose(self):
         from tools.passive_pcb_sync import run_live_sync_phase
@@ -891,7 +1011,10 @@ class PassivePcbSyncTest(unittest.TestCase):
 
             self.assertEqual(result["phase"], "live-sync")
             self.assertEqual(result["status"], "NEEDS_CONTEXT")
-            self.assertIn("close PCB editor", result["next_action"])
+            self.assertIn("no viable J1 pose", result["next_action"])
+            self.assertEqual(result["bounded_search"]["status"], "no_viable_candidate")
+            self.assertEqual(result["bounded_search"]["viable_count"], 0)
+            self.assertIsNone(result["bounded_search"]["selected"])
             self.assertNotIn("flip_component", [call[0] for call in client.calls])
 
 

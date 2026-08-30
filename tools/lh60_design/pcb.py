@@ -3,16 +3,23 @@ from __future__ import annotations
 import argparse
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
 import json
 import math
 from pathlib import Path
+import re
+
+from shapely import affinity
+from shapely.geometry import box
 
 from tools.lh60_design.interconnect import interboard_contract
 from tools.lh60_design.interconnect_library import interconnect_footprint_spec
 from tools.lh60_design.layout import physical_keys
 from tools.lh60_design.mcp import McpClient
 from tools.lh60_design.project import BOARD_HEIGHT_MM, BOARD_WIDTH_MM
-from tools.lh60_design.schematic import switch_references
+from tools.lh60_design.socket_geometry import build_footprint_specs
+from tools.lh60_design.socket_library import _courtyard_geometry
+from tools.lh60_design.schematic import _switch_footprint, switch_references
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,6 +57,7 @@ CANDIDATE_ROTATIONS_DEG = (0.0, 90.0, 180.0, 270.0)
 BOARD_ACCESS_MARGIN_MM = 0.5
 FFC_STIFFENER_INSERTION_MM = 6.0
 FFC_FIRST_BEND_CLEARANCE_MM = 6.0
+PASSIVE_FFC_SEARCH_GRID_MM = 0.5
 REVIEWED_PLACEMENT_OVERRIDE_REASON = (
     "The planned 408-candidate legacy-centroid search was exhausted: "
     "all candidates were outside production board access bounds because "
@@ -90,6 +98,14 @@ class AxisAlignedRect:
         dx = max(other.min_x - self.max_x, self.min_x - other.max_x, 0.0)
         dy = max(other.min_y - self.max_y, self.min_y - other.max_y, 0.0)
         return math.hypot(dx, dy)
+
+    def corners(self) -> tuple[tuple[float, float], ...]:
+        return (
+            (self.min_x, self.min_y),
+            (self.max_x, self.min_y),
+            (self.max_x, self.max_y),
+            (self.min_x, self.max_y),
+        )
 
 
 @dataclass(frozen=True)
@@ -156,7 +172,6 @@ class PassiveFfcPlacement:
     y_mm: float
     rotation_deg: float
     layer: str = "B.Cu"
-    mouth_edge: str = "bottom"
     stiffener_insertion_mm: float = FFC_STIFFENER_INSERTION_MM
     first_bend_clearance_mm: float = FFC_FIRST_BEND_CLEARANCE_MM
     copper_to_edge_mm: float = BOARD_ACCESS_MARGIN_MM
@@ -168,8 +183,6 @@ class PassiveFfcPlacement:
             raise ValueError("passive FFC placement layer must be B.Cu")
         if self.rotation_deg not in (0.0, 90.0, 180.0, 270.0):
             raise ValueError("passive FFC placement rotation must be a quarter turn")
-        if self.mouth_edge not in {"top", "bottom", "left", "right"}:
-            raise ValueError("passive FFC mouth edge is invalid")
         if not all(
             math.isfinite(value)
             for value in (
@@ -191,32 +204,38 @@ class PassiveFfcPlacement:
 
     @property
     def mouth_direction(self) -> str:
+        x, y = self._transform_local_point(0.0, 1.0)
+        dx = x - self.x_mm
+        dy = y - self.y_mm
+        if abs(dx) > abs(dy):
+            return "east" if dx > 0 else "west"
+        return "south" if dy > 0 else "north"
+
+    @property
+    def mouth_edge(self) -> str:
         return {
-            "bottom": "south",
-            "top": "north",
-            "left": "west",
-            "right": "east",
-        }[self.mouth_edge]
+            "north": "top",
+            "south": "bottom",
+            "west": "left",
+            "east": "right",
+        }[self.mouth_direction]
+
+    def _transform_local_point(self, x: float, y: float) -> tuple[float, float]:
+        if self.layer == "B.Cu":
+            y = -y
+        angle = int(self.rotation_deg) % 360
+        if angle == 0:
+            tx, ty = x, y
+        elif angle == 90:
+            tx, ty = -y, x
+        elif angle == 180:
+            tx, ty = -x, -y
+        else:
+            tx, ty = y, -x
+        return self.x_mm + tx, self.y_mm + ty
 
     def _rotated_rect(self, rect: AxisAlignedRect) -> AxisAlignedRect:
-        angle = int(self.rotation_deg) % 360
-        points = (
-            (rect.min_x, rect.min_y),
-            (rect.min_x, rect.max_y),
-            (rect.max_x, rect.min_y),
-            (rect.max_x, rect.max_y),
-        )
-        transformed = []
-        for x, y in points:
-            if angle == 0:
-                tx, ty = x, y
-            elif angle == 90:
-                tx, ty = -y, x
-            elif angle == 180:
-                tx, ty = -x, -y
-            else:
-                tx, ty = y, -x
-            transformed.append((self.x_mm + tx, self.y_mm + ty))
+        transformed = [self._transform_local_point(x, y) for x, y in rect.corners()]
         xs = [point[0] for point in transformed]
         ys = [point[1] for point in transformed]
         return AxisAlignedRect(min(xs), min(ys), max(xs), max(ys))
@@ -233,33 +252,25 @@ class PassiveFfcPlacement:
         )
 
     def courtyard_envelope(self) -> AxisAlignedRect:
-        spec = interconnect_footprint_spec()
-        return self._rotated_rect(
-            AxisAlignedRect(
-                spec.fab_min_x - spec.courtyard_clearance_mm,
-                -0.875,
-                spec.fab_max_x + spec.courtyard_clearance_mm,
-                spec.fab_max_y + spec.courtyard_clearance_mm,
-            )
-        )
+        return self._rotated_rect(_passive_ffc_courtyard_local_rect())
 
     def access_envelope(self) -> AxisAlignedRect:
         courtyard = self.courtyard_envelope()
-        if self.mouth_edge == "bottom":
+        if self.mouth_direction == "north":
             return AxisAlignedRect(
                 courtyard.min_x,
                 max(BOARD_ACCESS_MARGIN_MM, courtyard.min_y - self.stiffener_insertion_mm),
                 courtyard.max_x,
                 courtyard.max_y,
             )
-        if self.mouth_edge == "top":
+        if self.mouth_direction == "south":
             return AxisAlignedRect(
                 courtyard.min_x,
                 courtyard.min_y,
                 courtyard.max_x,
                 min(BOARD_HEIGHT_MM - BOARD_ACCESS_MARGIN_MM, courtyard.max_y + self.stiffener_insertion_mm),
             )
-        if self.mouth_edge == "left":
+        if self.mouth_direction == "west":
             return AxisAlignedRect(
                 max(BOARD_ACCESS_MARGIN_MM, courtyard.min_x - self.stiffener_insertion_mm),
                 courtyard.min_y,
@@ -352,11 +363,117 @@ FROZEN_CONNECTOR_PLACEMENTS = (
     ConnectorPlacement("J6", 3, 282.5, 42.0, 180.0),
 )
 
+
+def _passive_ffc_courtyard_local_rect() -> AxisAlignedRect:
+    spec = interconnect_footprint_spec()
+    min_x = min(
+        [spec.fab_min_x]
+        + [pad.x - pad.width / 2 for pad in spec.pads]
+    ) - spec.courtyard_clearance_mm
+    max_x = max(
+        [spec.fab_max_x]
+        + [pad.x + pad.width / 2 for pad in spec.pads]
+    ) + spec.courtyard_clearance_mm
+    min_y = min(
+        [spec.fab_min_y]
+        + [pad.y - pad.height / 2 for pad in spec.pads]
+    ) - spec.courtyard_clearance_mm
+    max_y = max(
+        [spec.fab_max_y]
+        + [pad.y + pad.height / 2 for pad in spec.pads]
+    ) + spec.courtyard_clearance_mm
+    return AxisAlignedRect(min_x, min_y, max_x, max_y)
+
+
+def _top_edge_passive_ffc_candidates() -> tuple[PassiveFfcPlacement, ...]:
+    y = BOARD_ACCESS_MARGIN_MM + _passive_ffc_courtyard_local_rect().max_y
+    top_row = sorted(
+        (placement.x_mm for placement in socket_placement_plan() if placement.y_mm < 20.0)
+    )
+    between_keys = tuple(
+        (left + right) / 2
+        for left, right in zip(top_row, top_row[1:])
+        if right - left > 4.0
+    )
+    return tuple(PassiveFfcPlacement("J1", x, y, 0.0) for x in between_keys)
+
+
+def _frange(start: float, stop: float, step: float) -> tuple[float, ...]:
+    values = []
+    value = math.ceil(start / step) * step
+    while value <= stop + 1e-9:
+        values.append(round(value, 6))
+        value += step
+    return tuple(values)
+
+
+def _candidate_sweep_range(
+    sample_courtyard: AxisAlignedRect,
+    *,
+    axis: str,
+) -> tuple[float, ...]:
+    if axis == "x":
+        start = BOARD_ACCESS_MARGIN_MM - sample_courtyard.min_x
+        stop = BOARD_WIDTH_MM - BOARD_ACCESS_MARGIN_MM - sample_courtyard.max_x
+    else:
+        start = BOARD_ACCESS_MARGIN_MM - sample_courtyard.min_y
+        stop = BOARD_HEIGHT_MM - BOARD_ACCESS_MARGIN_MM - sample_courtyard.max_y
+    return _frange(start, stop, PASSIVE_FFC_SEARCH_GRID_MM)
+
+
+def _edge_candidate_fixed_coordinate(
+    sample_courtyard: AxisAlignedRect,
+    *,
+    edge: str,
+) -> float:
+    if edge == "top":
+        return BOARD_ACCESS_MARGIN_MM - sample_courtyard.min_y
+    if edge == "bottom":
+        return BOARD_HEIGHT_MM - BOARD_ACCESS_MARGIN_MM - sample_courtyard.max_y
+    if edge == "left":
+        return BOARD_ACCESS_MARGIN_MM - sample_courtyard.min_x
+    if edge == "right":
+        return BOARD_WIDTH_MM - BOARD_ACCESS_MARGIN_MM - sample_courtyard.max_x
+    raise ValueError(f"unsupported edge: {edge}")
+
+
+def _edge_passive_ffc_candidates() -> tuple[PassiveFfcPlacement, ...]:
+    rotations_by_edge = {
+        "top": 0.0,
+        "bottom": 180.0,
+        "left": 270.0,
+        "right": 90.0,
+    }
+    candidates = []
+    for edge, rotation in rotations_by_edge.items():
+        sample = PassiveFfcPlacement("J1", 0.0, 0.0, rotation).courtyard_envelope()
+        if edge in {"top", "bottom"}:
+            y = _edge_candidate_fixed_coordinate(sample, edge=edge)
+            for x in _candidate_sweep_range(sample, axis="x"):
+                candidates.append(PassiveFfcPlacement("J1", x, y, rotation))
+        else:
+            x = _edge_candidate_fixed_coordinate(sample, edge=edge)
+            for y in _candidate_sweep_range(sample, axis="y"):
+                candidates.append(PassiveFfcPlacement("J1", x, y, rotation))
+    return tuple(candidates)
+
+
+def _former_mcu_region_passive_ffc_candidates() -> tuple[PassiveFfcPlacement, ...]:
+    sample = PassiveFfcPlacement("J1", 0.0, 0.0, 180.0).courtyard_envelope()
+    y = _edge_candidate_fixed_coordinate(sample, edge="bottom")
+    start = max(60.0, BOARD_ACCESS_MARGIN_MM - sample.min_x)
+    stop = min(140.0, BOARD_WIDTH_MM - BOARD_ACCESS_MARGIN_MM - sample.max_x)
+    return tuple(
+        PassiveFfcPlacement("J1", x, y, 180.0)
+        for x in _frange(start, stop, PASSIVE_FFC_SEARCH_GRID_MM)
+    )
+
+
 PASSIVE_FFC_CANDIDATES = (
-    PassiveFfcPlacement("J1", 276.0, 7.0, 0.0, mouth_edge="bottom"),
-    PassiveFfcPlacement("J1", 276.0, 88.0, 180.0, mouth_edge="top"),
-    PassiveFfcPlacement("J1", 9.0, 48.0, 270.0, mouth_edge="left"),
-    PassiveFfcPlacement("J1", 276.0, 48.0, 90.0, mouth_edge="right"),
+    PassiveFfcPlacement("J1", 276.0, 7.0, 0.0),
+    PassiveFfcPlacement("J1", 276.0, 88.0, 180.0),
+    PassiveFfcPlacement("J1", 9.0, 48.0, 270.0),
+    PassiveFfcPlacement("J1", 276.0, 48.0, 90.0),
 )
 
 
@@ -405,6 +522,34 @@ def _board_access_rejection_reasons(envelope: AxisAlignedRect) -> tuple[str, ...
     if envelope.max_y > max_y:
         reasons.append("board_max_y")
     return tuple(reasons)
+
+
+def _geometry_for_rect(rect: AxisAlignedRect):
+    return box(rect.min_x, rect.min_y, rect.max_x, rect.max_y)
+
+
+@lru_cache(maxsize=1)
+def _socket_courtyard_geometries() -> tuple[tuple[str, object], ...]:
+    specs = {spec.name: spec for spec in build_footprint_specs()}
+    geometries = []
+    keys_by_id = {key.physical_key_id: key for key in physical_keys()}
+    for placement in socket_placement_plan():
+        key = keys_by_id[placement.physical_key_id]
+        footprint = _switch_footprint(key)
+        footprint_name = re.sub(r"^[^:]+:", "", footprint)
+        geometry = _courtyard_geometry(specs[footprint_name])
+        geometry = affinity.rotate(
+            geometry,
+            -placement.rotation_deg,
+            origin=(0, 0),
+        )
+        geometry = affinity.translate(
+            geometry,
+            xoff=placement.x_mm,
+            yoff=placement.y_mm,
+        )
+        geometries.append((placement.reference, geometry))
+    return tuple(geometries)
 
 
 def audit_legacy_connector_search(
@@ -468,20 +613,55 @@ def passive_connector_pad_nets() -> dict[str, str]:
     }
 
 
+def _default_passive_ffc_candidates() -> tuple[PassiveFfcPlacement, ...]:
+    candidates = [
+        PASSIVE_FFC_CANDIDATES[0],
+        *_top_edge_passive_ffc_candidates(),
+        *PASSIVE_FFC_CANDIDATES[1:],
+        *_edge_passive_ffc_candidates(),
+        *_former_mcu_region_passive_ffc_candidates(),
+    ]
+    deduplicated = []
+    seen = set()
+    for candidate in candidates:
+        key = (
+            candidate.reference,
+            round(candidate.x_mm, 6),
+            round(candidate.y_mm, 6),
+            round(candidate.rotation_deg, 6),
+            candidate.layer,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduplicated.append(candidate)
+    return tuple(deduplicated)
+
+
 def audit_passive_ffc_candidates(
-    candidates: tuple[PassiveFfcPlacement, ...] = PASSIVE_FFC_CANDIDATES,
+    candidates: tuple[PassiveFfcPlacement, ...] | None = None,
 ) -> tuple[PassiveFfcCandidateAudit, ...]:
+    candidates = _default_passive_ffc_candidates() if candidates is None else candidates
     audits = []
+    socket_courtyards = _socket_courtyard_geometries()
     for candidate in candidates:
         reasons = []
+        candidate_courtyard = candidate.courtyard_envelope()
+        candidate_courtyard_geometry = _geometry_for_rect(candidate_courtyard)
+        candidate_access_geometry = _geometry_for_rect(candidate.access_envelope())
         if candidate.courtyard_envelope().distance_to(candidate.access_envelope()) > 0:
             reasons.append("access_envelope_detached")
         for label, envelope in (
             ("body", candidate.body_envelope()),
-            ("courtyard", candidate.courtyard_envelope()),
+            ("courtyard", candidate_courtyard),
             ("access", candidate.access_envelope()),
         ):
             reasons.extend(f"{label}_{reason}" for reason in _board_access_rejection_reasons(envelope))
+        for reference, socket_courtyard in socket_courtyards:
+            if candidate_courtyard_geometry.intersects(socket_courtyard):
+                reasons.append(f"courtyard_collision_{reference}")
+            if candidate_access_geometry.intersects(socket_courtyard):
+                reasons.append(f"access_collision_{reference}")
         if candidate.copper_to_edge_mm < BOARD_ACCESS_MARGIN_MM:
             reasons.append("copper_to_edge")
         if candidate.first_bend_clearance_mm < candidate.stiffener_insertion_mm:
