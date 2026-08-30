@@ -1156,11 +1156,25 @@ def sync_debug_connectors(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Guarded LH60 debug connector PCB sync helper.")
+    parser = argparse.ArgumentParser(description="Guarded LH60 passive FFC PCB sync helper.")
     mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--capture-baseline", action="store_true")
     mode.add_argument("--apply", action="store_true")
     parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--candidate-dir", type=Path)
+    parser.add_argument("--existing-candidate", action="store_true")
+    parser.add_argument(
+        "--phase",
+        choices=("live-sync", "closed-pose", "live-verify"),
+        help="Passive candidate phase. --dry-run without --phase aliases to live-sync.",
+    )
+    parser.add_argument(
+        "--prior-report",
+        type=Path,
+        help="Evidence JSON from the previous passive candidate phase.",
+    )
+    parser.add_argument("--approval", type=Path)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--schematic", type=Path, default=SCHEMATIC)
     parser.add_argument("--board", type=Path, default=BOARD)
@@ -1171,13 +1185,62 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=Path.home() / ".config/konnect/config.toml",
     )
     args = parser.parse_args(argv)
-    if args.apply and args.baseline is None:
-        parser.error("--apply requires --baseline")
+    if args.apply and args.baseline is None and args.approval is None:
+        parser.error("--apply requires --approval for passive production mutation")
     return args
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.dry_run:
+        from tools.passive_pcb_sync import (
+            default_candidate_dir,
+            run_closed_pose_phase,
+            run_live_sync_phase,
+            run_live_verify_phase,
+        )
+
+        candidate_dir = args.candidate_dir or default_candidate_dir()
+        phase = args.phase or "live-sync"
+        with McpClient(args.konnect, args.config) as client:
+            if phase == "live-sync":
+                result = run_live_sync_phase(
+                    client,
+                    candidate_dir=candidate_dir,
+                    report=args.report,
+                    schematic=args.schematic,
+                    board=args.board,
+                    use_existing_candidate=args.existing_candidate,
+                )
+            elif phase == "closed-pose":
+                if args.prior_report is None:
+                    raise RuntimeError("--phase closed-pose requires --prior-report")
+                result = run_closed_pose_phase(
+                    client,
+                    candidate_dir=candidate_dir,
+                    report=args.report,
+                    prior_report=args.prior_report,
+                    schematic=args.schematic,
+                    board=args.board,
+                )
+            else:
+                if args.prior_report is None:
+                    raise RuntimeError("--phase live-verify requires --prior-report")
+                result = run_live_verify_phase(
+                    client,
+                    candidate_dir=candidate_dir,
+                    report=args.report,
+                    prior_report=args.prior_report,
+                    schematic=args.schematic,
+                    board=args.board,
+                    kicad_cli=args.konnect.parent / "kicad-cli",
+                )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return
+    if args.apply:
+        from tools.passive_pcb_sync import apply_production_requires_approval
+
+        apply_production_requires_approval(args.approval)
     with McpClient(args.konnect, args.config) as client:
         if args.capture_baseline:
             result = capture_baseline(client, args.schematic, args.board)

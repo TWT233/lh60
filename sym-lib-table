@@ -2,4 +2,5 @@
   (version 7)
 
   (lib (name "lh60-mcu") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-mcu/lh60-mcu.kicad_sym") (options "") (descr ""))
-  (lib (name "lh60-core") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-core/lh60-core.kicad_sym") (options "") (descr "")))
+  (lib (name "lh60-core") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-core/lh60-core.kicad_sym") (options "") (descr ""))
+  (lib (name "lh60-interconnect") (type "KiCad") (uri "${KIPRJMOD}/lib/lh60-interconnect/lh60-interconnect.kicad_sym") (options "") (descr "")))
